@@ -95,64 +95,156 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
   // Attendance metrics
   const totalPresent = filteredAttendance.filter(a => a.status === 'present' || a.status === 'late').length;
   const totalAttRecords = filteredAttendance.length;
-  const attendanceRate = totalAttRecords > 0 ? Math.round((totalPresent / totalAttRecords) * 100) : 94;
+  const attendanceRate = totalAttRecords > 0 ? Math.round((totalPresent / totalAttRecords) * 100) : 0;
 
   // Academic Pass Rates
   const totalAssessments = filteredAssessments.length;
   const passedAssessments = filteredAssessments.filter(a => a.final_score >= 60).length;
-  const overallPassRate = totalAssessments > 0 ? Math.round((passedAssessments / totalAssessments) * 100) : 92;
+  const overallPassRate = totalAssessments > 0 ? Math.round((passedAssessments / totalAssessments) * 100) : 0;
 
   const distinctions = filteredAssessments.filter(a => a.final_score >= 85).length;
   const credits = filteredAssessments.filter(a => a.final_score >= 75 && a.final_score < 85).length;
   const passes = filteredAssessments.filter(a => a.final_score >= 60 && a.final_score < 75).length;
 
-  // Dynamic Growth Data depending on GrowthPeriod
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthIdx = now.getMonth();
+
+  // Helper to extract intake date from student or enrollment
+  const getStudentIntakeDate = (studentId: string, createdAt?: string): Date => {
+    const enrollment = enrollments.find(e => e.student_id === studentId);
+    if (enrollment?.enrolled_at) {
+      const d = new Date(enrollment.enrolled_at);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (enrollment?.cohort_id) {
+      const cohort = cohorts.find(c => c.id === enrollment.cohort_id);
+      if (cohort?.start_date) {
+        const d = new Date(cohort.start_date);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    if (createdAt) {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  };
+
+  // Dynamic Growth Data computed directly from REAL database records
   const getGrowthData = () => {
     switch (growthPeriod) {
-      case 'monthly':
-        return [
-          { label: 'Jan', newTrainees: 8, totalNetwork: 48, rate: '+12%' },
-          { label: 'Feb', newTrainees: 12, totalNetwork: 60, rate: '+15%' },
-          { label: 'Mar', newTrainees: 14, totalNetwork: 74, rate: '+18%' },
-          { label: 'Apr', newTrainees: 10, totalNetwork: 84, rate: '+10%' },
-          { label: 'May', newTrainees: 15, totalNetwork: 99, rate: '+20%' },
-          { label: 'Jun', newTrainees: 11, totalNetwork: 110, rate: '+12%' },
-          { label: 'Jul', newTrainees: 13, totalNetwork: 123, rate: '+14%' },
-          { label: 'Aug', newTrainees: 10, totalNetwork: 133, rate: '+10%', isCurrent: true },
-          { label: 'Sep', newTrainees: 12, totalNetwork: 145, rate: '+16%', isProjected: true },
-          { label: 'Oct', newTrainees: 15, totalNetwork: 160, rate: '+18%', isProjected: true },
-          { label: 'Nov', newTrainees: 14, totalNetwork: 174, rate: '+15%', isProjected: true },
-          { label: 'Dec', newTrainees: 16, totalNetwork: 190, rate: '+22%', isProjected: true },
+      case 'monthly': {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        let runningTotal = filteredAlumni.filter(a => (a.graduation_year || 2025) < currentYear).length;
+
+        return months.map((monthName, idx) => {
+          const newTraineesCount = filteredStudents.filter(s => {
+            const intakeDate = getStudentIntakeDate(s.id, s.created_at);
+            return intakeDate.getFullYear() === currentYear && intakeDate.getMonth() === idx;
+          }).length;
+
+          runningTotal += newTraineesCount;
+          const isCurrent = idx === currentMonthIdx;
+          const isProjected = idx > currentMonthIdx;
+
+          return {
+            label: monthName,
+            newTrainees: newTraineesCount,
+            totalNetwork: runningTotal,
+            rate: newTraineesCount > 0 ? `+${newTraineesCount}` : '0',
+            isCurrent,
+            isProjected,
+          };
+        });
+      }
+
+      case 'quarterly': {
+        const quarters = [
+          { label: 'Q1 (Jan-Mar)', months: [0, 1, 2] },
+          { label: 'Q2 (Apr-Jun)', months: [3, 4, 5] },
+          { label: 'Q3 (Jul-Sep)', months: [6, 7, 8] },
+          { label: 'Q4 (Oct-Dec)', months: [9, 10, 11] },
         ];
-      case 'quarterly':
-        return [
-          { label: 'Q1 (Jan-Mar)', newTrainees: 34, totalNetwork: 74, rate: '+24%' },
-          { label: 'Q2 (Apr-Jun)', newTrainees: 36, totalNetwork: 110, rate: '+28%' },
-          { label: 'Q3 (Jul-Sep)', newTrainees: 35, totalNetwork: 145, rate: '+32%', isCurrent: true },
-          { label: 'Q4 (Oct-Dec)', newTrainees: 45, totalNetwork: 190, rate: '+38%', isProjected: true },
-        ];
-      case 'yearly':
-        return [
-          { label: '2024 (Inaugural)', newTrainees: 45, totalNetwork: 45, rate: 'Base Year' },
-          { label: '2025 (Regional Expansion)', newTrainees: 85, totalNetwork: 130, rate: '+88.8%' },
-          { label: '2026 (Current Academic Year)', newTrainees: 145, totalNetwork: 275, rate: '+111.5%', isCurrent: true },
-          { label: '2027 (Projected Capacity)', newTrainees: 220, totalNetwork: 495, rate: '+80.0%', isProjected: true },
-        ];
+        let runningTotal = filteredAlumni.filter(a => (a.graduation_year || 2025) < currentYear).length;
+        const currentQIdx = Math.floor(currentMonthIdx / 3);
+
+        return quarters.map((q, qIdx) => {
+          const newTraineesCount = filteredStudents.filter(s => {
+            const intakeDate = getStudentIntakeDate(s.id, s.created_at);
+            return intakeDate.getFullYear() === currentYear && q.months.includes(intakeDate.getMonth());
+          }).length;
+
+          runningTotal += newTraineesCount;
+          const isCurrent = qIdx === currentQIdx;
+          const isProjected = qIdx > currentQIdx;
+
+          return {
+            label: q.label,
+            newTrainees: newTraineesCount,
+            totalNetwork: runningTotal,
+            rate: newTraineesCount > 0 ? `+${newTraineesCount}` : '0',
+            isCurrent,
+            isProjected,
+          };
+        });
+      }
+
+      case 'yearly': {
+        const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+        let runningTotal = 0;
+
+        return years.map(yr => {
+          const isCurrent = yr === currentYear;
+          const isProjected = yr > currentYear;
+
+          const alumniInYr = filteredAlumni.filter(a => a.graduation_year === yr).length;
+          const studentsInYr = yr === currentYear
+            ? filteredStudents.length
+            : filteredStudents.filter(s => {
+                const intakeDate = getStudentIntakeDate(s.id, s.created_at);
+                return intakeDate.getFullYear() === yr;
+              }).length;
+
+          const totalForYr = alumniInYr + studentsInYr;
+          runningTotal += totalForYr;
+
+          return {
+            label: isCurrent ? `${yr} (Active Year)` : isProjected ? `${yr} (Projected)` : `${yr}`,
+            newTrainees: totalForYr,
+            totalNetwork: runningTotal,
+            rate: totalForYr > 0 ? `+${totalForYr}` : '0',
+            isCurrent,
+            isProjected,
+          };
+        });
+      }
     }
   };
 
   const growthSeries = getGrowthData();
-  const maxNewTrainees = Math.max(...growthSeries.map(d => d.newTrainees));
+  const realMaxTrainees = Math.max(...growthSeries.map(d => d.newTrainees));
+  const maxNewTrainees = realMaxTrainees > 0 ? realMaxTrainees : 1;
 
-  // Dynamic Real-Time Calculations from Live Database
-  const currentYear = 2026;
-  const lastYear = 2025;
-  const alumniLastYear = alumni.filter(a => a.graduation_year === lastYear).length || 45;
-  const currentYearTotal = alumni.filter(a => a.graduation_year === currentYear).length + students.length;
-  const yoyGrowthPercent = alumniLastYear > 0
-    ? (((currentYearTotal - alumniLastYear) / alumniLastYear) * 100).toFixed(1)
-    : '42.8';
-  const yoySign = parseFloat(yoyGrowthPercent) >= 0 ? '+' : '';
+  // Real-Time Calculations from Live Database
+  const lastYear = currentYear - 1;
+  const alumniLastYear = filteredAlumni.filter(a => a.graduation_year === lastYear).length;
+  const currentYearTotal = filteredAlumni.filter(a => a.graduation_year === currentYear).length + filteredStudents.length;
+
+  let yoyGrowthDisplay = '0.0% YoY';
+  let yoySubtitle = `${currentYearTotal} in ${currentYear} vs ${alumniLastYear} in ${lastYear}`;
+  if (alumniLastYear > 0) {
+    const diff = currentYearTotal - alumniLastYear;
+    const pct = ((diff / alumniLastYear) * 100).toFixed(1);
+    const sign = diff >= 0 ? '+' : '';
+    yoyGrowthDisplay = `${sign}${pct}% YoY`;
+  } else if (currentYearTotal > 0) {
+    yoyGrowthDisplay = `+${currentYearTotal} New YoY`;
+    yoySubtitle = `${currentYearTotal} Trainees in ${currentYear} (Initial Intake)`;
+  } else {
+    yoyGrowthDisplay = '0.0% YoY';
+    yoySubtitle = `0 in ${currentYear} vs 0 in ${lastYear}`;
+  }
 
   const totalEnrolled = enrollments.length;
   const activeOrGraduated = enrollments.filter(e => e.status !== 'dropped').length;
@@ -230,13 +322,19 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{filteredStudents.length}</span>
-            <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
-              <ArrowUpRight size={14} /> +10 New (Cohort 12)
+            <span style={{ fontSize: '0.75rem', color: filteredStudents.length > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+              {filteredStudents.length > 0 ? (
+                <>
+                  <ArrowUpRight size={14} /> {filteredCohorts.length > 0 ? `${filteredCohorts.length} Active ${filteredCohorts.length === 1 ? 'Cohort' : 'Cohorts'}` : 'New Intake'}
+                </>
+              ) : (
+                'Awaiting Admissions'
+              )}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px' }}>
-            <span>KYC Verified: 100%</span>
-            <span>Intake 12: Active</span>
+            <span>KYC Verified: {filteredStudents.length > 0 ? `${Math.round((filteredStudents.filter(s => s.kyc_verified).length / filteredStudents.length) * 100)}%` : '0%'}</span>
+            <span>Intakes: {filteredCohorts.length} Cohorts</span>
           </div>
         </div>
 
@@ -254,7 +352,7 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px' }}>
             <span>Total Staff: {totalStaffCount}</span>
-            <span style={{ color: '#10B981', fontWeight: 600 }}>Active Today: {staffClockedInToday || teachersCount}</span>
+            <span style={{ color: staffClockedInToday > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: 600 }}>Active Today: {staffClockedInToday}</span>
           </div>
         </div>
 
@@ -285,7 +383,9 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10B981' }}>{overallPassRate}%</span>
+            <span style={{ fontSize: '1.8rem', fontWeight: 800, color: totalAssessments > 0 ? '#10B981' : 'var(--text-muted)' }}>
+              {totalAssessments > 0 ? `${overallPassRate}%` : 'N/A'}
+            </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--crema-gold)', fontWeight: 700 }}>SCA Standard</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px' }}>
@@ -364,7 +464,9 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
               +{filteredStudents.length} Trainees
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700 }}>100% Onboarded</div>
+            <div style={{ fontSize: '0.7rem', color: filteredStudents.length > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: 700 }}>
+              {filteredStudents.length > 0 ? `${filteredStudents.filter(s => s.kyc_verified).length} KYC Verified` : '0 Active Registrations'}
+            </div>
           </div>
 
           <div
@@ -384,7 +486,7 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
               <span style={{ fontSize: '0.68rem', color: 'var(--crema-gold)', fontWeight: 700 }}>View List &rarr;</span>
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--primary-accent)', marginTop: '2px' }}>
-              {filteredAlumni.length + filteredStudents.length} Certified
+              {filteredAlumni.length + filteredStudents.length} Registered
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               {filteredAlumni.length} Alumni + {filteredStudents.length} Active Trainees
@@ -394,20 +496,24 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
           <div style={{ background: 'var(--bg-surface-elevated)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Year-over-Year Growth</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#10B981', marginTop: '2px' }}>
-              {yoySign}{yoyGrowthPercent}% YoY
+              {yoyGrowthDisplay}
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700 }}>
-              {currentYearTotal} in {currentYear} vs {alumniLastYear} in {lastYear}
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              {yoySubtitle}
             </div>
           </div>
 
           <div style={{ background: 'var(--bg-surface-elevated)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Program Retention Rate</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--crema-gold)', marginTop: '2px' }}>
-              {liveRetentionRate}%
+              {totalEnrolled > 0 ? `${liveRetentionRate}%` : '100%'}
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              {droppedCount === 0 ? 'Zero Dropouts (100% On Track)' : `${droppedCount} Dropped`}
+              {totalEnrolled === 0
+                ? 'Zero Dropouts (Fresh Session)'
+                : droppedCount === 0
+                ? 'Zero Dropouts (100% On Track)'
+                : `${droppedCount} Dropped (${totalEnrolled - droppedCount} Active)`}
             </div>
           </div>
         </div>
@@ -415,33 +521,38 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
         {/* Digital Growth Bar & Area Chart Visualization */}
         <div style={{ height: '240px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '14px', paddingBottom: '16px', borderBottom: '1px solid var(--border-subtle)' }}>
           {growthSeries.map((item) => {
-            const heightPercent = Math.round((item.newTrainees / maxNewTrainees) * 100);
+            const hasData = item.newTrainees > 0;
+            const heightPercent = realMaxTrainees > 0
+              ? Math.max(10, Math.round((item.newTrainees / realMaxTrainees) * 100))
+              : 0;
 
             return (
               <div key={item.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '8px' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: item.isCurrent ? '#2563EB' : 'var(--text-muted)' }}>
-                  +{item.newTrainees}
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: hasData ? (item.isCurrent ? '#2563EB' : 'var(--text-primary)') : 'var(--text-muted)' }}>
+                  {hasData ? `+${item.newTrainees}` : '0'}
                 </div>
 
                 <div
                   style={{
                     width: '100%',
                     maxWidth: '42px',
-                    height: `${Math.max(heightPercent, 14)}%`,
-                    borderRadius: '8px 8px 0 0',
-                    background: item.isCurrent
-                      ? 'linear-gradient(180deg, #2563EB 0%, #60A5FA 100%)'
-                      : item.isProjected
-                      ? 'repeating-linear-gradient(45deg, rgba(37,99,235,0.2), rgba(37,99,235,0.2) 6px, rgba(37,99,235,0.3) 6px, rgba(37,99,235,0.3) 12px)'
-                      : 'linear-gradient(180deg, rgba(37, 99, 235, 0.4) 0%, rgba(37, 99, 235, 0.15) 100%)',
-                    boxShadow: item.isCurrent ? '0 6px 16px rgba(37, 99, 235, 0.35)' : 'none',
+                    height: hasData ? `${heightPercent}%` : '4px',
+                    borderRadius: hasData ? '8px 8px 0 0' : '2px',
+                    background: hasData
+                      ? (item.isCurrent
+                          ? 'linear-gradient(180deg, #2563EB 0%, #60A5FA 100%)'
+                          : item.isProjected
+                          ? 'repeating-linear-gradient(45deg, rgba(37,99,235,0.2), rgba(37,99,235,0.2) 6px, rgba(37,99,235,0.3) 6px, rgba(37,99,235,0.3) 12px)'
+                          : 'linear-gradient(180deg, rgba(37, 99, 235, 0.4) 0%, rgba(37, 99, 235, 0.15) 100%)')
+                      : (item.isCurrent ? 'rgba(37, 99, 235, 0.5)' : 'var(--bg-surface-elevated)'),
+                    boxShadow: (hasData && item.isCurrent) ? '0 6px 16px rgba(37, 99, 235, 0.35)' : 'none',
                     transition: 'all 0.3s ease',
                     cursor: 'pointer',
                   }}
-                  title={`${item.label}: +${item.newTrainees} New Trainees (Total Network: ${item.totalNetwork})`}
+                  title={`${item.label}: ${item.newTrainees} Trainees (Total Network: ${item.totalNetwork})`}
                 />
 
-                <div style={{ fontSize: '0.74rem', color: item.isCurrent ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: item.isCurrent ? 800 : 500, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '0.74rem', color: item.isCurrent ? '#2563EB' : 'var(--text-muted)', fontWeight: item.isCurrent ? 800 : 500, textAlign: 'center', whiteSpace: 'nowrap' }}>
                   {item.label}
                 </div>
               </div>
@@ -454,20 +565,20 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#2563EB' }} />
-              <span>Current Active Cohort (+10 Enrollees)</span>
+              <span>Current Month ({filteredStudents.filter(s => getStudentIntakeDate(s.id, s.created_at).getMonth() === currentMonthIdx).length} Enrolled)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(37, 99, 235, 0.3)' }} />
-              <span>Historical Intakes</span>
+              <span>Admitted Intakes</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '12px', height: '12px', borderRadius: '3px', border: '1px dashed #2563EB', background: 'transparent' }} />
-              <span>Projected Admissions</span>
+              <span>Future Intakes</span>
             </div>
           </div>
 
           <span style={{ fontWeight: 600, color: 'var(--crema-gold)' }}>
-            Growth Target: 200 Annual Certified Graduates
+            Network Capacity: {filteredCohorts.reduce((sum, c) => sum + (c.max_capacity || 16), 0)} Trainees Across {filteredCohorts.length} Batches
           </span>
         </div>
       </div>

@@ -200,12 +200,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         idx + 1,
         p?.full_name || 'Trainee',
         p?.reg_number || 'N/A',
-        crs?.title || 'Barista Skills',
-        coh?.name || 'Cohort 12',
-        (inv?.total_fee || 35000).toLocaleString(),
-        (inv?.amount_paid || 35000).toLocaleString(),
+        crs?.title || 'General Course',
+        coh?.name || 'General Intake',
+        (inv?.total_fee || 0).toLocaleString(),
+        (inv?.amount_paid || 0).toLocaleString(),
         (inv?.balance_due || 0).toLocaleString(),
-        inv?.status?.toUpperCase() || 'PAID',
+        inv?.status?.toUpperCase() || (inv ? 'UNPAID' : 'NO INVOICE'),
         s.kyc_verified ? 'VERIFIED' : 'PENDING',
         p?.phone || 'N/A',
         p?.email || 'N/A',
@@ -302,7 +302,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         att.session_date,
         p?.full_name || 'Trainee',
         p?.reg_number || 'N/A',
-        coh?.name || 'Cohort 12',
+        coh?.name || 'General Intake',
         att.session_title || 'Class Session',
         att.status.toUpperCase(),
       ];
@@ -626,7 +626,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{branches.length} Campuses</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Nairobi • Mombasa • Kigali
+                {branches.map(b => b.city).filter(Boolean).slice(0, 4).join(' • ') || 'Active Campuses'}
               </div>
             </div>
 
@@ -652,7 +652,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 KES {totalDue.toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                2 partial clearance invoices
+                {invoices.filter(i => (i.balance_due || 0) > 0).length} pending clearance invoices
               </div>
             </div>
 
@@ -665,7 +665,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 {filteredStudents.length}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                100% KYC verified & Reg No assigned
+                {filteredStudents.length > 0
+                  ? `${Math.round((filteredStudents.filter(s => s.kyc_verified).length / filteredStudents.length) * 100)}% KYC verified & Reg No assigned`
+                  : 'Awaiting Student Admissions'}
               </div>
             </div>
           </div>
