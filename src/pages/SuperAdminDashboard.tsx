@@ -205,9 +205,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Trainee_Roster', headers, rows);
+      exportToCSV('Tripple_T_Trainee_Roster', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Trainee_Roster', 'Trainees & KYC Directory', 'Official Registry', headers, rows);
+      exportToPDFReport('Tripple_T_Trainee_Roster', 'Trainees & KYC Directory', 'Official Registry', headers, rows);
     }
   };
 
@@ -231,9 +231,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Grades_Ledger', headers, rows);
+      exportToCSV('Tripple_T_Grades_Ledger', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Grades_Ledger', 'Exam & Marks Ledger', 'Continuous Assessment Scores', headers, rows);
+      exportToPDFReport('Tripple_T_Grades_Ledger', 'Exam & Marks Ledger', 'Continuous Assessment Scores', headers, rows);
     }
   };
 
@@ -255,9 +255,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Tuition_Invoices', headers, rows);
+      exportToCSV('Tripple_T_Tuition_Invoices', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Tuition_Invoices', 'Tuition & Fee Invoices', 'Institutional Financial Ledger', headers, rows);
+      exportToPDFReport('Tripple_T_Tuition_Invoices', 'Tuition & Fee Invoices', 'Institutional Financial Ledger', headers, rows);
     }
   };
 
@@ -278,9 +278,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Mpesa_Payments', headers, rows);
+      exportToCSV('Tripple_T_Mpesa_Payments', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Mpesa_Payments', 'M-Pesa Collections & Receipts', 'Verified Transaction Ledger', headers, rows);
+      exportToPDFReport('Tripple_T_Mpesa_Payments', 'M-Pesa Collections & Receipts', 'Verified Transaction Ledger', headers, rows);
     }
   };
 
@@ -301,9 +301,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Attendance_RollCall', headers, rows);
+      exportToCSV('Tripple_T_Attendance_RollCall', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Attendance_RollCall', 'Lab & Class Attendance', 'Daily Session Roll-Call', headers, rows);
+      exportToPDFReport('Tripple_T_Attendance_RollCall', 'Lab & Class Attendance', 'Daily Session Roll-Call', headers, rows);
     }
   };
 
@@ -314,7 +314,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       return [
         staff.full_name,
         staff.role.replace('_', ' ').toUpperCase(),
-        sBranch?.name || 'Nairobi Campus',
+        sBranch?.name || 'Aurevia Coffee Institute',
         staff.phone || 'N/A',
         staff.email,
         staff.is_active ? 'ACTIVE' : 'INACTIVE',
@@ -322,9 +322,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Faculty_Staff', headers, rows);
+      exportToCSV('Tripple_T_Faculty_Staff', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Faculty_Staff', 'Faculty & Staff Directory', 'Institutional Personnel', headers, rows);
+      exportToPDFReport('Tripple_T_Faculty_Staff', 'Faculty & Staff Directory', 'Institutional Personnel', headers, rows);
     }
   };
 
@@ -341,14 +341,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         `${alm.job_title} @ ${alm.current_employer}`,
         alm.employment_status,
         alm.certificate_serial_no,
-        b?.name || 'Nairobi Campus',
+        b?.name || 'Aurevia Coffee Institute',
       ];
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Certified_Alumni', headers, rows);
+      exportToCSV('Tripple_T_Certified_Alumni', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Certified_Alumni', 'Certified Alumni & Career Placements', 'Official Graduate Registry', headers, rows);
+      exportToPDFReport('Tripple_T_Certified_Alumni', 'Certified Alumni & Career Placements', 'Official Graduate Registry', headers, rows);
     }
   };
 
@@ -364,9 +364,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     ]);
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Academic_Curriculum', headers, rows);
+      exportToCSV('Tripple_T_Academic_Curriculum', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Academic_Curriculum', 'Academic Courses & Curriculum', 'Institutional Syllabus', headers, rows);
+      exportToPDFReport('Tripple_T_Academic_Curriculum', 'Academic Courses & Curriculum', 'Institutional Syllabus', headers, rows);
     }
   };
 
@@ -386,9 +386,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Intake_Cohorts', headers, rows);
+      exportToCSV('Tripple_T_Intake_Cohorts', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Intake_Cohorts', 'Intake Cohorts & Batches', 'Class Schedules', headers, rows);
+      exportToPDFReport('Tripple_T_Intake_Cohorts', 'Intake Cohorts & Batches', 'Class Schedules', headers, rows);
     }
   };
 
@@ -419,9 +419,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     });
 
     if (format === 'csv') {
-      exportToCSV('Aurevia_Campuses_Directory', headers, rows);
+      exportToCSV('Tripple_T_Campuses_Directory', headers, rows);
     } else {
-      exportToPDFReport('Aurevia_Campuses_Directory', 'Multi-Campus Hubs Directory & Financial Summary', 'Global Network Operations', headers, rows);
+      exportToPDFReport('Tripple_T_Campuses_Directory', 'Multi-Campus Hubs Directory & Financial Summary', 'Global Network Operations', headers, rows);
     }
   };
 
@@ -1809,7 +1809,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <span>Faculty & Staff Statutory Leave Entitlements</span>
                 </h3>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                  Statutory 21-day annual leave balances and usage across all Aurevia Academy campuses
+                  Statutory 21-day annual leave balances and usage across all Tripple T campuses
                 </p>
               </div>
               <button
@@ -1980,7 +1980,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                             <div style={{ fontWeight: 600, fontSize: '0.84rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{staff?.full_name || 'Staff Member'}</div>
                             <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{staff?.role.replace('_', ' ').toUpperCase()}</div>
                           </td>
-                          <td style={{ fontSize: '0.80rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sBranch?.name || 'Aurevia'}</td>
+                          <td style={{ fontSize: '0.80rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sBranch?.name || 'Aurevia Coffee Institute'}</td>
                           <td>
                             <span
                               style={{
@@ -2289,7 +2289,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     className="form-input"
                     value={newBranchName}
                     onChange={(e) => setNewBranchName(e.target.value)}
-                    placeholder="e.g. Aurevia Eldoret Roastery"
+                    placeholder="e.g. Tripple T Eldoret Campus"
                     required
                   />
                 </div>

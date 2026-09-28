@@ -51,12 +51,12 @@ export const PublicReceiptView: React.FC<{ receiptRef: string; onBack?: () => vo
 
   const branch = branches.find((b) => b.id === payment.branch_id) || branches[0] || {
     id: 'b1',
-    name: 'Aurevia Nairobi Roastery & Academy',
+    name: 'Aurevia Coffee Institute',
     code: 'NBO',
     city: 'Nairobi',
     country: 'Kenya',
     phone: '+254 711 234 567',
-    email: 'nairobi@aurevia.ac.ke',
+    email: 'info@aureviacoffeeinstitute.co.ke',
     is_active: true,
     created_at: '',
   };
@@ -79,8 +79,8 @@ export const PublicReceiptView: React.FC<{ receiptRef: string; onBack?: () => vo
               <Coffee size={22} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>Aurevia Institute of Coffee</h2>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Specialty Coffee Academy • Official Verification</div>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>Tripple T</h2>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{branch.name || 'Aurevia Coffee Institute'} • Official Verification</div>
             </div>
           </div>
           <span className="badge badge-paid" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', fontSize: '0.76rem' }}>

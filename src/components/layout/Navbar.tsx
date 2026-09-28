@@ -93,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSqlModal }) => {
                 }}
                 className="gold-gradient-text"
               >
-                AUREVIA
+                TRIPPLE T
               </span>
               <span
                 style={{
@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSqlModal }) => {
                   textTransform: 'uppercase',
                 }}
               >
-                Coffee Academy
+                Systems
               </span>
             </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>

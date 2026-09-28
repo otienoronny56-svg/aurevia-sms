@@ -116,8 +116,8 @@ const DashboardRouter: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Coffee size={14} color="var(--crema-gold)" />
-            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Aurevia Institute of Coffee</span>
-            <span>• Multi-Branch Management</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Tripple T</span>
+            <span>• Institutional Multi-Branch Management</span>
           </div>
 
           <div style={{ display: 'flex', gap: '14px' }}>

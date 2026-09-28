@@ -728,7 +728,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdInvoice = { ...invData, branch_id: params.branchId };
 
       // 5. Insert SMS log
-      const smsMsg = `Welcome to Aurevia Institute of Coffee! Reg No: ${regNumber}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Campus: ${branch.name}.`;
+      const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
       try {
         await supabase.from('aur_sms_logs').insert({
           recipient_phone: params.phone,
@@ -807,7 +807,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInvoices((prev) => [...prev, createdInvoice]);
 
     // Send SMS and register in communication ledger
-    const admissionMsg = `Welcome to Aurevia Institute of Coffee! Reg No: ${regNumber}. Invoice: ${createdInvoice.invoice_number} (KES ${feeAmount.toLocaleString()}).`;
+    const admissionMsg = `Welcome to ${branch?.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Invoice: ${createdInvoice.invoice_number} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
     const smsLog = await sendInstitutionalSMS({
       recipientPhone: params.phone,
       recipientName: params.fullName,
@@ -830,13 +830,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         regNumber,
         courseTitle: courseObj?.title || 'Specialty Coffee Barista Course',
         cohortName: cohortObj?.name || 'Upcoming Cohort',
-        branchName: branchObj?.name || 'Aurevia Nairobi Roastery & Academy',
+        branchName: branchObj?.name || 'Aurevia Coffee Institute',
         scheduleTiming: cohortObj?.schedule_timing,
       });
 
       sendResendEmail({
         to: params.email,
-        subject: `Welcome to Aurevia Specialty Coffee Academy - Reg: ${regNumber}`,
+        subject: `Welcome to ${branchObj?.name || 'Aurevia Coffee Institute'} - Reg: ${regNumber}`,
         html: welcomeHtml,
       }).then((res) => {
         setSmsLogs((prev) => [
@@ -1141,7 +1141,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Send SMS receipt and register in communications hub
     const student = students.find((s) => s.id === invoice.student_id);
     const studentProfile = profiles.find((p) => p.id === student?.profile_id);
-    const receiptMsg = `Confirmed KES ${params.amount.toLocaleString()} received for Invoice ${invoice.invoice_number}. M-Pesa Ref: ${receiptNumber}. Aurevia Institute of Coffee.`;
+    const branchObj = branches.find((b) => b.id === invoice.branch_id);
+    const receiptMsg = `Confirmed KES ${params.amount.toLocaleString()} received for Invoice ${invoice.invoice_number}. M-Pesa Ref: ${receiptNumber}. ${branchObj?.name || 'Aurevia Coffee Institute'} (Tripple T).`;
     const smsLog = await sendInstitutionalSMS({
       recipientPhone: params.phone,
       recipientName: studentProfile?.full_name || 'Student',
@@ -1184,7 +1185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       sendResendEmail({
         to: studentProfile.email,
-        subject: `Payment Receipt: KES ${params.amount.toLocaleString()} - Aurevia Coffee Academy`,
+        subject: `Payment Receipt: KES ${params.amount.toLocaleString()} - ${branchObj?.name || 'Aurevia Coffee Institute'}`,
         html: emailHtml,
       }).then((res) => {
         setSmsLogs((prev) => [
@@ -1882,7 +1883,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (params.channel === 'email' || params.channel === 'dual') {
       const emailRecipients = params.recipients.filter((r) => r.email && r.email.includes('@'));
       emailRecipients.forEach(async (rec) => {
-        const emailSubject = params.subject || 'Official Notification - Aurevia Specialty Coffee Academy';
+        const emailSubject = params.subject || 'Official Notification - Tripple T Systems';
         const renderedText = rec.messageContent || params.messageContent;
         const html = generateBroadcastEmailHtml({
           recipientName: rec.name,
