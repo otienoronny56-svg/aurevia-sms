@@ -22,7 +22,10 @@ import { InstitutionalCommunications } from '../components/analytics/Institution
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
 import { DeleteBranchModal } from '../components/modals/DeleteBranchModal';
-import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch } from '../types/database.types';
+import { EditBranchModal } from '../components/modals/EditBranchModal';
+import { EditCourseModal } from '../components/modals/EditCourseModal';
+import { DeleteCourseModal } from '../components/modals/DeleteCourseModal';
+import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch, Course } from '../types/database.types';
 
 type DashboardTab =
   | 'overview'
@@ -97,6 +100,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [selectedBranchForRoster, setSelectedBranchForRoster] = useState<Branch | null>(null);
   const [rosterInitialTab, setRosterInitialTab] = useState<'students' | 'staff'>('students');
   const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [branchToEdit, setBranchToEdit] = useState<Branch | null>(null);
+  const [courseToEdit, setCourseToEdit] = useState<Course | null>(null);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
 
   // Search and filter states for Trainees Directory
   const [studentSearch, setStudentSearch] = useState('');
@@ -723,6 +729,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         className="btn btn-ghost"
+                        title={`Edit ${branch.name}`}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          padding: 0,
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(212, 154, 91, 0.12)',
+                          border: '1px solid rgba(212, 154, 91, 0.3)',
+                          color: 'var(--crema-gold)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBranchToEdit(branch);
+                        }}
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                      <button
+                        className="btn btn-ghost"
                         title={`Decommission / Delete ${branch.name}`}
                         style={{
                           width: '36px',
@@ -911,11 +940,28 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     </button>
                   </div>
 
-                  <div style={{ marginTop: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
                     <button
                       className="btn btn-secondary"
                       style={{
-                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        background: 'rgba(212, 154, 91, 0.08)',
+                        borderColor: 'rgba(212, 154, 91, 0.3)',
+                        color: 'var(--crema-gold)',
+                      }}
+                      onClick={() => setBranchToEdit(branch)}
+                    >
+                      <Edit3 size={13} />
+                      <span>Edit Facility</span>
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{
                         padding: '6px 10px',
                         fontSize: '0.75rem',
                         display: 'flex',
@@ -929,7 +975,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       onClick={() => setBranchToDelete(branch)}
                     >
                       <Trash2 size={13} />
-                      <span>Delete Campus Facility...</span>
+                      <span>Delete Campus</span>
                     </button>
                   </div>
                 </div>
@@ -970,6 +1016,55 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       <h3 style={{ fontSize: '1.15rem', marginTop: '4px' }}>{course.title}</h3>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Code: {course.code} • {course.duration_weeks} Weeks Duration</p>
                     </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        className="btn btn-ghost"
+                        title={`Edit ${course.title}`}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          padding: 0,
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(212, 154, 91, 0.12)',
+                          border: '1px solid rgba(212, 154, 91, 0.3)',
+                          color: 'var(--crema-gold)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCourseToEdit(course);
+                        }}
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        title={`Decommission / Delete ${course.title}`}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          padding: 0,
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#EF4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCourseToDelete(course);
+                        }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
 
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '10px 0', lineHeight: 1.5 }}>
@@ -998,8 +1093,57 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                    Modules: Theory, Espresso Extraction, Milk Chemistry & Latte Art, Sensory Cupping
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    Certification: {course.certification_title || 'SCA Certificate of Completion'}
+                  </div>
+
+                  {/* Course Action Buttons */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      paddingTop: '10px',
+                      borderTop: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <button
+                      className="btn btn-secondary"
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        fontSize: '0.76rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        color: 'var(--crema-gold)',
+                        borderColor: 'rgba(212, 154, 91, 0.3)',
+                        background: 'rgba(212, 154, 91, 0.08)',
+                      }}
+                      onClick={() => setCourseToEdit(course)}
+                    >
+                      <Edit3 size={13} />
+                      <span>Edit Course</span>
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: '0.76rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        color: '#F87171',
+                        borderColor: 'rgba(239, 68, 68, 0.25)',
+                        background: 'rgba(239, 68, 68, 0.05)',
+                      }}
+                      onClick={() => setCourseToDelete(course)}
+                      title="Decommission Course Curriculum"
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -2458,6 +2602,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         <DeleteBranchModal
           branch={branchToDelete}
           onClose={() => setBranchToDelete(null)}
+        />
+      )}
+
+      {/* Edit Branch Modal */}
+      {branchToEdit && (
+        <EditBranchModal
+          branch={branchToEdit}
+          onClose={() => setBranchToEdit(null)}
+        />
+      )}
+
+      {/* Edit Course Modal */}
+      {courseToEdit && (
+        <EditCourseModal
+          course={courseToEdit}
+          onClose={() => setCourseToEdit(null)}
+        />
+      )}
+
+      {/* Delete Course Modal */}
+      {courseToDelete && (
+        <DeleteCourseModal
+          course={courseToDelete}
+          onClose={() => setCourseToDelete(null)}
         />
       )}
     </div>

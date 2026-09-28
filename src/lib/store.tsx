@@ -113,7 +113,11 @@ interface AppContextType {
   resetStaffPassword: (profileId: string, newPassword: string) => Promise<void>;
   deleteStaffMember: (profileId: string) => Promise<void>;
   createBranch: (branch: Partial<Branch>) => Promise<Branch>;
+  updateBranch: (branchId: string, updates: Partial<Branch>) => Promise<void>;
   deleteBranch: (branchId: string) => Promise<void>;
+  createCourse: (course: Partial<Course>) => Promise<Course>;
+  updateCourse: (courseId: string, updates: Partial<Course>) => Promise<void>;
+  deleteCourse: (courseId: string) => Promise<void>;
   createCohort: (cohort: Partial<Cohort>) => Promise<Cohort>;
   updateCohort: (cohortId: string, updates: Partial<Cohort>) => Promise<void>;
   deleteCohort: (cohortId: string) => Promise<void>;
@@ -460,9 +464,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : (localBranches || INITIAL_BRANCHES);
         setBranches(liveBranches);
 
+        const savedCourses = localStorage.getItem('aur_courses');
+        let localCourses: Course[] | null = null;
+        if (savedCourses) {
+          try {
+            const parsed = JSON.parse(savedCourses);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localCourses = parsed;
+            }
+          } catch (_) {}
+        }
+
         const liveCourses = (cRes.data && cRes.data.length > 0)
           ? cRes.data
-          : INITIAL_COURSES;
+          : (localCourses || INITIAL_COURSES);
         setCourses(liveCourses);
         setCohorts(hRes.data || []);
 
@@ -1665,6 +1680,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return created;
   };
 
+  // Update Branch
+  const updateBranch = async (branchId: string, updates: Partial<Branch>): Promise<void> => {
+    try {
+      await supabase
+        .from('aur_branches')
+        .update({
+          code: updates.code?.toUpperCase(),
+          name: updates.name,
+          address: updates.address,
+          city: updates.city,
+          country: updates.country,
+          phone: updates.phone,
+          email: updates.email,
+          manager_name: updates.manager_name,
+          is_active: updates.is_active,
+        })
+        .eq('id', branchId);
+    } catch (e) {
+      console.warn('Supabase updateBranch error (fallback to local state):', e);
+    }
+
+    setBranches((prev) => {
+      const next = prev.map((b) => (b.id === branchId ? { ...b, ...updates } : b));
+      localStorage.setItem('aur_branches', JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Delete Branch & Cascading Dependencies
   const deleteBranch = async (branchId: string): Promise<void> => {
     // 1. Supabase Cleanup (safe, strictly aur_* tables only)
@@ -1787,6 +1830,123 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (selectedBranchId === branchId) {
       setSelectedBranchId('ALL');
     }
+  };
+
+  // Create Course
+  const createCourse = async (course: Partial<Course>): Promise<Course> => {
+    let created: Course;
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'c' + Date.now();
+    try {
+      const { data, error } = await supabase
+        .from('aur_courses')
+        .insert({
+          id: newId,
+          code: course.code?.toUpperCase() || 'NEW-01',
+          title: course.title || 'New Course',
+          category: course.category || 'Barista Skills',
+          duration_weeks: Number(course.duration_weeks || 2),
+          fee_amount: Number(course.fee_amount || 35000),
+          description: course.description || 'Specialty Coffee Association curriculum module.',
+          modules: course.modules || [],
+          certification_title: course.certification_title || `${course.title || 'SCA'} Certification`,
+          is_active: course.is_active ?? true,
+        })
+        .select()
+        .single();
+
+      if (error || !data) throw error;
+      created = data;
+    } catch (e) {
+      created = {
+        id: newId,
+        code: course.code?.toUpperCase() || 'NEW-01',
+        title: course.title || 'New Course',
+        category: (course.category as any) || 'Barista Skills',
+        duration_weeks: Number(course.duration_weeks || 2),
+        fee_amount: Number(course.fee_amount || 35000),
+        description: course.description || 'Specialty Coffee Association curriculum module.',
+        modules: course.modules || [],
+        certification_title: course.certification_title || `${course.title || 'SCA'} Certification`,
+        is_active: course.is_active ?? true,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    setCourses((prev) => {
+      const next = [...prev, created];
+      localStorage.setItem('aur_courses', JSON.stringify(next));
+      return next;
+    });
+    return created;
+  };
+
+  // Update Course
+  const updateCourse = async (courseId: string, updates: Partial<Course>): Promise<void> => {
+    try {
+      await supabase
+        .from('aur_courses')
+        .update({
+          code: updates.code?.toUpperCase(),
+          title: updates.title,
+          category: updates.category,
+          duration_weeks: updates.duration_weeks ? Number(updates.duration_weeks) : undefined,
+          fee_amount: updates.fee_amount ? Number(updates.fee_amount) : undefined,
+          description: updates.description,
+          modules: updates.modules,
+          certification_title: updates.certification_title,
+          is_active: updates.is_active,
+        })
+        .eq('id', courseId);
+    } catch (e) {
+      console.warn('Supabase updateCourse error (fallback to local state):', e);
+    }
+
+    setCourses((prev) => {
+      const next = prev.map((c) => (c.id === courseId ? { ...c, ...updates } : c));
+      localStorage.setItem('aur_courses', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Delete Course & Cascading Dependencies
+  const deleteCourse = async (courseId: string): Promise<void> => {
+    try {
+      // Find all cohorts for this course
+      const targetCohorts = cohorts.filter((c) => c.course_id === courseId);
+      const targetCohortIds = targetCohorts.map((c) => c.id);
+
+      // Cleanup attendance & assessments & enrollments for those cohorts
+      if (targetCohortIds.length > 0) {
+        await supabase.from('aur_attendance').delete().in('cohort_id', targetCohortIds);
+        await supabase.from('aur_assessments').delete().in('cohort_id', targetCohortIds);
+        await supabase.from('aur_enrollments').delete().in('cohort_id', targetCohortIds);
+        await supabase.from('aur_cohorts').delete().in('id', targetCohortIds);
+      }
+
+      // Finally delete the course
+      const { error } = await supabase.from('aur_courses').delete().eq('id', courseId);
+      if (error) console.warn('Supabase delete aur_courses note:', error);
+    } catch (e) {
+      console.warn('Supabase deleteCourse error (fallback to local state):', e);
+    }
+
+    setCourses((prev) => {
+      const next = prev.filter((c) => c.id !== courseId);
+      localStorage.setItem('aur_courses', JSON.stringify(next));
+      return next;
+    });
+
+    setCohorts((prev) => {
+      const next = prev.filter((c) => c.course_id !== courseId);
+      localStorage.setItem('aur_cohorts', JSON.stringify(next));
+      return next;
+    });
+
+    setLessons((prev) => {
+      const next = prev.filter((l) => l.course_id !== courseId);
+      localStorage.setItem('aur_lessons', JSON.stringify(next));
+      return next;
+    });
   };
 
   // Create Cohort
@@ -2234,7 +2394,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createLesson,
         deleteLesson,
         createBranch,
+        updateBranch,
         deleteBranch,
+        createCourse,
+        updateCourse,
+        deleteCourse,
         createCohort,
         updateCohort,
         deleteCohort,
