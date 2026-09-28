@@ -193,13 +193,15 @@ interface AppContextType {
 }
 
 const STORAGE_CLEAN_VERSION_KEY = 'aur_storage_version_2026';
-const CURRENT_STORAGE_VERSION = 'v2_clean_slate_live';
+const CURRENT_STORAGE_VERSION = 'v5_aurevia_coffee_institute_fixed';
 
 if (typeof window !== 'undefined') {
   const currentVer = localStorage.getItem(STORAGE_CLEAN_VERSION_KEY);
   if (currentVer !== CURRENT_STORAGE_VERSION) {
-    // Purge cached test data so user gets their clean slate immediately
+    // Purge cached test data and stale branch cache to load Aurevia Coffee Institute
     [
+      'aur_branches',
+      'aur_courses',
       'aur_students',
       'aur_enrollments',
       'aur_invoices',
@@ -235,12 +237,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // State collections with LocalStorage persistence (defaults to clean [] for live production)
   const [branches, setBranches] = useState<Branch[]>(() => {
     const saved = localStorage.getItem('aur_branches');
-    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((b: Branch, idx: number) =>
+            idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
+              ? { ...b, name: 'Aurevia Coffee Institute' }
+              : b
+          );
+        }
+      } catch (_) {}
+    }
+    return INITIAL_BRANCHES;
   });
 
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem('aur_courses');
-    return saved ? JSON.parse(saved) : INITIAL_COURSES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (_) {}
+    }
+    return INITIAL_COURSES;
   });
 
   const [cohorts, setCohorts] = useState<Cohort[]>(() => {
@@ -417,8 +439,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
 
         // Hydrate all collections directly from Supabase
-        setBranches(resolveStoreData(bRes.data, 'aur_branches', INITIAL_BRANCHES));
-        setCourses(resolveStoreData(cRes.data, 'aur_courses', INITIAL_COURSES));
+        const liveBranches = (bRes.data && bRes.data.length > 0)
+          ? bRes.data.map((b: any, idx: number) =>
+              idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
+                ? { ...b, name: 'Aurevia Coffee Institute' }
+                : b
+            )
+          : INITIAL_BRANCHES;
+        setBranches(liveBranches);
+
+        const liveCourses = (cRes.data && cRes.data.length > 0)
+          ? cRes.data
+          : INITIAL_COURSES;
+        setCourses(liveCourses);
         setCohorts(hRes.data || []);
 
         // Remove student profiles from faculty/staff profiles
