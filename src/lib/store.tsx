@@ -192,6 +192,32 @@ interface AppContextType {
   joinLiveSessionAsStudent: (sessionId: string, studentId: string) => Promise<void>;
 }
 
+const STORAGE_CLEAN_VERSION_KEY = 'aur_storage_version_2026';
+const CURRENT_STORAGE_VERSION = 'v2_clean_slate_live';
+
+if (typeof window !== 'undefined') {
+  const currentVer = localStorage.getItem(STORAGE_CLEAN_VERSION_KEY);
+  if (currentVer !== CURRENT_STORAGE_VERSION) {
+    // Purge cached test data so user gets their clean slate immediately
+    [
+      'aur_students',
+      'aur_enrollments',
+      'aur_invoices',
+      'aur_payments',
+      'aur_attendance',
+      'aur_assessments',
+      'aur_cohorts',
+      'aur_alumni',
+      'aur_sms_logs',
+      'aur_staff_clockins',
+      'aur_leave_requests',
+      'aur_lessons',
+      'aur_live_sessions',
+    ].forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem(STORAGE_CLEAN_VERSION_KEY, CURRENT_STORAGE_VERSION);
+  }
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -206,7 +232,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // State collections with LocalStorage persistence
+  // State collections with LocalStorage persistence (defaults to clean [] for live production)
   const [branches, setBranches] = useState<Branch[]>(() => {
     const saved = localStorage.getItem('aur_branches');
     return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
@@ -219,98 +245,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cohorts, setCohorts] = useState<Cohort[]>(() => {
     const saved = localStorage.getItem('aur_cohorts');
-    return saved ? JSON.parse(saved) : INITIAL_COHORTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [profiles, setProfiles] = useState<Profile[]>(() => {
     const saved = localStorage.getItem('aur_profiles');
-    const baseList: Profile[] = saved ? JSON.parse(saved) : INITIAL_PROFILES;
-    return baseList.map((p) =>
-      p.reg_number === 'AUR/NBO/2026/001' || p.full_name === 'Faith Cherono'
-        ? { ...p, phone: '0714767240' }
-        : p
-    );
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((p: Profile) => p.role !== 'student');
+        }
+      } catch (_) {}
+    }
+    return INITIAL_PROFILES.filter((p) => p.role !== 'student');
   });
 
   const [students, setStudents] = useState<StudentKYC[]>(() => {
     const saved = localStorage.getItem('aur_students');
-    return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [enrollments, setEnrollments] = useState<Enrollment[]>(() => {
     const saved = localStorage.getItem('aur_enrollments');
-    return saved ? JSON.parse(saved) : INITIAL_ENROLLMENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     const saved = localStorage.getItem('aur_invoices');
-    const baseList: Invoice[] = saved ? JSON.parse(saved) : INITIAL_INVOICES;
-    return baseList.map((i) =>
-      i.invoice_number === 'INV-AUR-2026-0001'
-        ? { ...i, total_fee: 35000, amount_paid: 15000, balance_due: 20000, status: 'partial' as const }
-        : i
-    );
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [payments, setPayments] = useState<Payment[]>(() => {
     const saved = localStorage.getItem('aur_payments');
-    const baseList: Payment[] = saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
-    return baseList.map((p) =>
-      p.id === 'b5000000-0000-0000-0000-000000000001'
-        ? { ...p, amount: 15000, mpesa_phone_number: '0714767240' }
-        : p
-    );
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [assessments, setAssessments] = useState<Assessment[]>(() => {
     const saved = localStorage.getItem('aur_assessments');
-    return saved ? JSON.parse(saved) : INITIAL_ASSESSMENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem('aur_attendance');
-    const baseList: AttendanceRecord[] = saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
-    // Auto-repair any record that had empty cohort_id or missing cohort from previous sessions
-    return baseList.map((a) => {
-      if (!a.cohort_id || a.cohort_id === '') {
-        const enr = INITIAL_ENROLLMENTS.find((e) => e.student_id === a.student_id);
-        return {
-          ...a,
-          cohort_id: enr?.cohort_id || 'a1000000-0000-0000-0000-000000000001',
-        };
-      }
-      return a;
-    });
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [staffClockins, setStaffClockins] = useState<StaffClockIn[]>(() => {
     const saved = localStorage.getItem('aur_staff_clockins');
-    return saved ? JSON.parse(saved) : INITIAL_STAFF_CLOCKINS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
     const saved = localStorage.getItem('aur_leave_requests');
-    return saved ? JSON.parse(saved) : INITIAL_LEAVE_REQUESTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [smsLogs, setSmsLogs] = useState<SMSLog[]>(() => {
     const saved = localStorage.getItem('aur_sms_logs');
-    return saved ? JSON.parse(saved) : INITIAL_SMS_LOGS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [lessons, setLessons] = useState<TimetableLesson[]>(() => {
     const saved = localStorage.getItem('aur_lessons');
-    return saved ? JSON.parse(saved) : INITIAL_LESSONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [alumni, setAlumni] = useState<Alumni[]>(() => {
     const saved = localStorage.getItem('aur_alumni');
-    return saved ? JSON.parse(saved) : INITIAL_ALUMNI;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [liveSessions, setLiveSessions] = useState<LiveClassSession[]>(() => {
     const saved = localStorage.getItem('aur_live_sessions');
-    return saved ? JSON.parse(saved) : INITIAL_LIVE_SESSIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Sync to localStorage
@@ -331,16 +339,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('aur_alumni', JSON.stringify(alumni)); }, [alumni]);
   useEffect(() => { localStorage.setItem('aur_live_sessions', JSON.stringify(liveSessions)); }, [liveSessions]);
 
-  // Safe Data Loader Helper: Uses Supabase when available, falls back to localStorage, then INITIAL constants
+  // Safe Data Loader Helper: If remoteData is provided (even if empty []), use remoteData!
   const resolveStoreData = <T,>(remoteData: T[] | null | undefined, localKey: string, initialFallback: T[]): T[] => {
-    if (remoteData && remoteData.length > 0) {
+    if (remoteData !== null && remoteData !== undefined) {
       return remoteData;
     }
     const saved = localStorage.getItem(localKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       } catch (e) {}
@@ -408,21 +416,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           delivery_status: log.status || log.delivery_status || 'delivered',
         }));
 
-        // Hydrate all collections
+        // Hydrate all collections directly from Supabase
         setBranches(resolveStoreData(bRes.data, 'aur_branches', INITIAL_BRANCHES));
         setCourses(resolveStoreData(cRes.data, 'aur_courses', INITIAL_COURSES));
-        setCohorts(resolveStoreData(hRes.data, 'aur_cohorts', INITIAL_COHORTS));
-        setProfiles(resolveStoreData(pRes.data, 'aur_profiles', INITIAL_PROFILES));
-        setStudents(resolveStoreData(sRes.data, 'aur_students', INITIAL_STUDENTS));
-        setEnrollments(resolveStoreData(eRes.data, 'aur_enrollments', INITIAL_ENROLLMENTS));
-        setInvoices(normalizedInvoices.length > 0 ? normalizedInvoices : resolveStoreData(null, 'aur_invoices', INITIAL_INVOICES));
-        setPayments(normalizedPayments.length > 0 ? normalizedPayments : resolveStoreData(null, 'aur_payments', INITIAL_PAYMENTS));
-        setAssessments(resolveStoreData(assRes.data, 'aur_assessments', INITIAL_ASSESSMENTS));
-        setAttendance(resolveStoreData(attRes.data, 'aur_attendance', INITIAL_ATTENDANCE));
-        setStaffClockins(resolveStoreData(scRes.data, 'aur_staff_clockins', INITIAL_STAFF_CLOCKINS));
-        setLeaveRequests(resolveStoreData(lrRes.data, 'aur_leave_requests', INITIAL_LEAVE_REQUESTS));
-        setSmsLogs(normalizedSms.length > 0 ? normalizedSms : resolveStoreData(null, 'aur_sms_logs', INITIAL_SMS_LOGS));
-        setAlumni(resolveStoreData(alRes.data, 'aur_alumni', INITIAL_ALUMNI));
+        setCohorts(hRes.data || []);
+
+        // Remove student profiles from faculty/staff profiles
+        const cleanProfiles = (pRes.data && pRes.data.length > 0)
+          ? pRes.data.filter((p: any) => p.role !== 'student')
+          : INITIAL_PROFILES.filter((p) => p.role !== 'student');
+        setProfiles(cleanProfiles);
+
+        setStudents(sRes.data || []);
+        setEnrollments(eRes.data || []);
+        setInvoices(normalizedInvoices);
+        setPayments(normalizedPayments);
+        setAssessments(assRes.data || []);
+        setAttendance(attRes.data || []);
+        setStaffClockins(scRes.data || []);
+        setLeaveRequests(lrRes.data || []);
+        setSmsLogs(normalizedSms);
+        setAlumni(alRes.data || []);
 
         setLastSyncTime(new Date());
       } catch (err) {
