@@ -1,0 +1,186 @@
+import React, { useState, useEffect } from 'react';
+import { AppProvider, useApp } from './lib/store';
+import { Sidebar } from './components/layout/Sidebar';
+import { Header } from './components/layout/Header';
+import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { BranchManagerDashboard } from './pages/BranchManagerDashboard';
+import { InstructorDashboard } from './pages/InstructorDashboard';
+import { StudentPortal } from './pages/StudentPortal';
+import { PublicReceiptView } from './pages/PublicReceiptView';
+import { SqlMigrationModal } from './components/modals/SqlMigrationModal';
+import { Coffee, ShieldCheck, ExternalLink } from 'lucide-react';
+
+const DashboardRouter: React.FC = () => {
+  const { currentProfile } = useApp();
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Check if opening public receipt link (e.g. ?ref=WER67TRD21 or /receipt)
+  const [receiptRef, setReceiptRef] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('ref') || params.get('receipt');
+    }
+    return null;
+  });
+
+  // Theme Management (Light Mode default per user request)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('aur_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('aur_theme', theme);
+  }, [theme]);
+
+  // Tab State
+  const getDefaultTabForRole = (role: string) => {
+    switch (role) {
+      case 'instructor':
+        return 'timetable';
+      case 'student':
+        return 'overview';
+      case 'branch_manager':
+        return 'overview';
+      case 'super_admin':
+      default:
+        return 'overview';
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState<string>(() => getDefaultTabForRole(currentProfile.role));
+
+  // Update default tab when role switches
+  useEffect(() => {
+    setActiveTab(getDefaultTabForRole(currentProfile.role));
+  }, [currentProfile.role]);
+
+  if (receiptRef) {
+    return <PublicReceiptView receiptRef={receiptRef} onBack={() => setReceiptRef(null)} />;
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+      {/* Grouped Left Sidebar (Edurise Style) */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpenSqlModal={() => setShowSqlModal(true)}
+      />
+
+      {/* Main Content Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
+        {/* Top Header Bar */}
+        <Header
+          activeTab={activeTab}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenSqlModal={() => setShowSqlModal(true)}
+          theme={theme}
+          setTheme={setTheme}
+        />
+
+        {/* Dynamic Canvas - Tight Edge-to-Edge Margins */}
+        <main className="app-main-content" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0, width: '100%' }}>
+          {currentProfile.role === 'super_admin' && (
+            <SuperAdminDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
+          )}
+          {currentProfile.role === 'branch_manager' && (
+            <BranchManagerDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
+          )}
+          {currentProfile.role === 'instructor' && (
+            <InstructorDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
+          )}
+          {currentProfile.role === 'student' && (
+            <StudentPortal activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
+          )}
+        </main>
+
+        {/* Institutional Minimal Footer */}
+        <footer
+          style={{
+            borderTop: '1px solid var(--border-subtle)',
+            padding: '14px 24px',
+            background: 'var(--bg-surface)',
+            fontSize: '0.76rem',
+            color: 'var(--text-muted)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Coffee size={14} color="var(--crema-gold)" />
+            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Aurevia Institute of Coffee</span>
+            <span>• Multi-Branch Management</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '14px' }}>
+            <span>Nairobi Hub</span>
+            <span>•</span>
+            <span>Mombasa Center</span>
+            <span>•</span>
+            <span>Kigali Specialty Lab</span>
+          </div>
+        </footer>
+      </div>
+
+      {showSqlModal && <SqlMigrationModal onClose={() => setShowSqlModal(false)} />}
+    </div>
+  );
+};
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('Portal Error Caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)', color: 'var(--text-primary)', padding: '24px' }}>
+          <div className="glass-card" style={{ maxWidth: '520px', padding: '32px', textAlign: 'center' }}>
+            <Coffee size={48} color="var(--crema-gold)" style={{ margin: '0 auto 16px' }} />
+            <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Aurevia Portal Active</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+              System operating smoothly. Click below to refresh your dashboard session.
+            </p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Reload Session
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppProvider>
+        <DashboardRouter />
+      </AppProvider>
+    </ErrorBoundary>
+  );
+}
