@@ -21,6 +21,7 @@ import { CreateCourseModal } from '../components/modals/CreateCourseModal';
 import { InstitutionalCommunications } from '../components/analytics/InstitutionalCommunications';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
+import { DeleteBranchModal } from '../components/modals/DeleteBranchModal';
 import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch } from '../types/database.types';
 
 type DashboardTab =
@@ -95,6 +96,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [inspectedStudent, setInspectedStudent] = useState<StudentKYC | null>(null);
   const [selectedBranchForRoster, setSelectedBranchForRoster] = useState<Branch | null>(null);
   const [rosterInitialTab, setRosterInitialTab] = useState<'students' | 'staff'>('students');
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
 
   // Search and filter states for Trainees Directory
   const [studentSearch, setStudentSearch] = useState('');
@@ -718,18 +720,43 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       <h3 style={{ fontSize: '1.15rem', marginTop: '4px' }}>{branch.name}</h3>
                       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{branch.address}, {branch.city}</p>
                     </div>
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: 'var(--radius-sm)',
-                        background: 'rgba(212, 154, 91, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Building2 size={20} color="var(--crema-gold)" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        className="btn btn-ghost"
+                        title={`Decommission / Delete ${branch.name}`}
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          padding: 0,
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#EF4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBranchToDelete(branch);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(212, 154, 91, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Building2 size={20} color="var(--crema-gold)" />
+                      </div>
                     </div>
                   </div>
 
@@ -881,6 +908,28 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     >
                       <Users size={14} />
                       <span>View Staff ({bStaff.length})</span>
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        background: 'rgba(239, 68, 68, 0.04)',
+                        borderColor: 'rgba(239, 68, 68, 0.2)',
+                        color: '#F87171',
+                      }}
+                      onClick={() => setBranchToDelete(branch)}
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete Campus Facility...</span>
                     </button>
                   </div>
                 </div>
@@ -2402,6 +2451,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Branch Modal */}
+      {branchToDelete && (
+        <DeleteBranchModal
+          branch={branchToDelete}
+          onClose={() => setBranchToDelete(null)}
+        />
       )}
     </div>
   );

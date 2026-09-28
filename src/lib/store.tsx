@@ -113,6 +113,7 @@ interface AppContextType {
   resetStaffPassword: (profileId: string, newPassword: string) => Promise<void>;
   deleteStaffMember: (profileId: string) => Promise<void>;
   createBranch: (branch: Partial<Branch>) => Promise<Branch>;
+  deleteBranch: (branchId: string) => Promise<void>;
   createCohort: (cohort: Partial<Cohort>) => Promise<Cohort>;
   updateCohort: (cohortId: string, updates: Partial<Cohort>) => Promise<void>;
   deleteCohort: (cohortId: string) => Promise<void>;
@@ -439,13 +440,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
 
         // Hydrate all collections directly from Supabase
+        const savedBranches = localStorage.getItem('aur_branches');
+        let localBranches: Branch[] | null = null;
+        if (savedBranches) {
+          try {
+            const parsed = JSON.parse(savedBranches);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localBranches = parsed;
+            }
+          } catch (_) {}
+        }
+
         const liveBranches = (bRes.data && bRes.data.length > 0)
           ? bRes.data.map((b: any, idx: number) =>
               idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
                 ? { ...b, name: 'Aurevia Coffee Institute' }
                 : b
             )
-          : INITIAL_BRANCHES;
+          : (localBranches || INITIAL_BRANCHES);
         setBranches(liveBranches);
 
         const liveCourses = (cRes.data && cRes.data.length > 0)
@@ -1653,6 +1665,130 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return created;
   };
 
+  // Delete Branch & Cascading Dependencies
+  const deleteBranch = async (branchId: string): Promise<void> => {
+    // 1. Supabase Cleanup (safe, strictly aur_* tables only)
+    try {
+      const targetBranch = branches.find((b) => b.id === branchId);
+
+      // Find branch cohorts
+      const branchCohorts = cohorts.filter((c) => c.branch_id === branchId);
+      const branchCohortIds = branchCohorts.map((c) => c.id);
+
+      // Find branch students
+      const branchStudents = students.filter((s) => s.branch_id === branchId);
+      const branchStudentIds = branchStudents.map((s) => s.id);
+      const branchStudentProfileIds = branchStudents.map((s) => s.profile_id).filter(Boolean) as string[];
+
+      // Cleanup attendance, assessments & enrollments for cohorts
+      if (branchCohortIds.length > 0) {
+        await supabase.from('aur_attendance').delete().in('cohort_id', branchCohortIds);
+        await supabase.from('aur_assessments').delete().in('cohort_id', branchCohortIds);
+        await supabase.from('aur_enrollments').delete().in('cohort_id', branchCohortIds);
+      }
+
+      // Cleanup records for students
+      if (branchStudentIds.length > 0) {
+        await supabase.from('aur_attendance').delete().in('student_id', branchStudentIds);
+        await supabase.from('aur_assessments').delete().in('student_id', branchStudentIds);
+        await supabase.from('aur_enrollments').delete().in('student_id', branchStudentIds);
+        await supabase.from('aur_payments').delete().in('student_id', branchStudentIds);
+        await supabase.from('aur_invoices').delete().in('student_id', branchStudentIds);
+      }
+
+      // Cleanup payments & invoices matching branch_id directly
+      await supabase.from('aur_payments').delete().eq('branch_id', branchId);
+      await supabase.from('aur_invoices').delete().eq('branch_id', branchId);
+
+      // Delete student KYC records and student profiles
+      if (branchStudentIds.length > 0) {
+        await supabase.from('aur_students').delete().eq('branch_id', branchId);
+      }
+      if (branchStudentProfileIds.length > 0) {
+        await supabase.from('aur_profiles').delete().in('id', branchStudentProfileIds);
+      }
+
+      // Delete cohorts in this branch
+      await supabase.from('aur_cohorts').delete().eq('branch_id', branchId);
+
+      // Delete staff clock-ins and leave requests for this branch
+      await supabase.from('aur_staff_clockin').delete().eq('branch_id', branchId);
+      await supabase.from('aur_leave_requests').delete().eq('branch_id', branchId);
+
+      // Unassign staff members from this branch (keep their user profile)
+      await supabase.from('aur_profiles').update({ branch_id: null }).eq('branch_id', branchId);
+
+      // Delete alumni for this branch
+      await supabase.from('aur_alumni').delete().eq('branch_id', branchId);
+
+      // Delete reg sequences for this branch if code is known
+      if (targetBranch?.code) {
+        await supabase.from('aur_reg_sequences').delete().eq('branch_code', targetBranch.code);
+      }
+
+      // Finally delete the branch itself
+      const { error } = await supabase.from('aur_branches').delete().eq('id', branchId);
+      if (error) {
+        console.warn('Supabase delete aur_branches note:', error);
+      }
+    } catch (e) {
+      console.warn('Supabase deleteBranch fallback notice:', e);
+    }
+
+    // 2. React State & LocalStorage Updates
+    const branchStudentIdsSet = new Set(students.filter((s) => s.branch_id === branchId).map((s) => s.id));
+    const branchProfileIdsSet = new Set(students.filter((s) => s.branch_id === branchId).map((s) => s.profile_id));
+
+    setBranches((prev) => {
+      const next = prev.filter((b) => b.id !== branchId);
+      localStorage.setItem('aur_branches', JSON.stringify(next));
+      return next;
+    });
+
+    setCohorts((prev) => {
+      const next = prev.filter((c) => c.branch_id !== branchId);
+      localStorage.setItem('aur_cohorts', JSON.stringify(next));
+      return next;
+    });
+
+    setStudents((prev) => {
+      const next = prev.filter((s) => s.branch_id !== branchId);
+      localStorage.setItem('aur_students', JSON.stringify(next));
+      return next;
+    });
+
+    setEnrollments((prev) => prev.filter((e) => !branchStudentIdsSet.has(e.student_id)));
+
+    setInvoices((prev) => {
+      const next = prev.filter((i) => i.branch_id !== branchId && !branchStudentIdsSet.has(i.student_id));
+      localStorage.setItem('aur_invoices', JSON.stringify(next));
+      return next;
+    });
+
+    setPayments((prev) => {
+      const next = prev.filter((p) => p.branch_id !== branchId && !branchStudentIdsSet.has(p.student_id));
+      localStorage.setItem('aur_payments', JSON.stringify(next));
+      return next;
+    });
+
+    setProfiles((prev) =>
+      prev
+        .filter((p) => !branchProfileIdsSet.has(p.id))
+        .map((p) => (p.branch_id === branchId ? { ...p, branch_id: undefined } : p))
+    );
+
+    setAttendance((prev) => prev.filter((a) => !branchStudentIdsSet.has(a.student_id)));
+    setStaffClockins((prev) => prev.filter((sc) => sc.branch_id !== branchId));
+    setLeaveRequests((prev) => prev.filter((lr) => lr.branch_id !== branchId));
+    setAlumni((prev) => prev.filter((al) => al.branch_id !== branchId));
+    setLessons((prev) => prev.filter((l) => l.branch_id !== branchId));
+    setLiveSessions((prev) => prev.filter((s) => s.branch_id !== branchId));
+
+    if (selectedBranchId === branchId) {
+      setSelectedBranchId('ALL');
+    }
+  };
+
   // Create Cohort
   const createCohort = async (cohort: Partial<Cohort>): Promise<Cohort> => {
     let created: Cohort;
@@ -2098,6 +2234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createLesson,
         deleteLesson,
         createBranch,
+        deleteBranch,
         createCohort,
         updateCohort,
         deleteCohort,
