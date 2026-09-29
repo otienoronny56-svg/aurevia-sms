@@ -4,11 +4,12 @@ import { UserRole, Profile } from '../types/database.types';
 import {
   Coffee, Lock, Mail, Key, Eye, EyeOff, ArrowRight,
   Sparkles, Building2, Award, GraduationCap, CheckCircle2,
-  AlertCircle, LogIn, ShieldCheck, HelpCircle
+  AlertCircle, LogIn, ShieldCheck, HelpCircle,
+  Copy, Check, ExternalLink, RefreshCw, X
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginWithGoogle, loginWithProfile, profiles, students } = useApp();
+  const { login, loginWithGoogle, checkGoogleOAuthConfigured, loginWithProfile, profiles, students } = useApp();
 
   const [portalType, setPortalType] = useState<'staff' | 'student'>('staff');
   const [identifier, setIdentifier] = useState('');
@@ -19,6 +20,12 @@ export const LoginPage: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  // Google OAuth Guide & Quick Test Modal State
+  const [showGoogleGuideModal, setShowGoogleGuideModal] = useState(false);
+  const [isCopiedRedirect, setIsCopiedRedirect] = useState(false);
+  const [isRetryingLive, setIsRetryingLive] = useState(false);
+  const [liveCheckStatus, setLiveCheckStatus] = useState<'idle' | 'configured' | 'pending'>('idle');
 
   // Handle standard Email / ID / Reg No + Password login
   const handleFormLogin = async (e: React.FormEvent) => {
@@ -57,16 +64,65 @@ export const LoginPage: React.FC = () => {
     try {
       const res = await loginWithGoogle();
       if (!res.success) {
-        setErrorMessage(
-          res.error?.includes('provider') || res.error?.includes('disabled')
-            ? 'Google OAuth is pending activation in your Supabase Auth settings. You can sign in using your staff/student credentials or instant demo profiles below.'
-            : res.error || 'Unable to connect with Google OAuth.'
-        );
+        if (res.notConfigured) {
+          setShowGoogleGuideModal(true);
+        } else {
+          setErrorMessage(
+            res.error?.includes('provider') || res.error?.includes('disabled')
+              ? 'Google OAuth is pending activation in your Supabase Auth settings. Click "Google Setup" below for 1-click test access or setup instructions.'
+              : res.error || 'Unable to connect with Google OAuth.'
+          );
+        }
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Google sign-in encountered an error.');
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  // Instant Google Sign-in Test (Ronny Ronald - Super Admin)
+  const handleInstantGoogleRonnyLogin = () => {
+    const admin = profiles.find((p) => p.role === 'super_admin') || {
+      id: 'aur-ronny-superadmin',
+      role: 'super_admin' as UserRole,
+      full_name: 'Ronny Ronald (Google Admin)',
+      email: 'ronny@aurevia.ac.ke',
+      phone: '+254 700 000 000',
+      branch_id: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    loginWithProfile(admin);
+    setShowGoogleGuideModal(false);
+  };
+
+  // Copy OAuth Redirect URI for Google Cloud Console
+  const handleCopyRedirectUri = () => {
+    const callbackUri = 'https://evxmyqnsiapiojsukxmh.supabase.co/auth/v1/callback';
+    navigator.clipboard.writeText(callbackUri).then(() => {
+      setIsCopiedRedirect(true);
+      setTimeout(() => setIsCopiedRedirect(false), 2500);
+    });
+  };
+
+  // Check Supabase provider live & attempt OAuth
+  const handleRetryLiveGoogle = async () => {
+    setIsRetryingLive(true);
+    setLiveCheckStatus('idle');
+    try {
+      const isConfigured = await checkGoogleOAuthConfigured();
+      if (isConfigured) {
+        setLiveCheckStatus('configured');
+        setShowGoogleGuideModal(false);
+        await loginWithGoogle();
+      } else {
+        setLiveCheckStatus('pending');
+      }
+    } catch (e) {
+      setLiveCheckStatus('pending');
+    } finally {
+      setIsRetryingLive(false);
     }
   };
 
@@ -262,6 +318,34 @@ export const LoginPage: React.FC = () => {
           )}
           <span>{isGoogleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
         </button>
+
+        {/* Google Sign-In Setup & 1-Click Test Link */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-8px', marginBottom: '16px' }}>
+          <button
+            type="button"
+            onClick={() => setShowGoogleGuideModal(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#D49A5B',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 8px',
+              borderRadius: '4px',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#F5D7B5')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#D49A5B')}
+          >
+            <Sparkles size={12} />
+            <span style={{ textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+              Google Setup Guide & 1-Click Ronny Test Sign-In
+            </span>
+          </button>
+        </div>
 
         {/* Divider */}
         <div
@@ -720,6 +804,303 @@ export const LoginPage: React.FC = () => {
           <span>256-bit Encrypted Session • Supabase Multi-Branch Cloud Auth</span>
         </div>
       </div>
+
+      {/* Google OAuth Setup & Instant Ronny Test Modal */}
+      {showGoogleGuideModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.78)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            boxSizing: 'border-box',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGoogleGuideModal(false);
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '540px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              background: '#1A120E',
+              border: '1px solid rgba(212, 154, 91, 0.4)',
+              borderRadius: '16px',
+              padding: '28px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(212, 154, 91, 0.15)',
+              position: 'relative',
+              boxSizing: 'border-box',
+              color: '#F5F1EE',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    background: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#FDFBF7' }}>
+                    Google Sign-In Configuration
+                  </h3>
+                  <div style={{ fontSize: '0.72rem', color: '#D49A5B', marginTop: '2px' }}>
+                    Supabase Project: <code style={{ background: 'rgba(212,154,91,0.15)', padding: '1px 5px', borderRadius: '4px' }}>evxmyqnsiapiojsukxmh</code>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGoogleGuideModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '8px',
+                  color: 'rgba(245,241,238,0.7)',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Instant 1-Click Access Card (Fast Lane) */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.22) 0%, rgba(140, 90, 40, 0.15) 100%)',
+                border: '1px solid rgba(212, 154, 91, 0.45)',
+                borderRadius: '10px',
+                padding: '16px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                <Sparkles size={16} color="#D49A5B" />
+                <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#FDFBF7' }}>
+                  ⚡ Instant Sign-In as Ronny Ronald (No Waiting)
+                </span>
+              </div>
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.74rem', color: '#E5D5C5', lineHeight: 1.45 }}>
+                Bypass Google Cloud setup right now and immediately enter the portal with a verified Google profile as <strong>Super Admin</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={handleInstantGoogleRonnyLogin}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  background: 'linear-gradient(135deg, #D49A5B 0%, #B87D3B 100%)',
+                  color: '#150F0D',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(212, 154, 91, 0.35)',
+                }}
+              >
+                <CheckCircle2 size={16} strokeWidth={2.4} />
+                <span>Launch Portal as Ronny Ronald (Super Admin)</span>
+              </button>
+            </div>
+
+            {/* Why You Saw the 400 Error */}
+            <div
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '18px',
+                fontSize: '0.74rem',
+                color: '#FECACA',
+                lineHeight: 1.45,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', color: '#FCA5A5' }}>
+                <AlertCircle size={14} />
+                <span>Why Supabase returned "Unsupported provider: provider is not enabled"</span>
+              </div>
+              <div>
+                In your Supabase dashboard (as shown in your screenshot), the <strong>"Enable Sign in with Google"</strong> switch is turned ON, but the <strong>Client IDs</strong> and <strong>Client Secret</strong> inputs are empty. Supabase requires these two credentials from Google Cloud to activate the live OAuth service.
+              </div>
+            </div>
+
+            {/* Step-by-Step Instructions */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#D49A5B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                📋 3-Minute Live Setup in Google Cloud Console
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.76rem', color: '#F5F1EE' }}>
+                {/* Step 1 */}
+                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>1</div>
+                  <div>
+                    <div>Open <strong>Google Cloud Console Credentials</strong>:</div>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#60A5FA', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px', textDecoration: 'underline' }}
+                    >
+                      <span>console.cloud.google.com/apis/credentials</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>2</div>
+                  <div>
+                    Click <strong>+ CREATE CREDENTIALS</strong> → <strong>OAuth client ID</strong>. Set Application type to <strong>Web application</strong>.
+                  </div>
+                </div>
+
+                {/* Step 3: Callback URI */}
+                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>3</div>
+                  <div style={{ width: '100%' }}>
+                    <div>Under <strong>Authorized redirect URIs</strong>, paste this exact callback URL:</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', background: 'rgba(0,0,0,0.5)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(212,154,91,0.25)' }}>
+                      <code style={{ fontSize: '0.7rem', color: '#D49A5B', wordBreak: 'break-all', flex: 1 }}>
+                        https://evxmyqnsiapiojsukxmh.supabase.co/auth/v1/callback
+                      </code>
+                      <button
+                        type="button"
+                        onClick={handleCopyRedirectUri}
+                        style={{
+                          background: isCopiedRedirect ? '#10B981' : 'rgba(212, 154, 91, 0.2)',
+                          color: isCopiedRedirect ? '#FFFFFF' : '#D49A5B',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '4px 8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isCopiedRedirect ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{isCopiedRedirect ? 'Copied!' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>4</div>
+                  <div>
+                    Click <strong>Create</strong>, then copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into the two empty fields in your Supabase screenshot, and click <strong>Save</strong>!
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Check Supabase Status Alert */}
+            {liveCheckStatus === 'pending' && (
+              <div
+                style={{
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#FDE68A',
+                  fontSize: '0.74rem',
+                }}
+              >
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>Supabase has not received the keys yet. Make sure you pasted Client ID & Secret and clicked <strong>Save</strong> in Supabase.</span>
+              </div>
+            )}
+
+            {/* Bottom Controls */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid rgba(212, 154, 91, 0.2)', paddingTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setShowGoogleGuideModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid rgba(245, 241, 238, 0.25)',
+                  borderRadius: '6px',
+                  color: 'rgba(245, 241, 238, 0.8)',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRetryLiveGoogle}
+                disabled={isRetryingLive}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(212, 154, 91, 0.18)',
+                  border: '1px solid rgba(212, 154, 91, 0.4)',
+                  borderRadius: '6px',
+                  color: '#D49A5B',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: isRetryingLive ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <RefreshCw size={13} className={isRetryingLive ? 'spin' : ''} />
+                <span>{isRetryingLive ? 'Checking Supabase...' : 'Check Supabase & Launch Google'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -36,7 +36,7 @@ import {
   INITIAL_LIVE_SESSIONS,
 } from './mockData';
 import { INITIAL_ALUMNI } from './alumniData';
-import { supabase, checkSupabaseConnection } from './supabase';
+import { supabase, checkSupabaseConnection, supabaseUrl, supabaseAnonKey } from './supabase';
 import { generateMpesaReceiptNumber } from './mpesa';
 import { sendInstitutionalSMS } from './sms';
 import { sendResendEmail } from './resend';
@@ -51,7 +51,8 @@ interface AppContextType {
   // Authentication & Session
   isAuthenticated: boolean;
   login: (credentials: { identifier: string; password?: string }) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string; notConfigured?: boolean }>;
+  checkGoogleOAuthConfigured: () => Promise<boolean>;
   loginWithProfile: (profile: Profile) => void;
   logout: () => void;
 
@@ -788,8 +789,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+  const checkGoogleOAuthConfigured = async (): Promise<boolean> => {
     try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+        headers: {
+          apikey: supabaseAnonKey,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return !!data?.external?.google;
+      }
+    } catch (e) {
+      console.warn('Unable to query Supabase auth settings:', e);
+    }
+    return false;
+  };
+
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string; notConfigured?: boolean }> => {
+    try {
+      const isConfigured = await checkGoogleOAuthConfigured();
+      if (!isConfigured) {
+        return {
+          success: false,
+          notConfigured: true,
+          error: 'Google OAuth provider is not yet enabled with Client ID & Secret in Supabase.',
+        };
+      }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -2560,6 +2587,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated,
         login,
         loginWithGoogle,
+        checkGoogleOAuthConfigured,
         loginWithProfile,
         logout,
         currentRole,
