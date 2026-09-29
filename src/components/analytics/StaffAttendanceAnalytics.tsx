@@ -29,13 +29,27 @@ export const StaffAttendanceAnalytics: React.FC = () => {
   });
 
   const todayClockins = filteredClockins.filter((c) => c.work_date === today);
-  const clockedInCount = todayClockins.length || Math.max(1, filteredInstructors.length - 1);
-  const clockInRate = Math.round((clockedInCount / Math.max(1, filteredInstructors.length)) * 100);
+  const clockedInCount = todayClockins.length;
+  const clockInRate = filteredInstructors.length > 0
+    ? Math.round((clockedInCount / filteredInstructors.length) * 100)
+    : 0;
 
   // Student Attendance Rate
-  const totalStudentAttendance = attendance.length || 1;
-  const presentStudents = attendance.filter((a) => a.status === 'present').length || totalStudentAttendance;
-  const studentAttendanceRate = Math.round((presentStudents / totalStudentAttendance) * 100);
+  const totalStudentAttendance = attendance.length;
+  const presentStudents = attendance.filter((a) => a.status === 'present').length;
+  const studentAttendanceRate = totalStudentAttendance > 0
+    ? Math.round((presentStudents / totalStudentAttendance) * 100)
+    : 0;
+
+  // Shift Punctuality Rate
+  const punctualClockins = todayClockins.filter((c) => {
+    if (!c.clock_in) return false;
+    const date = new Date(c.clock_in);
+    return date.getHours() < 9 || (date.getHours() === 9 && date.getMinutes() <= 15);
+  }).length;
+  const punctualityRate = todayClockins.length > 0
+    ? Math.round((punctualClockins / todayClockins.length) * 100)
+    : 0;
 
   // Attendance Export Handler (Both Staff & Trainees)
   const handleExportAttendance = (format: 'csv' | 'pdf') => {
@@ -97,11 +111,25 @@ export const StaffAttendanceAnalytics: React.FC = () => {
     });
 
     const fRate = branchInstructors.length > 0
-      ? Math.min(100, Math.round(((branchClockins.length || branchInstructors.length) / branchInstructors.length) * 100))
-      : 100;
+      ? Math.min(100, Math.round((branchClockins.length / branchInstructors.length) * 100))
+      : 0;
 
-    const sRate = b.code === 'NBO' ? 98 : b.code === 'MSA' ? 94 : 96;
-    const punctualityRate = b.code === 'NBO' ? 97 : b.code === 'MSA' ? 92 : 95;
+    const branchAttendance = attendance.filter((a) => {
+      const s = students.find((std) => std.id === a.student_id);
+      return s?.branch_id === b.id;
+    });
+    const sRate = branchAttendance.length > 0
+      ? Math.round((branchAttendance.filter((a) => a.status === 'present').length / branchAttendance.length) * 100)
+      : 0;
+
+    const branchPunctual = branchClockins.filter((c) => {
+      if (!c.clock_in) return false;
+      const date = new Date(c.clock_in);
+      return date.getHours() < 9 || (date.getHours() === 9 && date.getMinutes() <= 15);
+    }).length;
+    const branchPunctualityRate = branchClockins.length > 0
+      ? Math.round((branchPunctual / branchClockins.length) * 100)
+      : 0;
 
     return {
       id: b.id,
@@ -110,22 +138,43 @@ export const StaffAttendanceAnalytics: React.FC = () => {
       city: b.city,
       facultyRate: fRate,
       studentRate: sRate,
-      punctuality: punctualityRate,
+      punctuality: branchPunctualityRate,
       instructorCount: branchInstructors.length,
       studentCount: branchStudents.length,
-      status: fRate >= 95 ? 'Optimal' : fRate >= 85 ? 'Good' : 'Needs Review',
+      status: fRate >= 90 ? 'Optimal' : fRate >= 70 ? 'Good' : 'Needs Review',
     };
   });
 
-  // Weekly Histogram Data (Mon - Sat)
-  const weeklyTrend = [
-    { day: 'Mon', faculty: 100, students: 96, label: '08:30 AM Lab' },
-    { day: 'Tue', faculty: 92, students: 94, label: 'Sensory Calibration' },
-    { day: 'Wed', faculty: 100, students: 98, label: 'Roastery Lab' },
-    { day: 'Thu', faculty: 96, students: 95, label: 'Latte Art Station' },
-    { day: 'Fri', faculty: 100, students: 100, label: 'Weekly CAT Exams' },
-    { day: 'Sat', faculty: 88, students: 92, label: 'Weekend Masterclass' },
-  ];
+  // Weekly Histogram Data (Mon - Sat) dynamically calculated
+  const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyTrend = daysOfWeek.map((dayName, dayIndex) => {
+    const targetDayNumber = dayIndex + 1; // 1 to 6
+    const matchingClockins = filteredClockins.filter((c) => {
+      const d = new Date(c.work_date);
+      return d.getDay() === targetDayNumber;
+    });
+    const matchingAttendance = attendance.filter((a) => {
+      const s = students.find((std) => std.id === a.student_id);
+      if (selectedCampusFilter !== 'ALL' && s?.branch_id !== selectedCampusFilter) return false;
+      const d = new Date(a.session_date);
+      return d.getDay() === targetDayNumber;
+    });
+
+    const facultyPct = filteredInstructors.length > 0 && matchingClockins.length > 0
+      ? Math.min(100, Math.round((matchingClockins.length / filteredInstructors.length) * 100))
+      : 0;
+
+    const studentPct = matchingAttendance.length > 0
+      ? Math.round((matchingAttendance.filter((a) => a.status === 'present').length / matchingAttendance.length) * 100)
+      : 0;
+
+    return {
+      day: dayName,
+      faculty: facultyPct,
+      students: studentPct,
+      label: `${dayName} Calibration`,
+    };
+  });
 
   return (
     <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -186,7 +235,9 @@ export const StaffAttendanceAnalytics: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--crema-gold)' }}>{studentAttendanceRate}%</span>
-            <span style={{ fontSize: '0.74rem', color: '#10B981', fontWeight: 600 }}>+2.4% vs Last Term</span>
+            <span style={{ fontSize: '0.74rem', color: totalStudentAttendance > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: 600 }}>
+              {totalStudentAttendance > 0 ? `${presentStudents}/${totalStudentAttendance} Present` : 'No Roll-Call Records'}
+            </span>
           </div>
           <div style={{ marginTop: '8px', height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
             <div style={{ width: `${studentAttendanceRate}%`, height: '100%', background: 'var(--crema-gold)', borderRadius: '2px' }} />
@@ -200,11 +251,13 @@ export const StaffAttendanceAnalytics: React.FC = () => {
             <Clock size={14} color="#38BDF8" />
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38BDF8' }}>95.8%</span>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Within 15m Window</span>
+            <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38BDF8' }}>{punctualityRate}%</span>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              {todayClockins.length > 0 ? `${punctualClockins}/${todayClockins.length} On-Time Shifts` : 'Within 15m Window'}
+            </span>
           </div>
           <div style={{ marginTop: '8px', height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
-            <div style={{ width: '95.8%', height: '100%', background: '#38BDF8', borderRadius: '2px' }} />
+            <div style={{ width: `${punctualityRate}%`, height: '100%', background: '#38BDF8', borderRadius: '2px' }} />
           </div>
         </div>
 
@@ -216,12 +269,16 @@ export const StaffAttendanceAnalytics: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {leaveRequests.filter((r) => r.status === 'approved').length || 1}
+              {leaveRequests.filter((r) => r.status === 'approved').length}
             </span>
-            <span style={{ fontSize: '0.74rem', color: '#10B981', fontWeight: 600 }}>100% Station Covered</span>
+            <span style={{ fontSize: '0.74rem', color: '#10B981', fontWeight: 600 }}>
+              {leaveRequests.filter((r) => r.status === 'approved').length > 0 ? 'Approved Leaves' : '100% Station Covered'}
+            </span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            Zero station disruptions reported
+            {leaveRequests.filter((r) => r.status === 'approved').length > 0
+              ? 'Station coverage reassigned'
+              : 'Zero station disruptions reported'}
           </div>
         </div>
       </div>
@@ -415,7 +472,15 @@ export const StaffAttendanceAnalytics: React.FC = () => {
                 Trainee Check-in
               </span>
             </div>
-            <span style={{ fontWeight: 600, color: '#10B981' }}>Peak Attendance: Friday (100%)</span>
+            <span style={{ fontWeight: 600, color: '#10B981' }}>
+              {(() => {
+                const peakItem = [...weeklyTrend].sort((a, b) => (b.faculty + b.students) - (a.faculty + a.students))[0];
+                if (peakItem && (peakItem.faculty > 0 || peakItem.students > 0)) {
+                  return `Peak Attendance: ${peakItem.day} (${Math.max(peakItem.faculty, peakItem.students)}%)`;
+                }
+                return 'No weekly shifts logged yet';
+              })()}
+            </span>
           </div>
         </div>
       </div>

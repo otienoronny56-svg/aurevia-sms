@@ -1657,7 +1657,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 {alumni.length} Alumni
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                SCA Standards Certified 2024–2026
+                {alumni.length > 0 ? 'SCA Standards Certified' : 'No Certified Alumni Yet'}
               </div>
             </div>
 
@@ -1667,10 +1667,28 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <CheckCircle2 size={15} color="#10B981" />
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10B981' }}>
-                98.5%
+                {alumni.length > 0
+                  ? `${Math.round(
+                      (alumni.filter(
+                        (a) =>
+                          (a.current_employer && a.current_employer.trim() !== '') ||
+                          (a.employment_status && !a.employment_status.toLowerCase().includes('seeking'))
+                      ).length /
+                        alumni.length) *
+                        100
+                    )}%`
+                  : '0.0%'}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Employed in Leading Specialty Cafes
+                {alumni.length > 0
+                  ? `${
+                      alumni.filter(
+                        (a) =>
+                          (a.current_employer && a.current_employer.trim() !== '') ||
+                          (a.employment_status && !a.employment_status.toLowerCase().includes('seeking'))
+                      ).length
+                    } of ${alumni.length} in Active Employment`
+                  : 'Awaiting Graduate Placements'}
               </div>
             </div>
 
@@ -1680,10 +1698,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <Building2 size={15} color="#6EE7B7" />
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#6EE7B7' }}>
-                3 Campuses
+                {branches.length === 1 ? '1 Campus' : `${branches.length} Campuses`}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Nairobi ({alumni.filter(a => a.branch_id === 'b1000000-0000-0000-0000-000000000001').length}) • Mombasa ({alumni.filter(a => a.branch_id === 'b2000000-0000-0000-0000-000000000002').length}) • Kigali ({alumni.filter(a => a.branch_id === 'b3000000-0000-0000-0000-000000000003').length})
+                {branches.length > 0
+                  ? branches
+                      .map((b) => `${b.city || b.name} (${alumni.filter((a) => a.branch_id === b.id).length})`)
+                      .slice(0, 3)
+                      .join(' • ')
+                  : 'No Active Campuses'}
               </div>
             </div>
 
@@ -1693,10 +1716,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <Coffee size={15} color="var(--crema-gold)" />
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--crema-gold)' }}>
-                24+ Brands
+                {(() => {
+                  const uniqueBrands = Array.from(
+                    new Set(
+                      alumni
+                        .map((a) => a.current_employer?.trim())
+                        .filter((e): e is string => Boolean(e && e.toLowerCase() !== 'unemployed' && e.toLowerCase() !== 'none'))
+                    )
+                  );
+                  return `${uniqueBrands.length} Partner${uniqueBrands.length === 1 ? '' : 's'}`;
+                })()}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Artcaffe, Java House, Spring Valley
+                {(() => {
+                  const uniqueBrands = Array.from(
+                    new Set(
+                      alumni
+                        .map((a) => a.current_employer?.trim())
+                        .filter((e): e is string => Boolean(e && e.toLowerCase() !== 'unemployed' && e.toLowerCase() !== 'none'))
+                    )
+                  );
+                  return uniqueBrands.length > 0
+                    ? uniqueBrands.slice(0, 3).join(', ') + (uniqueBrands.length > 3 ? '...' : '')
+                    : 'No Employer Placements Logged';
+                })()}
               </div>
             </div>
           </div>
@@ -1705,7 +1748,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
             <input
               type="text"
-              placeholder="Search by graduate name, current employer (e.g. Spring Valley, Artcaffe), or certificate serial..."
+              placeholder="Search by graduate name, current employer, role, or certificate serial..."
               value={alumniSearch}
               onChange={(e) => setAlumniSearch(e.target.value)}
               style={{
@@ -1760,8 +1803,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {alumni
-                  .filter((a) => {
+                {(() => {
+                  const filteredAlumni = alumni.filter((a) => {
                     const matchBranch = alumniBranchFilter === 'ALL' || a.branch_id === alumniBranchFilter;
                     const q = alumniSearch.toLowerCase();
                     const matchSearch =
@@ -1771,8 +1814,27 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       a.job_title.toLowerCase().includes(q) ||
                       a.certificate_serial_no.toLowerCase().includes(q);
                     return matchBranch && matchSearch;
-                  })
-                  .map((a, idx) => (
+                  });
+
+                  if (filteredAlumni.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                          <GraduationCap size={32} style={{ opacity: 0.35, margin: '0 auto 8px auto', display: 'block' }} />
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                            No Alumni Records Found
+                          </div>
+                          <div style={{ fontSize: '0.78rem' }}>
+                            {alumni.length === 0
+                              ? 'No trainees have graduated yet. When students complete a course cohort and are graduated, their certified profiles will appear here.'
+                              : 'No alumni match the current search or campus filter.'}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredAlumni.map((a, idx) => (
                     <tr key={a.id}>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>#{idx + 1}</td>
                       <td>
@@ -1791,12 +1853,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{a.current_employer}</div>
-                        <div style={{ fontSize: '0.72rem', color: '#10B981' }}>{a.job_title}</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{a.current_employer || '—'}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#10B981' }}>{a.job_title || '—'}</div>
                       </td>
                       <td>
                         <span className="badge badge-approved">
-                          {a.employment_status}
+                          {a.employment_status || 'Employed'}
                         </span>
                       </td>
                       <td>
@@ -1815,7 +1877,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

@@ -119,8 +119,8 @@ export const StudentRollCallAnalytics: React.FC<StudentRollCallAnalyticsProps> =
         late: 0,
         absent: 0,
         excused: 0,
-        attendanceRate: 100,
-        punctualityRate: 100,
+        attendanceRate: 0,
+        punctualityRate: 0,
         uniqueSessions: 0,
       };
     }
@@ -397,13 +397,13 @@ export const StudentRollCallAnalytics: React.FC<StudentRollCallAnalyticsProps> =
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 700,
-                color: stats.attendanceRate >= 90 ? '#10B981' : stats.attendanceRate >= 80 ? 'var(--crema-gold)' : '#EF4444',
-                background: stats.attendanceRate >= 90 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                color: stats.total === 0 ? 'var(--text-muted)' : stats.attendanceRate >= 90 ? '#10B981' : stats.attendanceRate >= 80 ? 'var(--crema-gold)' : '#EF4444',
+                background: stats.total === 0 ? 'rgba(255, 255, 255, 0.05)' : stats.attendanceRate >= 90 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                 padding: '2px 6px',
                 borderRadius: '4px',
               }}
             >
-              {stats.attendanceRate >= 85 ? 'SCA Compliant' : 'Risk Detected'}
+              {stats.total === 0 ? 'Awaiting Sessions' : stats.attendanceRate >= 85 ? 'SCA Compliant' : 'Risk Detected'}
             </span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '6px' }}>

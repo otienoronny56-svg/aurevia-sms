@@ -775,11 +775,13 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Award size={18} color="var(--crema-gold)" />
                   <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                    Aurevia Certified Alumni Directory
+                    Certified Alumni Directory
                   </h3>
                 </div>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {alumni.length} SCA certified graduates placed across premier specialty roasteries & coffee lounges
+                  {alumni.length > 0
+                    ? `${alumni.length} SCA certified graduates placed across premier specialty roasteries & coffee lounges`
+                    : 'No certified graduates recorded in the database yet'}
                 </p>
               </div>
               <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={() => setShowAlumniModal(false)}>
@@ -839,8 +841,8 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
                   </tr>
                 </thead>
                 <tbody>
-                  {alumni
-                    .filter((a) => {
+                  {(() => {
+                    const filtered = alumni.filter((a) => {
                       const matchBranch = alumniBranchFilter === 'ALL' || a.branch_id === alumniBranchFilter;
                       const q = alumniSearch.toLowerCase();
                       const matchSearch =
@@ -850,8 +852,26 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
                         a.job_title.toLowerCase().includes(q) ||
                         a.certificate_serial_no.toLowerCase().includes(q);
                       return matchBranch && matchSearch;
-                    })
-                    .map((a) => (
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={5} style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                              No Alumni Records Found
+                            </div>
+                            <div style={{ fontSize: '0.75rem' }}>
+                              {alumni.length === 0
+                                ? 'No alumni records currently exist in the database.'
+                                : 'No alumni match the selected filters.'}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((a) => (
                       <tr key={a.id}>
                         <td>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.full_name}</div>
@@ -869,8 +889,8 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
                           </div>
                         </td>
                         <td>
-                          <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{a.current_employer}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#10B981' }}>{a.job_title}</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{a.current_employer || '—'}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#10B981' }}>{a.job_title || '—'}</div>
                         </td>
                         <td>
                           <span
@@ -887,7 +907,8 @@ export const InstitutionalAnalytics: React.FC<InstitutionalAnalyticsProps> = ({ 
                           </span>
                         </td>
                       </tr>
-                    ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
