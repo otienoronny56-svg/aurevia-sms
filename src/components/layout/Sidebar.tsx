@@ -22,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   onOpenSqlModal,
 }) => {
-  const { currentProfile, profiles, branches, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions } = useApp();
+  const { currentProfile, profiles, branches, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions, logout } = useApp();
 
   const myBranch = branches.find((b) => b.id === currentProfile.branch_id);
 
@@ -347,20 +347,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <span
-            style={{
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: '4px',
-              background: 'var(--bg-surface-elevated)',
-              color: 'var(--crema-gold)',
-              border: '1px solid var(--border-subtle)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {myBranch?.code || 'HQ'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                padding: '2px 6px',
+                borderRadius: '4px',
+                background: 'var(--bg-surface-elevated)',
+                color: 'var(--crema-gold)',
+                border: '1px solid var(--border-subtle)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {myBranch?.code || 'HQ'}
+            </span>
+            <button
+              type="button"
+              onClick={logout}
+              title="Log Out"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '4px',
+                transition: 'color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
       </aside>
     </>

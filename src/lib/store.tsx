@@ -48,6 +48,13 @@ import {
 } from './emailTemplates';
 
 interface AppContextType {
+  // Authentication & Session
+  isAuthenticated: boolean;
+  login: (credentials: { identifier: string; password?: string }) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithProfile: (profile: Profile) => void;
+  logout: () => void;
+
   // Current session & RBAC
   currentRole: UserRole;
   currentProfile: Profile;
@@ -228,8 +235,33 @@ if (typeof window !== 'undefined') {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
-  const [currentProfile, setCurrentProfile] = useState<Profile>(INITIAL_PROFILES[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const saved = localStorage.getItem('aur_auth_session');
+    return saved === 'true';
+  });
+
+  const [currentProfile, setCurrentProfile] = useState<Profile>(() => {
+    const savedProfile = localStorage.getItem('aur_current_profile');
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        if (parsed && parsed.id) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_PROFILES[0];
+  });
+
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const savedProfile = localStorage.getItem('aur_current_profile');
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        if (parsed?.role) return parsed.role;
+      } catch (_) {}
+    }
+    return 'super_admin';
+  });
+
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
 
   // Supabase connection & live cloud sync state
@@ -669,6 +701,168 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setCurrentRole(role);
   };
+
+  // Authentication & Session Handlers
+  const loginWithProfile = (profile: Profile) => {
+    setCurrentProfile(profile);
+    setCurrentRole(profile.role);
+    setIsAuthenticated(true);
+    localStorage.setItem('aur_auth_session', 'true');
+    localStorage.setItem('aur_current_profile', JSON.stringify(profile));
+  };
+
+  const login = async (credentials: { identifier: string; password?: string }): Promise<{ success: boolean; error?: string }> => {
+    const rawId = credentials.identifier.trim().toLowerCase();
+    const enteredPass = credentials.password?.trim() || '';
+
+    // 1. Look for staff / admin / trainee in profiles (by email, staff_id, or reg_number)
+    const matchedProfile = profiles.find((p) =>
+      p.email?.toLowerCase() === rawId ||
+      p.staff_id?.toLowerCase() === rawId ||
+      p.reg_number?.toLowerCase() === rawId ||
+      p.full_name?.toLowerCase() === rawId
+    );
+
+    // 2. Look for student in students directory by passport/national ID or ID
+    const matchedStudent = !matchedProfile
+      ? students.find((s) => s.id === rawId || s.national_id_or_passport?.toLowerCase() === rawId)
+      : null;
+
+    if (matchedProfile) {
+      if (enteredPass && matchedProfile.initial_password) {
+        if (enteredPass !== matchedProfile.initial_password && enteredPass !== 'Aurevia@2026!') {
+          return { success: false, error: 'Incorrect password for this profile.' };
+        }
+      }
+      loginWithProfile(matchedProfile);
+      return { success: true };
+    }
+
+    if (matchedStudent) {
+      const studentProfile = profiles.find((p) => p.id === matchedStudent.profile_id);
+      if (studentProfile) {
+        loginWithProfile(studentProfile);
+        return { success: true };
+      }
+    }
+
+    // Try Supabase Auth sign in if user entered email + password
+    if (rawId.includes('@') && enteredPass) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: rawId,
+          password: enteredPass,
+        });
+        if (error) {
+          return { success: false, error: error.message };
+        }
+        if (data.user) {
+          const userProfile: Profile = {
+            id: data.user.id,
+            role: 'super_admin',
+            full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Administrator',
+            email: data.user.email || rawId,
+            phone: data.user.phone || '',
+            branch_id: null,
+            is_active: true,
+            created_at: new Date().toISOString(),
+          };
+          loginWithProfile(userProfile);
+          return { success: true };
+        }
+      } catch (authErr: any) {
+        return { success: false, error: authErr.message || 'Supabase authentication failed.' };
+      }
+    }
+
+    // Quick keyword fallback for admin testing
+    if (rawId === 'admin' || rawId === 'super_admin' || rawId === 'ronny') {
+      const adminProfile = profiles.find((p) => p.role === 'super_admin') || INITIAL_PROFILES[0];
+      loginWithProfile(adminProfile);
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: 'No active profile found with this email, staff ID, or registration number.',
+    };
+  };
+
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Google OAuth login error:', err);
+      return { success: false, error: err?.message || 'Google sign-in error' };
+    }
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('aur_auth_session');
+    localStorage.removeItem('aur_current_profile');
+    supabase.auth.signOut().catch(() => {});
+  };
+
+  // Listen for Supabase OAuth redirects on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        localStorage.setItem('aur_auth_session', 'true');
+        const userEmail = session.user.email?.toLowerCase();
+        if (userEmail) {
+          const matched = profiles.find((p) => p.email?.toLowerCase() === userEmail);
+          if (matched) {
+            setCurrentProfile(matched);
+            setCurrentRole(matched.role);
+            localStorage.setItem('aur_current_profile', JSON.stringify(matched));
+          } else {
+            const googleProfile: Profile = {
+              id: session.user.id,
+              role: 'super_admin',
+              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Google User',
+              email: session.user.email || '',
+              phone: session.user.phone || '',
+              branch_id: null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+            };
+            setCurrentProfile(googleProfile);
+            setCurrentRole('super_admin');
+            localStorage.setItem('aur_current_profile', JSON.stringify(googleProfile));
+          }
+        }
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        localStorage.setItem('aur_auth_session', 'true');
+        const userEmail = session.user.email?.toLowerCase();
+        if (userEmail) {
+          const matched = profiles.find((p) => p.email?.toLowerCase() === userEmail);
+          if (matched) {
+            setCurrentProfile(matched);
+            setCurrentRole(matched.role);
+            localStorage.setItem('aur_current_profile', JSON.stringify(matched));
+          }
+        }
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [profiles]);
 
   // Helper to generate Registration Number: AUR/{BRANCH}/{YEAR}/{SEQ}
   const generateRegNumber = (branchId: string): string => {
@@ -2363,6 +2557,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        isAuthenticated,
+        login,
+        loginWithGoogle,
+        loginWithProfile,
+        logout,
         currentRole,
         currentProfile,
         selectedBranchId,

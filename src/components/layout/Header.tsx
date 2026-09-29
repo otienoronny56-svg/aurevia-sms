@@ -4,7 +4,7 @@ import { UserRole } from '../../types/database.types';
 import {
   Sun, Moon, Bell, Database, Menu,
   ChevronDown, CheckCircle2, Shield, User,
-  Building2, Sparkles, Coffee, RefreshCw
+  Building2, Sparkles, Coffee, RefreshCw, LogOut
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -26,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
     currentRole,
     currentProfile,
     switchRole,
+    logout,
     isDbConnected,
     dbStatusMessage,
     branches,
@@ -306,6 +307,36 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentRole === r.role && <CheckCircle2 size={14} color="var(--crema-gold)" />}
                 </button>
               ))}
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '6px', paddingTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout();
+                    setShowRoleDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#EF4444',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <LogOut size={14} />
+                  <span>Log Out & Exit</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './lib/store';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { LoginPage } from './pages/LoginPage';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { BranchManagerDashboard } from './pages/BranchManagerDashboard';
 import { InstructorDashboard } from './pages/InstructorDashboard';
@@ -175,11 +176,33 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
   }
 }
 
+const MainApp: React.FC = () => {
+  const { isAuthenticated } = useApp();
+
+  const [receiptRef, setReceiptRef] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('ref') || params.get('receipt');
+    }
+    return null;
+  });
+
+  if (receiptRef) {
+    return <PublicReceiptView receiptRef={receiptRef} onBack={() => setReceiptRef(null)} />;
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return <DashboardRouter />;
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <DashboardRouter />
+        <MainApp />
       </AppProvider>
     </ErrorBoundary>
   );
