@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
-  Info, ShieldCheck, MapPin,
+  Info, ShieldCheck, MapPin, CheckCircle2,
 } from 'lucide-react';
+import { PasswordResetModal } from '../components/modals/PasswordResetModal';
 import './LoginPage.css';
 
 const MAX_ATTEMPTS = 5;
@@ -56,6 +57,8 @@ export const LoginPage: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForgot, setShowForgot] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetSuccessToast, setResetSuccessToast] = useState<string | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number>(() => Number(localStorage.getItem(LOCK_KEY)) || 0);
   const [now, setNow] = useState(Date.now());
@@ -229,6 +232,27 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
 
+          {resetSuccessToast && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid #10B981',
+                color: '#10B981',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                marginBottom: '16px',
+              }}
+            >
+              <CheckCircle2 size={18} />
+              <span>{resetSuccessToast}</span>
+            </div>
+          )}
+
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <div className="auth-field">
               <label htmlFor="login-identifier">
@@ -266,9 +290,8 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   id="forgot-password-btn"
                   className="auth-link"
-                  onClick={() => setShowForgot((v) => !v)}
-                  aria-expanded={showForgot}
-                  aria-controls="forgot-password-help"
+                  onClick={() => setShowResetModal(true)}
+                  aria-haspopup="dialog"
                 >
                   Forgot password?
                 </button>
@@ -353,6 +376,19 @@ export const LoginPage: React.FC = () => {
           </footer>
         </div>
       </main>
+
+      <PasswordResetModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        initialIdentifier={identifier}
+        onSuccess={(id, newPass) => {
+          setIdentifier(id);
+          setPassword(newPass);
+          setError(null);
+          setResetSuccessToast('Password successfully reset! Your new credentials have been filled below.');
+          setTimeout(() => setResetSuccessToast(null), 8000);
+        }}
+      />
     </div>
   );
 };

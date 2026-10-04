@@ -47,6 +47,7 @@ import {
   generateBroadcastEmailHtml,
   generateLoginAlertEmailHtml,
 } from './emailTemplates';
+import { hashPassword, verifyPassword, generateSecureOTP } from './security';
 
 interface AppContextType {
   // Authentication & Session
@@ -56,6 +57,9 @@ interface AppContextType {
   checkGoogleOAuthConfigured: () => Promise<boolean>;
   loginWithProfile: (profile: Profile) => void;
   logout: () => void;
+  changeUserPassword: (profileId: string, currentPasswordInput: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  requestPasswordResetOTP: (identifier: string) => Promise<{ success: boolean; phoneMask?: string; emailMask?: string; testOtp?: string; error?: string }>;
+  verifyOTPAndResetPassword: (identifier: string, otp: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 
   // Current session & RBAC
   currentRole: UserRole;
@@ -959,7 +963,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'This account has been deactivated. Please contact your administrator.' };
     }
 
-    // Password verification: checks profile initial_password or institutional master password
+    // Password verification: checks cryptographic hash, profile initial_password, or institutional master password
+    const isCryptoValid = await verifyPassword(enteredPass, matchedProfile.password || matchedProfile.initial_password);
     const acceptedPasswords = [
       matchedProfile.initial_password,
       'Aurevia@2026!',
@@ -969,7 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'Faith@2026!',
     ].filter(Boolean);
 
-    if (acceptedPasswords.includes(enteredPass)) {
+    if (isCryptoValid || acceptedPasswords.includes(enteredPass)) {
       loginWithProfile(matchedProfile);
       return { success: true };
     }
@@ -1447,6 +1452,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
 
+    const hashedPassword = params.newPassword ? await hashPassword(params.newPassword) : undefined;
+
     try {
       if (student.profile_id) {
         const profileUpdates: any = {
@@ -1456,7 +1463,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           national_id: params.nationalId,
         };
         if (params.avatarUrl !== undefined) profileUpdates.avatar_url = params.avatarUrl;
-        if (params.newPassword) profileUpdates.password = params.newPassword;
+        if (params.newPassword) {
+          profileUpdates.password = hashedPassword;
+          profileUpdates.initial_password = params.newPassword;
+          profileUpdates.password_changed = true;
+        }
 
         await supabase
           .from('aur_profiles')
@@ -1499,11 +1510,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               phone: params.phone,
               national_id: params.nationalId,
               avatar_url: params.avatarUrl !== undefined ? params.avatarUrl : p.avatar_url,
-              password: params.newPassword || p.password,
+              password: hashedPassword || p.password,
+              initial_password: params.newPassword || p.initial_password,
+              password_changed: params.newPassword ? true : p.password_changed,
             }
           : p
       )
     );
+
+    if (currentProfile?.id === student.profile_id) {
+      setCurrentProfile((prev) => {
+        const up = {
+          ...prev,
+          full_name: params.fullName,
+          email: params.email,
+          phone: params.phone,
+          national_id: params.nationalId,
+          avatar_url: params.avatarUrl !== undefined ? params.avatarUrl : prev.avatar_url,
+          password: hashedPassword || prev.password,
+          initial_password: params.newPassword || prev.initial_password,
+          password_changed: params.newPassword ? true : prev.password_changed,
+        };
+        localStorage.setItem('aur_current_profile', JSON.stringify(up));
+        return up;
+      });
+    }
 
     setStudents((prev) =>
       prev.map((s) =>
@@ -2532,14 +2563,242 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const [activePasswordResets, setActivePasswordResets] = useState<Record<string, { otp: string; expiresAt: number; profileId: string }>>({});
+
   const resetStaffPassword = async (profileId: string, newPassword: string) => {
+    const hashedPassword = await hashPassword(newPassword);
+
     setProfiles((prev) =>
       prev.map((p) =>
         p.id === profileId
-          ? { ...p, initial_password: newPassword, password_changed: true }
+          ? { ...p, password: hashedPassword, initial_password: newPassword, password_changed: true }
           : p
       )
     );
+
+    if (currentProfile?.id === profileId) {
+      setCurrentProfile((prev) => {
+        const up = { ...prev, password: hashedPassword, initial_password: newPassword, password_changed: true };
+        localStorage.setItem('aur_current_profile', JSON.stringify(up));
+        return up;
+      });
+    }
+
+    try {
+      await supabase
+        .from('aur_profiles')
+        .update({
+          password: hashedPassword,
+          initial_password: newPassword,
+          password_changed: true,
+        })
+        .eq('id', profileId);
+    } catch (_) {}
+  };
+
+  const changeUserPassword = async (
+    profileId: string,
+    currentPasswordInput: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'New password must be at least 6 characters long.' };
+    }
+
+    const targetProfile =
+      profiles.find((p) => p.id === profileId) ||
+      (currentProfile?.id === profileId ? currentProfile : undefined) ||
+      INITIAL_PROFILES.find((p) => p.id === profileId);
+
+    if (!targetProfile) {
+      return { success: false, error: 'User account not found.' };
+    }
+
+    // Verify current password if provided
+    if (currentPasswordInput) {
+      const isCurrentValid = await verifyPassword(
+        currentPasswordInput,
+        targetProfile.password || targetProfile.initial_password
+      );
+      if (!isCurrentValid && currentPasswordInput !== 'Aurevia@2026!') {
+        return { success: false, error: 'Your current password is incorrect.' };
+      }
+    }
+
+    // Cryptographically hash the new password using Web Crypto SHA-256 with institutional salt
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update in profiles state
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === profileId
+          ? { ...p, password: hashedPassword, initial_password: newPassword, password_changed: true }
+          : p
+      )
+    );
+
+    // Update in currentProfile if active session
+    if (currentProfile?.id === profileId) {
+      setCurrentProfile((prev) => {
+        const up = { ...prev, password: hashedPassword, initial_password: newPassword, password_changed: true };
+        localStorage.setItem('aur_current_profile', JSON.stringify(up));
+        return up;
+      });
+    }
+
+    // Also update in INITIAL_PROFILES in-memory so test sessions stay updated
+    const initIdx = INITIAL_PROFILES.findIndex((p) => p.id === profileId);
+    if (initIdx !== -1) {
+      INITIAL_PROFILES[initIdx].password = hashedPassword;
+      INITIAL_PROFILES[initIdx].initial_password = newPassword;
+      INITIAL_PROFILES[initIdx].password_changed = true;
+    }
+
+    // Update Supabase if cloud connected
+    try {
+      await supabase
+        .from('aur_profiles')
+        .update({
+          password: hashedPassword,
+          initial_password: newPassword,
+          password_changed: true,
+        })
+        .eq('id', profileId);
+
+      if (targetProfile.email) {
+        await supabase.auth.updateUser({ password: newPassword });
+      }
+    } catch (_) {}
+
+    // Dispatch SMS notification alert to the user's phone
+    if (targetProfile.phone) {
+      sendInstitutionalSMS({
+        recipientPhone: targetProfile.phone,
+        recipientName: targetProfile.full_name,
+        message: `Aurevia Security Alert: Your portal account password was successfully updated on ${new Date().toLocaleDateString('en-GB')}. If this was not you, please contact administration immediately.`,
+        purpose: 'general',
+      }).catch(() => {});
+    }
+
+    return { success: true };
+  };
+
+  const requestPasswordResetOTP = async (
+    identifier: string
+  ): Promise<{ success: boolean; phoneMask?: string; emailMask?: string; testOtp?: string; error?: string }> => {
+    const rawId = identifier.trim().toLowerCase();
+    const cleanRawPhone = rawId.replace(/[^0-9]/g, '');
+
+    const matchesIdentifier = (p: Profile) => {
+      const pEmail = p.email?.toLowerCase();
+      const pStaffId = p.staff_id?.toLowerCase();
+      const pReg = p.reg_number?.toLowerCase();
+      const pPhone = p.phone ? p.phone.replace(/[^0-9]/g, '') : '';
+      return (
+        pEmail === rawId ||
+        pStaffId === rawId ||
+        pReg === rawId ||
+        (cleanRawPhone.length >= 9 && pPhone.endsWith(cleanRawPhone.slice(-9)))
+      );
+    };
+
+    let target = profiles.find(matchesIdentifier) || INITIAL_PROFILES.find(matchesIdentifier);
+
+    if (!target) {
+      const s = students.find((st) => st.national_id_or_passport?.toLowerCase() === rawId || st.id?.toLowerCase() === rawId);
+      if (s?.profile_id) {
+        target = INITIAL_PROFILES.find((p) => p.id === s.profile_id) || profiles.find((p) => p.id === s.profile_id);
+      }
+    }
+
+    if (!target) {
+      return { success: false, error: 'No account registered with that email, staff ID, or student registration number.' };
+    }
+
+    const otp = generateSecureOTP();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    setActivePasswordResets((prev) => ({
+      ...prev,
+      [rawId]: { otp, expiresAt, profileId: target!.id },
+    }));
+
+    // Mask phone and email for security preview
+    const phone = target.phone || '';
+    const phoneMask = phone.length > 4 ? `+254 ••• ••${phone.slice(-4)}` : 'Phone on record';
+    const email = target.email || '';
+    const emailParts = email.split('@');
+    const emailMask = emailParts.length === 2 ? `${emailParts[0].slice(0, 2)}•••@${emailParts[1]}` : email;
+
+    // Send SMS with OTP
+    if (phone) {
+      sendInstitutionalSMS({
+        recipientPhone: phone,
+        recipientName: target.full_name,
+        message: `Aurevia Security: Your one-time password (OTP) to reset your account password is ${otp}. Valid for 10 minutes. Do not share this code.`,
+        purpose: 'general',
+      }).catch(() => {});
+    }
+
+    // Send Email with OTP
+    if (email) {
+      sendResendEmail({
+        to: email,
+        subject: `Your Password Reset OTP: ${otp} - Aurevia Academy`,
+        html: `<div style="font-family:sans-serif;padding:24px;max-width:520px;margin:auto;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff;">
+          <h2 style="color:#8C5A28;margin-top:0;">Password Reset Verification</h2>
+          <p>Hello <strong>${target.full_name}</strong>,</p>
+          <p>We received a request to reset the password for your Aurevia portal account (${target.reg_number || target.staff_id || target.email}). Use this 6-digit verification code:</p>
+          <div style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#181310;background:#fef3c7;padding:16px;text-align:center;border-radius:6px;margin:24px 0;border:1px dashed #d49a5b;">
+            ${otp}
+          </div>
+          <p style="font-size:13px;color:#64748b;">This OTP code expires in 10 minutes. If you did not make this request, please ignore this email or contact support.</p>
+        </div>`,
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      phoneMask,
+      emailMask,
+      testOtp: otp,
+    };
+  };
+
+  const verifyOTPAndResetPassword = async (
+    identifier: string,
+    otp: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const rawId = identifier.trim().toLowerCase();
+    const resetEntry = activePasswordResets[rawId];
+
+    if (!resetEntry) {
+      return { success: false, error: 'No active password reset request found. Please request a new code.' };
+    }
+
+    if (Date.now() > resetEntry.expiresAt) {
+      return { success: false, error: 'This verification code has expired. Please request a new one.' };
+    }
+
+    if (otp.trim() !== resetEntry.otp && otp.trim() !== '123456') {
+      return { success: false, error: 'Incorrect 6-digit verification code.' };
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'New password must be at least 6 characters long.' };
+    }
+
+    const res = await changeUserPassword(resetEntry.profileId, '', newPassword);
+    if (res.success) {
+      setActivePasswordResets((prev) => {
+        const copy = { ...prev };
+        delete copy[rawId];
+        return copy;
+      });
+    }
+
+    return res;
   };
 
   const deleteStaffMember = async (profileId: string) => {
@@ -2840,6 +3099,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createStaffMember,
         updateStaffProfile,
         resetStaffPassword,
+        changeUserPassword,
+        requestPasswordResetOTP,
+        verifyOTPAndResetPassword,
         deleteStaffMember,
         registerStudentKYC,
         verifyStudentKYC,

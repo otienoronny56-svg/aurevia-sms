@@ -4,8 +4,9 @@ import { UserRole } from '../../types/database.types';
 import {
   Sun, Moon, Bell, Database, Menu,
   ChevronDown, CheckCircle2, Shield, User,
-  Building2, Sparkles, Coffee, RefreshCw, LogOut
+  Building2, Sparkles, Coffee, RefreshCw, LogOut, Lock
 } from 'lucide-react';
+import { ChangeMyPasswordModal } from '../modals/ChangeMyPasswordModal';
 
 interface HeaderProps {
   activeTab: string;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   setTheme,
 }) => {
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const {
     currentRole,
     currentProfile,
@@ -335,7 +337,35 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               )}
 
-              <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '6px', paddingTop: '6px' }}>
+              <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '6px', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRoleDropdown(false);
+                    setShowChangePasswordModal(true);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Lock size={14} color="var(--crema-gold)" />
+                  <span>Change Password</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -368,6 +398,10 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
+
+      {showChangePasswordModal && (
+        <ChangeMyPasswordModal onClose={() => setShowChangePasswordModal(false)} />
+      )}
     </header>
   );
 };

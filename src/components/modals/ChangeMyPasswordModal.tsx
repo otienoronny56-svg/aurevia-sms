@@ -7,7 +7,7 @@ interface ChangeMyPasswordModalProps {
 }
 
 export const ChangeMyPasswordModal: React.FC<ChangeMyPasswordModalProps> = ({ onClose }) => {
-  const { currentProfile, resetStaffPassword } = useApp();
+  const { currentProfile, changeUserPassword } = useApp();
 
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -33,12 +33,16 @@ export const ChangeMyPasswordModal: React.FC<ChangeMyPasswordModalProps> = ({ on
 
     setIsSaving(true);
     try {
-      await resetStaffPassword(currentProfile.id, newPassword);
+      const res = await changeUserPassword(currentProfile.id, currentPasswordInput, newPassword);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to update password');
+        return;
+      }
       setIsSuccess(true);
       setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 1200);
+      }, 1500);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update password');
     } finally {
