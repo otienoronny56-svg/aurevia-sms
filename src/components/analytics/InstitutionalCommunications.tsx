@@ -68,6 +68,8 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
   // Dispatch state & Toast feedback
   const [isDispatching, setIsDispatching] = useState<boolean>(false);
   const [dispatchSuccess, setDispatchSuccess] = useState<{ count: number; channel: string } | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [templateCopiedAlert, setTemplateCopiedAlert] = useState<string | null>(null);
 
   // Ledger Table Filters & Search
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -297,6 +299,44 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
     customEmail,
   ]);
 
+  // Dynamic Segment Statistics for clear count badges
+  const segmentStats = useMemo(() => {
+    const scopedStudents = students.filter((s) => {
+      if (isBranchManagerMode) return s.branch_id === currentProfile.branch_id;
+      if (selectedBranchId !== 'ALL') return s.branch_id === selectedBranchId;
+      return true;
+    });
+
+    const feeDefaultersCount = scopedStudents.filter((s) => {
+      const studentInvoices = invoices.filter((inv) => inv.student_id === s.id);
+      const totalBilled = studentInvoices.reduce((acc, curr) => acc + curr.total_fee, 0);
+      const totalPaid = studentInvoices.reduce((acc, curr) => acc + curr.amount_paid, 0);
+      const bal = studentInvoices.reduce((acc, curr) => acc + curr.balance_due, 0) || (totalBilled - totalPaid);
+      return bal > 0;
+    }).length;
+
+    const lowAttendanceCount = scopedStudents.filter((s) => {
+      const studentLogs = attendance.filter((a) => a.student_id === s.id);
+      if (studentLogs.length === 0) return false;
+      const presentCount = studentLogs.filter((a) => a.status === 'present' || a.status === 'late').length;
+      return Math.round((presentCount / studentLogs.length) * 100) < 85;
+    }).length;
+
+    const staffCount = profiles.filter((p) => {
+      if (p.role === 'student') return false;
+      if (isBranchManagerMode) return p.branch_id === currentProfile.branch_id || !p.branch_id;
+      if (selectedBranchId !== 'ALL') return p.branch_id === selectedBranchId || !p.branch_id;
+      return true;
+    }).length;
+
+    return {
+      all: scopedStudents.length,
+      feeDefaulters: feeDefaultersCount,
+      lowAttendance: lowAttendanceCount,
+      staff: staffCount,
+    };
+  }, [students, invoices, attendance, profiles, isBranchManagerMode, currentProfile, selectedBranchId]);
+
   // ---------------------------------------------------------------------------
   // 1-CLICK PRESET TEMPLATES
   // ---------------------------------------------------------------------------
@@ -355,6 +395,8 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
     setPurpose(tpl.purpose);
     setSubject(tpl.subject);
     setMessageBody(tpl.body);
+    setTemplateCopiedAlert(`Loaded "${tpl.title}" preset template!`);
+    setTimeout(() => setTemplateCopiedAlert(null), 3000);
   };
 
   const insertTag = (tag: string) => {
@@ -787,309 +829,520 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(420px, 1.4fr) minmax(340px, 1fr)',
+            gridTemplateColumns: 'minmax(460px, 1.45fr) minmax(360px, 1fr)',
             gap: '24px',
             alignItems: 'start',
           }}
         >
-          {/* LEFT COLUMN: COMPOSE FORM */}
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* LEFT COLUMN: COMPOSE WORKFLOW */}
+          <div className="glass-card" style={{ padding: '24px 26px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+            {/* Header with Title and Toast */}
             <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={20} color="var(--crema-gold)" />
-                <span>Create Institutional Communication</span>
-              </h3>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Dispatch SMS, Email, or Dual broadcasts to students, cohorts, defaulters, or faculty with merge variables.
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', margin: 0 }}>
+                  <Sparkles size={20} color="var(--crema-gold)" />
+                  <span>Institutional Broadcast Dispatcher</span>
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    background: 'rgba(212, 154, 91, 0.12)',
+                    color: 'var(--crema-gold)',
+                    fontWeight: 700,
+                    letterSpacing: '0.4px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Step-by-Step Dispatcher
+                </span>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
+                Reach students and faculty via direct SMS alerts, branded institutional emails, or dual broadcasts with dynamic merge tags.
               </p>
             </div>
 
-            {/* CHANNEL SELECTOR */}
+            {templateCopiedAlert && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: 'rgba(212, 154, 91, 0.15)',
+                  border: '1px solid var(--crema-gold)',
+                  color: 'var(--crema-gold)',
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                }}
+              >
+                <Sparkles size={16} />
+                <span>{templateCopiedAlert}</span>
+              </div>
+            )}
+
+            {/* STEP 1: DELIVERY CHANNEL */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                1. Select Delivery Channel
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel('sms')}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: selectedChannel === 'sms' ? '2px solid var(--crema-gold)' : '1px solid var(--border-color)',
-                    background: selectedChannel === 'sms' ? 'rgba(212, 163, 89, 0.15)' : 'var(--card-bg)',
-                    color: selectedChannel === 'sms' ? 'var(--crema-gold)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <Smartphone size={20} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Bulk SMS</span>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>Africa's Talking</span>
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--crema-gold)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(212, 154, 91, 0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>1</span>
+                  <span>Select Delivery Channel</span>
+                </label>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Active: <strong style={{ color: selectedChannel === 'dual' ? '#34D399' : selectedChannel === 'sms' ? 'var(--crema-gold)' : '#A78BFA' }}>
+                    {selectedChannel === 'dual' ? 'Dual (SMS + Email)' : selectedChannel === 'sms' ? 'SMS Only' : 'Email Only'}
+                  </strong>
+                </span>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel('email')}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: selectedChannel === 'email' ? '2px solid #8B5CF6' : '1px solid var(--border-color)',
-                    background: selectedChannel === 'email' ? 'rgba(139, 92, 246, 0.15)' : 'var(--card-bg)',
-                    color: selectedChannel === 'email' ? '#A78BFA' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <Mail size={20} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Institutional Email</span>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>Resend / SMTP</span>
-                </button>
-
-                <button
-                  type="button"
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                {/* DUAL CHANNEL */}
+                <div
                   onClick={() => setSelectedChannel('dual')}
                   style={{
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: selectedChannel === 'dual' ? '2px solid #10B981' : '1px solid var(--border-color)',
-                    background: selectedChannel === 'dual' ? 'rgba(16, 185, 129, 0.15)' : 'var(--card-bg)',
-                    color: selectedChannel === 'dual' ? '#34D399' : 'var(--text-secondary)',
+                    padding: '14px 12px',
+                    borderRadius: '12px',
+                    border: selectedChannel === 'dual' ? '2px solid #10B981' : '1px solid var(--border-subtle)',
+                    background: selectedChannel === 'dual' ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-surface-elevated)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
+                    gap: '8px',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedChannel === 'dual' ? '0 0 16px rgba(16, 185, 129, 0.2)' : 'none',
+                    position: 'relative',
                   }}
                 >
-                  <Zap size={20} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Dual Omnichannel</span>
-                  <span style={{ fontSize: '0.68rem', opacity: 0.8 }}>SMS + Email Blast</span>
-                </button>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-9px',
+                      background: '#10B981',
+                      color: '#042F2E',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                    }}
+                  >
+                    Recommended
+                  </span>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      background: selectedChannel === 'dual' ? '#10B981' : 'rgba(16, 185, 129, 0.15)',
+                      color: selectedChannel === 'dual' ? '#042F2E' : '#34D399',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: selectedChannel === 'dual' ? '#34D399' : 'var(--text-primary)' }}>
+                      Dual Omnichannel
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      SMS Text + Branded Email
+                    </div>
+                  </div>
+                </div>
+
+                {/* SMS ONLY */}
+                <div
+                  onClick={() => setSelectedChannel('sms')}
+                  style={{
+                    padding: '14px 12px',
+                    borderRadius: '12px',
+                    border: selectedChannel === 'sms' ? '2px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                    background: selectedChannel === 'sms' ? 'rgba(212, 154, 91, 0.12)' : 'var(--bg-surface-elevated)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedChannel === 'sms' ? '0 0 16px var(--crema-gold-glow)' : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      background: selectedChannel === 'sms' ? 'var(--crema-gold)' : 'rgba(212, 154, 91, 0.15)',
+                      color: selectedChannel === 'sms' ? '#181310' : 'var(--crema-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Smartphone size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: selectedChannel === 'sms' ? 'var(--crema-gold)' : 'var(--text-primary)' }}>
+                      Direct Mobile SMS
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Rapid alert (&lt;160 chars)
+                    </div>
+                  </div>
+                </div>
+
+                {/* EMAIL ONLY */}
+                <div
+                  onClick={() => setSelectedChannel('email')}
+                  style={{
+                    padding: '14px 12px',
+                    borderRadius: '12px',
+                    border: selectedChannel === 'email' ? '2px solid #8B5CF6' : '1px solid var(--border-subtle)',
+                    background: selectedChannel === 'email' ? 'rgba(139, 92, 246, 0.12)' : 'var(--bg-surface-elevated)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedChannel === 'email' ? '0 0 16px rgba(139, 92, 246, 0.2)' : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      background: selectedChannel === 'email' ? '#8B5CF6' : 'rgba(139, 92, 246, 0.15)',
+                      color: selectedChannel === 'email' ? '#FFFFFF' : '#A78BFA',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Mail size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: selectedChannel === 'email' ? '#A78BFA' : 'var(--text-primary)' }}>
+                      Institutional Email
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Formal letterhead via Resend
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* AUDIENCE TARGET SELECTOR */}
+            {/* STEP 2: AUDIENCE TARGETING */}
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                2. Target Audience Segment ({resolvedRecipients.length} recipients selected)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                <select
-                  className="input-field"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value as any)}
-                  style={{ fontSize: '0.85rem' }}
-                >
-                  <option value="all_students">All Enrolled Trainees</option>
-                  <option value="cohort">Specific Intake / Cohort</option>
-                  <option value="course">Specific Course Group</option>
-                  <option value="fee_defaulters">Students with Fee Balances (&gt; KES 0)</option>
-                  <option value="low_attendance">Trainees with Attendance &lt; 85%</option>
-                  <option value="staff">Faculty & Staff Members</option>
-                  <option value="custom">Single Direct Recipient</option>
-                </select>
-
-                {/* Branch selector if super admin */}
-                {!isBranchManagerMode ? (
-                  <select
-                    className="input-field"
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="ALL">All Campuses (National)</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.city})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div
-                    style={{
-                      padding: '10px 14px',
-                      background: 'rgba(212, 163, 89, 0.1)',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      color: 'var(--crema-gold)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Building2 size={16} />
-                    <span>Campus: {currentBranch?.name}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--crema-gold)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(212, 154, 91, 0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>2</span>
+                  <span>Select Target Audience</span>
+                </label>
+                {!isBranchManagerMode && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Campus Filter:</span>
+                    <select
+                      className="form-select"
+                      value={selectedBranchId}
+                      onChange={(e) => setSelectedBranchId(e.target.value)}
+                      style={{ fontSize: '0.75rem', padding: '4px 8px', height: 'auto', background: 'var(--bg-input)' }}
+                    >
+                      <option value="ALL">All Campuses (National)</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.city})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>
 
-              {/* Sub-selector for Cohort */}
+              {/* Segment Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+                {[
+                  { id: 'all_students', label: 'All Trainees', icon: Users, count: segmentStats.all, highlight: null },
+                  { id: 'fee_defaulters', label: 'Fee Defaulters', icon: CreditCard, count: segmentStats.feeDefaulters, highlight: '#F59E0B' },
+                  { id: 'low_attendance', label: 'Attendance < 85%', icon: AlertTriangle, count: segmentStats.lowAttendance, highlight: '#EF4444' },
+                  { id: 'cohort', label: 'By Cohort', icon: Calendar, count: null, highlight: null },
+                  { id: 'course', label: 'By Course', icon: BookOpen, count: null, highlight: null },
+                  { id: 'staff', label: 'Staff & Faculty', icon: Building2, count: segmentStats.staff, highlight: null },
+                  { id: 'custom', label: 'Single Recipient', icon: Smartphone, count: null, highlight: null },
+                ].map((seg) => {
+                  const Icon = seg.icon;
+                  const isSelected = targetAudience === seg.id;
+                  return (
+                    <button
+                      key={seg.id}
+                      type="button"
+                      onClick={() => setTargetAudience(seg.id as any)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: '10px',
+                        border: isSelected ? '1.5px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                        background: isSelected ? 'rgba(212, 154, 91, 0.15)' : 'var(--bg-surface-elevated)',
+                        color: isSelected ? 'var(--crema-gold)' : 'var(--text-primary)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '5px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <Icon size={16} color={isSelected ? 'var(--crema-gold)' : (seg.highlight || 'var(--text-secondary)')} />
+                      <span style={{ fontSize: '0.74rem', fontWeight: 600, textAlign: 'center', lineHeight: '1.2' }}>{seg.label}</span>
+                      {seg.count !== null && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: seg.highlight ? `${seg.highlight}25` : 'rgba(212, 154, 91, 0.2)',
+                            color: seg.highlight || 'var(--crema-gold)',
+                          }}
+                        >
+                          {seg.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Sub-selectors depending on segment */}
               {targetAudience === 'cohort' && (
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Choose Cohort:</label>
+                <div style={{ marginBottom: '12px', background: 'rgba(212, 154, 91, 0.06)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Select Target Cohort:
+                  </label>
                   <select
-                    className="input-field"
+                    className="form-select"
                     value={selectedCohortId}
                     onChange={(e) => setSelectedCohortId(e.target.value)}
-                    style={{ fontSize: '0.85rem', marginTop: '4px' }}
+                    style={{ width: '100%', fontSize: '0.84rem' }}
                   >
                     {cohorts
                       .filter((c) => (isBranchManagerMode ? c.branch_id === currentProfile.branch_id : selectedBranchId === 'ALL' || c.branch_id === selectedBranchId))
                       .map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} - {branches.find((b) => b.id === c.branch_id)?.name}
+                          {c.name} — {branches.find((b) => b.id === c.branch_id)?.name}
                         </option>
                       ))}
                   </select>
                 </div>
               )}
 
-              {/* Sub-selector for Course */}
               {targetAudience === 'course' && (
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Choose Academic Course:</label>
+                <div style={{ marginBottom: '12px', background: 'rgba(212, 154, 91, 0.06)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Select Academic Course Group:
+                  </label>
                   <select
-                    className="input-field"
+                    className="form-select"
                     value={selectedCourseId}
                     onChange={(e) => setSelectedCourseId(e.target.value)}
-                    style={{ fontSize: '0.85rem', marginTop: '4px' }}
+                    style={{ width: '100%', fontSize: '0.84rem' }}
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.title} ({c.code})
+                        {c.title} ({c.code}) — Fee: KES {c.fee_amount?.toLocaleString()}
                       </option>
                     ))}
                   </select>
                 </div>
               )}
 
-              {/* Sub-inputs for Custom Recipient */}
               {targetAudience === 'custom' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                  <input
-                    type="text"
-                    placeholder="Recipient Full Name"
-                    className="input-field"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Phone: +254 7..."
-                    className="input-field"
-                    value={customPhone}
-                    onChange={(e) => setCustomPhone(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    className="input-field"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    style={{ fontSize: '0.82rem' }}
-                  />
+                <div style={{ marginBottom: '12px', background: 'rgba(212, 154, 91, 0.06)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--crema-gold)', fontWeight: 600, marginBottom: '8px' }}>
+                    Single Direct Recipient Details:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Recipient Full Name"
+                      className="form-input"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      style={{ fontSize: '0.82rem' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Phone: +254 7..."
+                      className="form-input"
+                      value={customPhone}
+                      onChange={(e) => setCustomPhone(e.target.value)}
+                      style={{ fontSize: '0.82rem' }}
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address"
+                      className="form-input"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      style={{ fontSize: '0.82rem' }}
+                    />
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* 1-CLICK PRESET TEMPLATES */}
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                3. Load Fast Template Preset (1-Click)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
-                {PRESET_TEMPLATES.map((tpl) => {
-                  const Icon = tpl.icon;
-                  return (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => applyTemplate(tpl)}
-                      className="btn btn-secondary"
-                      style={{
-                        padding: '8px 10px',
-                        fontSize: '0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        justifyContent: 'flex-start',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <Icon size={14} color="var(--crema-gold)" />
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.title}</span>
-                    </button>
-                  );
-                })}
+              {/* Audience Summary Banner */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.1), rgba(24, 19, 16, 0.8))',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      background: 'rgba(212, 154, 91, 0.2)',
+                      color: 'var(--crema-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {resolvedRecipients.length}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Ready to contact {resolvedRecipients.length} recipient{resolvedRecipients.length === 1 ? '' : 's'}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                      {resolvedRecipients.length > 0
+                        ? `${resolvedRecipients.slice(0, 3).map((r) => r.name).join(', ')}${resolvedRecipients.length > 3 ? ` + ${resolvedRecipients.length - 3} more` : ''}`
+                        : 'No recipients matched the selected segment filters.'}
+                    </div>
+                  </div>
+                </div>
+                <span className="badge badge-gold" style={{ fontSize: '0.72rem' }}>
+                  {isBranchManagerMode ? currentBranch?.name : selectedBranchId === 'ALL' ? 'All Campuses (National)' : currentBranch?.name}
+                </span>
               </div>
             </div>
 
-            {/* SUBJECT & MESSAGE BODY */}
+            {/* STEP 3: MESSAGE & 1-CLICK TEMPLATES */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  4. Compose Message
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--crema-gold)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(212, 154, 91, 0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>3</span>
+                  <span>Message & Fast Templates</span>
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  <span style={{ color: 'var(--crema-gold)', fontWeight: 600 }}>{messageBody.length} Chars</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  <span style={{ color: 'var(--crema-gold)', fontWeight: 700 }}>{messageBody.length} Chars</span>
                   <span>•</span>
-                  <span>{Math.ceil(messageBody.length / 160) || 1} SMS Units</span>
+                  <span style={{ fontWeight: 600, color: Math.ceil(messageBody.length / 160) > 1 ? '#F59E0B' : '#10B981' }}>
+                    {Math.ceil(messageBody.length / 160) || 1} SMS Unit{Math.ceil(messageBody.length / 160) > 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* 1-Click Fast Templates Bar */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  ⚡ Quick-Load Institutional Presets (1-Click):
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
+                  {PRESET_TEMPLATES.map((tpl) => {
+                    const Icon = tpl.icon;
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => applyTemplate(tpl)}
+                        className="btn-ghost"
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--bg-surface-elevated)',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          textAlign: 'left',
+                          color: 'var(--text-primary)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <Icon size={14} color="var(--crema-gold)" style={{ flexShrink: 0 }} />
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.title}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Email / Dual Subject Line */}
               {selectedChannel !== 'sms' && (
                 <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Email Subject Line:
+                  </label>
                   <input
                     type="text"
-                    placeholder="Email Subject Line..."
-                    className="input-field"
+                    placeholder="Subject line for email recipients..."
+                    className="form-input"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     style={{
                       width: '100%',
-                      boxSizing: 'border-box',
-                      fontSize: '0.9rem',
+                      fontSize: '0.88rem',
                       fontWeight: 600,
-                      padding: '12px 14px',
-                      background: 'rgba(15, 23, 42, 0.85)',
-                      border: '1px solid rgba(212, 163, 89, 0.4)',
-                      borderRadius: '10px',
-                      color: '#F8FAFC',
+                      background: 'var(--bg-input)',
+                      borderColor: 'var(--border-medium)',
+                      color: 'var(--text-primary)',
                     }}
                   />
                 </div>
               )}
 
-              {/* Spacious High-Contrast Textarea */}
+              {/* High-Contrast Luxury Message Textarea */}
               <div style={{ position: 'relative', width: '100%' }}>
                 <textarea
                   value={messageBody}
                   onChange={(e) => setMessageBody(e.target.value)}
-                  placeholder="Write your broadcast message here... Use tags like {student_name} to auto-personalize for every person."
+                  placeholder="Write your broadcast message here... Use tags below like {student_name} to auto-personalize for every person."
                   style={{
                     width: '100%',
-                    minHeight: '180px',
+                    minHeight: '170px',
                     boxSizing: 'border-box',
                     padding: '16px 18px',
-                    fontSize: '0.95rem',
+                    fontSize: '0.94rem',
                     lineHeight: '1.6',
                     fontFamily: 'inherit',
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    color: '#F8FAFC',
-                    border: '1.5px solid rgba(212, 163, 89, 0.45)',
+                    background: '#16110E',
+                    color: '#F8F5F1',
+                    border: '1.5px solid var(--border-medium)',
                     borderRadius: '12px',
                     boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.4)',
                     outline: 'none',
@@ -1099,11 +1352,11 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
                 />
               </div>
 
-              {/* Dynamic Variable Pills & Explanation */}
-              <div style={{ marginTop: '12px', background: 'rgba(212, 163, 89, 0.06)', border: '1px solid rgba(212, 163, 89, 0.2)', borderRadius: '10px', padding: '12px 14px' }}>
+              {/* Smart Dynamic Merge Tags */}
+              <div style={{ marginTop: '12px', background: 'rgba(212, 154, 91, 0.06)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--crema-gold)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                    🏷️ Insert Dynamic Student Merge Tags
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--crema-gold)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    🏷️ Click to Insert Personalization Tags
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                     Auto-personalized per recipient
@@ -1111,69 +1364,88 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {[
-                    { tag: '{student_name}', label: 'Student Name', desc: 'e.g. Kevin Otieno' },
-                    { tag: '{course_name}', label: 'Course Title', desc: 'e.g. Barista Skills' },
-                    { tag: '{cohort_name}', label: 'Cohort Intake', desc: 'e.g. SEP-2026-NBO' },
-                    { tag: '{campus_name}', label: 'Campus Branch', desc: 'e.g. Nairobi Roastery' },
-                    { tag: '{balance_due}', label: 'Fee Balance Due', desc: 'e.g. 15,000' },
-                    { tag: '{attendance_rate}', label: 'Attendance %', desc: 'e.g. 78%' },
+                    { tag: '{student_name}', label: 'Student Name' },
+                    { tag: '{balance_due}', label: 'Fee Balance Due' },
+                    { tag: '{course_name}', label: 'Course Title' },
+                    { tag: '{cohort_name}', label: 'Cohort Intake' },
+                    { tag: '{campus_name}', label: 'Campus Branch' },
+                    { tag: '{attendance_rate}', label: 'Attendance %' },
                   ].map((item) => (
                     <button
                       key={item.tag}
                       type="button"
                       onClick={() => insertTag(item.tag)}
-                      title={item.desc}
                       style={{
-                        background: 'rgba(212, 163, 89, 0.15)',
-                        border: '1px solid rgba(212, 163, 89, 0.4)',
+                        background: 'rgba(212, 154, 91, 0.12)',
+                        border: '1px solid var(--border-medium)',
                         borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '0.78rem',
+                        padding: '5px 11px',
+                        fontSize: '0.76rem',
                         fontWeight: 600,
                         color: 'var(--crema-gold)',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                       }}
                     >
-                      + {item.label} <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>({item.tag})</span>
+                      + {item.label} <span style={{ opacity: 0.65, fontSize: '0.68rem', fontFamily: 'var(--font-mono)' }}>({item.tag})</span>
                     </button>
                   ))}
                 </div>
-                <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                  ℹ️ <strong>How this works:</strong> When you send to {resolvedRecipients.length} people, each person receives a customized message with their own name, fee balance, and cohort details.
+                <div style={{ marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  💡 <strong>Personalization Note:</strong> When you send to {resolvedRecipients.length} people, each person automatically receives their personal name, fee balance, and cohort details.
                 </div>
               </div>
             </div>
 
-            {/* DISPATCH ACTION BUTTON */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+            {/* STEP 4: DISPATCH ACTION CTA BAR */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                paddingTop: '16px',
+                borderTop: '1px solid var(--border-subtle)',
+              }}
+            >
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Targeting <strong>{resolvedRecipients.length}</strong> recipients across {isBranchManagerMode ? currentBranch?.name : (selectedBranchId === 'ALL' ? 'All Campuses' : currentBranch?.name)}.
+                Channel: <strong style={{ color: selectedChannel === 'dual' ? '#34D399' : selectedChannel === 'sms' ? 'var(--crema-gold)' : '#A78BFA' }}>
+                  {selectedChannel === 'dual' ? 'Dual (SMS + Email)' : selectedChannel === 'sms' ? 'Mobile SMS' : 'Institutional Email'}
+                </strong> • <strong>{resolvedRecipients.length}</strong> Recipients Queued
               </div>
 
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={handleDispatch}
+                onClick={() => {
+                  if (resolvedRecipients.length === 0) {
+                    alert('Please select a target audience with at least 1 recipient.');
+                    return;
+                  }
+                  if (!messageBody.trim()) {
+                    alert('Please write a message before dispatching.');
+                    return;
+                  }
+                  setShowConfirmModal(true);
+                }}
                 disabled={isDispatching || resolvedRecipients.length === 0}
-                style={{ padding: '10px 24px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{
+                  padding: '12px 28px',
+                  fontSize: '0.92rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 16px var(--crema-gold-glow)',
+                }}
               >
-                {isDispatching ? (
-                  <>
-                    <RefreshCw size={16} className="spin" />
-                    <span>Dispatching Broadcast...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={16} />
-                    <span>Dispatch Broadcast Now ({resolvedRecipients.length})</span>
-                  </>
-                )}
+                <Send size={16} />
+                <span>Review & Dispatch Broadcast ({resolvedRecipients.length})</span>
               </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: LIVE REAL-TIME DEVICE PREVIEWS */}
+          {/* RIGHT COLUMN: LUXURY REAL-TIME DEVICE PREVIEW */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div
               className="glass-card"
@@ -1181,25 +1453,28 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
                 padding: '14px 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '10px',
+                gap: '12px',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Live Recipient Preview</span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Eye size={15} color="var(--crema-gold)" />
+                  <span>Live Recipient Preview</span>
+                </span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     type="button"
                     className={`btn ${previewDevice === 'mobile_sms' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ padding: '4px 10px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                     onClick={() => setPreviewDevice('mobile_sms')}
                   >
                     <Smartphone size={13} />
-                    <span>SMS Phone</span>
+                    <span>Phone SMS</span>
                   </button>
                   <button
                     type="button"
                     className={`btn ${previewDevice === 'desktop_email' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ padding: '4px 10px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                     onClick={() => setPreviewDevice('desktop_email')}
                   >
                     <Mail size={13} />
@@ -1208,21 +1483,21 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
                 </div>
               </div>
 
-              {/* Recipient Switcher for Preview */}
+              {/* Recipient Selector for Preview */}
               {resolvedRecipients.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
                   <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                    Previewing personalized message for:
+                    Simulating personalized message for:
                   </label>
                   <select
-                    className="input-field"
+                    className="form-select"
                     value={previewRecipientIndex}
                     onChange={(e) => setPreviewRecipientIndex(Number(e.target.value))}
-                    style={{ fontSize: '0.8rem', padding: '5px 10px', width: '100%', boxSizing: 'border-box' }}
+                    style={{ fontSize: '0.78rem', padding: '5px 10px', width: '100%', boxSizing: 'border-box' }}
                   >
                     {resolvedRecipients.map((rec, idx) => (
                       <option key={idx} value={idx}>
-                        {rec.name} ({rec.phone}) - {rec.courseName || 'Student'}
+                        {rec.name} ({rec.phone}) — {rec.courseName || 'Trainee'}
                       </option>
                     ))}
                   </select>
@@ -1230,55 +1505,66 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
               )}
             </div>
 
-            {/* 1. MOBILE SMS DEVICE MOCKUP */}
+            {/* 1. LUXURY MOBILE SMS DEVICE MOCKUP */}
             {previewDevice === 'mobile_sms' ? (
               <div
                 style={{
                   background: '#0B0F19',
                   border: '8px solid #1E293B',
-                  borderRadius: '32px',
-                  padding: '20px 16px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                  borderRadius: '36px',
+                  padding: '18px 16px',
+                  boxShadow: '0 25px 50px rgba(0,0,0,0.7), 0 0 30px rgba(212, 154, 91, 0.1)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
                   minHeight: '440px',
                 }}
               >
-                {/* Phone Speaker Notch */}
-                <div style={{ width: '60px', height: '5px', background: '#334155', borderRadius: '4px', margin: '0 auto' }} />
+                {/* Dynamic Island Notch */}
+                <div style={{ width: '80px', height: '14px', background: '#000000', borderRadius: '10px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1E293B' }} />
+                </div>
 
-                {/* SMS Header */}
+                {/* Status Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#94A3B8', padding: '0 8px' }}>
+                  <span>9:41</span>
+                  <span>5G • 100%</span>
+                </div>
+
+                {/* SMS Sender Bar */}
                 <div style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--crema-gold)' }}>AUREVIA-SMS</div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--crema-gold)', letterSpacing: '0.5px' }}>
+                    AUREVIA-SMS
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
                     To: {activePreviewRecipient.name} ({activePreviewRecipient.phone})
                   </div>
                 </div>
 
                 {/* Time Badge */}
-                <div style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <div style={{ textAlign: 'center', fontSize: '0.65rem', color: '#64748B' }}>
                   Today, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
 
                 {/* SMS Chat Bubble */}
                 <div
                   style={{
-                    background: 'linear-gradient(135deg, #1E293B, #0F172A)',
-                    border: '1px solid rgba(212, 163, 89, 0.3)',
+                    background: 'linear-gradient(135deg, #1C1917, #0C0A09)',
+                    border: '1px solid rgba(212, 154, 91, 0.4)',
                     borderRadius: '16px 16px 16px 4px',
                     padding: '14px 16px',
-                    fontSize: '0.82rem',
-                    lineHeight: '1.5',
-                    color: '#F8FAFC',
+                    fontSize: '0.84rem',
+                    lineHeight: '1.55',
+                    color: '#F8F5F1',
                     alignSelf: 'flex-start',
                     maxWidth: '92%',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
                   }}
                 >
                   <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{previewRenderedBody}</p>
-                  <div style={{ marginTop: '8px', fontSize: '0.65rem', color: 'var(--crema-gold)', textAlign: 'right' }}>
-                    Sent via Africa's Talking Gateway • Delivered ✓✓
+                  <div style={{ marginTop: '10px', fontSize: '0.66rem', color: 'var(--crema-gold)', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px' }}>
+                    <span>Delivered via Africa's Talking</span>
+                    <span style={{ color: '#10B981', fontWeight: 700 }}>✓✓</span>
                   </div>
                 </div>
               </div>
@@ -1286,63 +1572,75 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
               /* 2. BRANDED EMAIL CLIENT PREVIEW */
               <div
                 style={{
-                  background: '#FFFFFF',
-                  color: '#1E293B',
+                  background: '#1A1411',
+                  color: '#F8F5F1',
                   borderRadius: '16px',
                   overflow: 'hidden',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 25px 50px rgba(0,0,0,0.7), 0 0 30px rgba(139, 92, 246, 0.1)',
+                  border: '1px solid var(--border-medium)',
                   minHeight: '440px',
                   display: 'flex',
                   flexDirection: 'column',
                 }}
               >
-                {/* Email Client Header Bar */}
-                <div style={{ background: '#0F172A', padding: '14px 18px', color: '#F8FAFC' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
-                    From: <strong>Aurevia Academic Directorate &lt;directorate@aurevia.ac.ke&gt;</strong>
+                {/* Desktop Window Header */}
+                <div style={{ background: '#120E0C', padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }} />
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }} />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                    Institutional Mail Client • TLS Resend Gateway
+                  </span>
+                </div>
+
+                {/* Email Metadata */}
+                <div style={{ background: '#181310', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    From: <strong style={{ color: 'var(--text-primary)' }}>Aurevia Specialty Coffee Academy &lt;directorate@aureviacoffeeinstitute.co.ke&gt;</strong>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '2px' }}>
-                    To: <strong>{activePreviewRecipient.name} &lt;{activePreviewRecipient.email}&gt;</strong>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                    To: <strong style={{ color: 'var(--crema-gold)' }}>{activePreviewRecipient.name} &lt;{activePreviewRecipient.email}&gt;</strong>
                   </div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#D4A359', marginTop: '8px' }}>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--crema-gold)', marginTop: '8px' }}>
                     {subject}
                   </div>
                 </div>
 
-                {/* Email Body Template */}
-                <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Email Body */}
+                <div style={{ padding: '22px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div
                       style={{
                         width: '32px',
                         height: '32px',
                         borderRadius: '8px',
-                        background: '#0F172A',
+                        background: 'linear-gradient(135deg, #D49A5B, #8C5A28)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#D4A359',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
+                        color: '#181310',
+                        fontWeight: 900,
+                        fontSize: '0.9rem',
                       }}
                     >
                       A
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0F172A' }}>AUREVIA INSTITUTE OF COFFEE</div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748B' }}>Specialty Coffee Training & SCA Certified Center</div>
+                      <div style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                        AUREVIA SPECIALTY COFFEE ACADEMY
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--crema-gold)' }}>
+                        Premier SCA Training Campus • Kenya
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '0.86rem', lineHeight: '1.65', color: '#E6E1DC', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
                     {previewRenderedBody}
                   </div>
 
-                  <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #E2E8F0', fontSize: '0.7rem', color: '#94A3B8' }}>
-                    This is an automated transmission from Aurevia Academic Management System.
-                    <br />
-                    Campus: {branches.find(b => b.id === activePreviewRecipient.branchId)?.name || currentBranch?.name} • Phone: +254 700 123 456
+                  <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Campus: {branches.find((b) => b.id === activePreviewRecipient.branchId)?.name || currentBranch?.name} • Official Academic Transmission • SCA Certified Center
                   </div>
                 </div>
               </div>
@@ -1633,6 +1931,160 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* CONFIRMATION SUMMARY MODAL BEFORE SENDING */}
+      {showConfirmModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div
+            className="modal-content glass-card"
+            style={{
+              maxWidth: '540px',
+              width: '92%',
+              padding: '28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              border: '1.5px solid var(--crema-gold)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--crema-gold-glow)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: 'rgba(212, 154, 91, 0.2)',
+                    color: 'var(--crema-gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Send size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                    Confirm Broadcast Dispatch
+                  </h3>
+                  <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                    Review audience and personalized preview before sending
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowConfirmModal(false)}
+                style={{ padding: '4px 8px', fontSize: '1rem', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Target Breakdown Grid */}
+            <div
+              style={{
+                background: 'var(--bg-surface-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                fontSize: '0.82rem',
+              }}
+            >
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Selected Channel:</span>
+                <strong style={{ color: selectedChannel === 'dual' ? '#34D399' : selectedChannel === 'sms' ? 'var(--crema-gold)' : '#A78BFA' }}>
+                  {selectedChannel === 'dual' ? 'Dual (SMS + Email)' : selectedChannel === 'sms' ? 'Mobile SMS' : 'Institutional Email'}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Audience Count:</span>
+                <strong style={{ color: 'var(--text-primary)' }}>{resolvedRecipients.length} Recipient{resolvedRecipients.length === 1 ? '' : 's'}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Campus / Branch:</span>
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  {isBranchManagerMode ? currentBranch?.name : (selectedBranchId === 'ALL' ? 'All Campuses (National)' : currentBranch?.name)}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>Message Purpose:</span>
+                <strong style={{ color: 'var(--crema-gold)', textTransform: 'capitalize' }}>
+                  {purpose.replace(/_/g, ' ')}
+                </strong>
+              </div>
+            </div>
+
+            {/* Personalized Sample Preview */}
+            <div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                Sample Preview for <strong>{activePreviewRecipient.name}</strong>:
+              </div>
+              <div
+                style={{
+                  background: '#16110E',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  fontSize: '0.84rem',
+                  lineHeight: '1.55',
+                  color: '#F8F5F1',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '140px',
+                  overflowY: 'auto',
+                }}
+              >
+                {previewRenderedBody}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isDispatching}
+              >
+                Cancel & Edit
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  setShowConfirmModal(false);
+                  await handleDispatch();
+                }}
+                disabled={isDispatching}
+                style={{
+                  padding: '10px 22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 16px var(--crema-gold-glow)',
+                }}
+              >
+                {isDispatching ? (
+                  <>
+                    <RefreshCw size={16} className="spin" />
+                    <span>Dispatching...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    <span>Confirm & Dispatch Broadcast</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
