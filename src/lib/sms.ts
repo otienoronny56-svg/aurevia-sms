@@ -81,3 +81,12 @@ export function buildFeeReceiptSMS(params: {
 
   return `Aurevia Institute of Coffee: Payment of KES ${params.amount.toLocaleString()} received for ${params.studentName} (${params.regNumber}). Receipt: ${params.receiptNumber}. ${balanceMsg}`;
 }
+
+export function buildLoginAlertSMS(params: {
+  recipientName: string;
+  roleTitle: string;
+  timeStr: string;
+}): string {
+  return `Aurevia Alert: Successful portal sign-in for ${params.recipientName} (${params.roleTitle}) on ${params.timeStr}. If not you, contact admin immediately.`;
+}
+

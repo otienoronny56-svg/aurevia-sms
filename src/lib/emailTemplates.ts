@@ -395,3 +395,77 @@ export function generateBroadcastEmailHtml(params: BroadcastNotificationEmailPar
 </html>
   `;
 }
+
+export interface LoginAlertEmailParams {
+  recipientName: string;
+  roleTitle: string;
+  loginTime: string;
+  loginMethod: string;
+  identifierUsed?: string;
+  branchName?: string;
+}
+
+export function generateLoginAlertEmailHtml(params: LoginAlertEmailParams): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Alert: Successful Sign-in - Aurevia</title>
+  ${RESPONSIVE_CSS}
+</head>
+<body style="${BASE_STYLES}">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #120E0C; padding: 12px 6px;">
+    <tr>
+      <td align="center">
+        <div class="email-card" style="${CARD_STYLES}">
+          <div style="${HEADER_STYLES}">
+            <div style="${LOGO_BADGE}">SECURITY NOTIFICATION</div>
+            <h1 class="email-title" style="color: #F5EBE1; font-size: 22px; font-weight: 800; margin: 8px 0 4px 0;">Successful Portal Sign-In</h1>
+            <p style="color: #10B981; font-size: 13px; font-weight: 700; margin: 0;">Session Activated Successfully</p>
+          </div>
+
+          <p style="font-size: 15px; color: #E6E1DC;">Dear <strong>${params.recipientName}</strong>,</p>
+          <p style="font-size: 14px; color: #C4B8AD; line-height: 1.6;">
+            Your Aurevia portal account was just accessed. Here are the details of this login session:
+          </p>
+
+          <table class="detail-table" width="100%" style="background-color: #271E19; border: 1px solid #443429; border-radius: 6px; padding: 18px; margin: 20px 0; font-size: 13px; color: #E6E1DC;">
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F; width: 40%;">Account Role:</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #D49A5B;">${params.roleTitle}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F;">Sign-in Method:</td>
+              <td style="padding: 6px 0; color: #F5EBE1;">${params.loginMethod}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F;">Timestamp:</td>
+              <td style="padding: 6px 0; color: #F5EBE1;">${params.loginTime}</td>
+            </tr>
+            ${params.branchName ? `
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F;">Assigned Campus:</td>
+              <td style="padding: 6px 0; color: #F5EBE1;">${params.branchName}</td>
+            </tr>` : ''}
+          </table>
+
+          <p style="font-size: 13px; color: #A89B8F; line-height: 1.5;">
+            If you recently signed in, no further action is required. If this was not you, please immediately notify your administrator or change your credentials to secure your account.
+          </p>
+
+          <div style="${FOOTER_STYLES}">
+            <p style="margin: 4px 0;"><strong>Aurevia Specialty Coffee Academy & Roastery</strong></p>
+            <p style="margin: 4px 0;">Specialty Coffee Association (SCA) Accredited Campus</p>
+            <p style="margin: 4px 0; color: #635850;">Nairobi • Mombasa • Eldoret • Kigali</p>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+

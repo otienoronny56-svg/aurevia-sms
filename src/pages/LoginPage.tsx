@@ -2,11 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
-  Info, ShieldCheck, Building2, GraduationCap, MapPin,
+  Info, ShieldCheck, MapPin,
 } from 'lucide-react';
 import './LoginPage.css';
-
-type Portal = 'staff' | 'student';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 60;
@@ -50,7 +48,6 @@ const consumeOAuthUrlError = (): string | null => {
 export const LoginPage: React.FC = () => {
   const { login, loginWithGoogle } = useApp();
 
-  const [portal, setPortal] = useState<Portal>('staff');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -108,12 +105,6 @@ export const LoginPage: React.FC = () => {
     }
   }, [isLocked, lockedUntil]);
 
-  const switchPortal = (next: Portal) => {
-    setPortal(next);
-    setError(null);
-    identifierRef.current?.focus();
-  };
-
   const handleCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
     setCapsLock(e.getModifierState?.('CapsLock') ?? false);
   };
@@ -124,7 +115,7 @@ export const LoginPage: React.FC = () => {
     setError(null);
 
     if (!identifier.trim()) {
-      setError(portal === 'staff' ? 'Enter your work email or staff ID.' : 'Enter your registration number or email.');
+      setError('Enter your email, staff ID, or student registration number.');
       identifierRef.current?.focus();
       return;
     }
@@ -181,8 +172,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const isStaff = portal === 'staff';
-
   return (
     <div className="auth">
       {/* ---------------- Brand / hero panel ---------------- */}
@@ -226,28 +215,7 @@ export const LoginPage: React.FC = () => {
             <span>{isGoogleLoading ? 'Redirecting to Google…' : 'Continue with Google'}</span>
           </button>
 
-          <div className="auth-divider">or sign in with your password</div>
-
-          <div className="auth-segment" role="radiogroup" aria-label="Account type">
-            <button
-              type="button"
-              role="radio"
-              id="portal-staff-tab"
-              aria-checked={isStaff}
-              onClick={() => switchPortal('staff')}
-            >
-              <Building2 size={15} aria-hidden="true" /> Staff &amp; Faculty
-            </button>
-            <button
-              type="button"
-              role="radio"
-              id="portal-student-tab"
-              aria-checked={!isStaff}
-              onClick={() => switchPortal('student')}
-            >
-              <GraduationCap size={15} aria-hidden="true" /> Trainee
-            </button>
-          </div>
+          <div className="auth-divider">or sign in with your credentials</div>
 
           <div aria-live="assertive">
             {error && (
@@ -264,25 +232,24 @@ export const LoginPage: React.FC = () => {
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <div className="auth-field">
               <label htmlFor="login-identifier">
-                {isStaff ? 'Work email or staff ID' : 'Registration number or email'}
+                Email, Staff ID, or Student Reg Number
               </label>
               <div className="auth-input">
                 <span className="auth-input__icon">
-                  {isStaff ? <Mail size={17} aria-hidden="true" /> : <GraduationCap size={17} aria-hidden="true" />}
+                  <Mail size={17} aria-hidden="true" />
                 </span>
                 <input
                   ref={identifierRef}
                   id="login-identifier"
                   name="username"
                   type="text"
-                  inputMode={isStaff ? 'email' : 'text'}
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                   autoFocus
                   required
-                  placeholder={isStaff ? 'name@aureviacoffeeinstitute.co.ke' : 'AUR/NBO/2026/001'}
+                  placeholder="e.g. name@aureviacoffeeinstitute.co.ke or AUR/NBO/..."
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   aria-invalid={!!error && !identifier.trim()}

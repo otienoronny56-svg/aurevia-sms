@@ -38,13 +38,14 @@ import {
 import { INITIAL_ALUMNI } from './alumniData';
 import { supabase, checkSupabaseConnection, supabaseUrl, supabaseAnonKey } from './supabase';
 import { generateMpesaReceiptNumber } from './mpesa';
-import { sendInstitutionalSMS } from './sms';
+import { sendInstitutionalSMS, buildLoginAlertSMS } from './sms';
 import { sendResendEmail } from './resend';
 import {
   generateWelcomeAdmissionEmailHtml,
   generateTuitionReceiptEmailHtml,
   generateAgreementSignedEmailHtml,
   generateBroadcastEmailHtml,
+  generateLoginAlertEmailHtml,
 } from './emailTemplates';
 
 interface AppContextType {
@@ -704,12 +705,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Authentication & Session Handlers
-  const loginWithProfile = (profile: Profile) => {
+  const dispatchLoginAlertNotifications = async (profile: Profile, method: string = 'Password / ID') => {
+    try {
+      const nowStr = new Date().toLocaleString('en-GB', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+      const roleDisplay = profile.role === 'super_admin'
+        ? 'Super Admin'
+        : profile.role === 'branch_manager'
+        ? 'Branch Manager'
+        : profile.role === 'instructor'
+        ? 'Instructor / Faculty'
+        : 'Trainee / Student';
+
+      const branchObj = branches.find((b) => b.id === profile.branch_id);
+      const branchName = branchObj ? branchObj.name : 'All Campuses';
+
+      // 1. Dispatch Automated Email Notification if email is available
+      if (profile.email && profile.email.includes('@')) {
+        const html = generateLoginAlertEmailHtml({
+          recipientName: profile.full_name,
+          roleTitle: roleDisplay,
+          loginTime: nowStr,
+          loginMethod: method,
+          branchName,
+        });
+
+        sendResendEmail({
+          to: profile.email,
+          subject: 'Security Alert: Successful Sign-in to Aurevia Portal',
+          html,
+          fromName: 'Aurevia Security Desk',
+        }).catch((err) => console.warn('[Auto Email Alert Notice]', err));
+      }
+
+      // 2. Dispatch Automated SMS Notification if phone is available
+      if (profile.phone && profile.phone.trim().length >= 8) {
+        const smsMessage = buildLoginAlertSMS({
+          recipientName: profile.full_name,
+          roleTitle: roleDisplay,
+          timeStr: nowStr,
+        });
+
+        sendInstitutionalSMS({
+          recipientPhone: profile.phone,
+          recipientName: profile.full_name,
+          message: smsMessage,
+          purpose: 'general',
+        })
+          .then((log) => {
+            setSmsLogs((prev) => [log, ...prev]);
+          })
+          .catch((err) => console.warn('[Auto SMS Alert Notice]', err));
+      }
+    } catch (err) {
+      console.warn('Could not dispatch login security alerts:', err);
+    }
+  };
+
+  const loginWithProfile = (profile: Profile, loginMethod: string = 'Credentials') => {
     setCurrentProfile(profile);
     setCurrentRole(profile.role);
     setIsAuthenticated(true);
     localStorage.setItem('aur_auth_session', 'true');
     localStorage.setItem('aur_current_profile', JSON.stringify(profile));
+
+    // Automated Direct Email & SMS Notification
+    dispatchLoginAlertNotifications(profile, loginMethod);
   };
 
   const login = async (credentials: { identifier: string; password?: string }): Promise<{ success: boolean; error?: string }> => {
@@ -863,7 +926,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (matched && matched.is_active !== false) {
-        loginWithProfile(matched);
+        loginWithProfile(matched, 'Google OAuth');
         return;
       }
 
