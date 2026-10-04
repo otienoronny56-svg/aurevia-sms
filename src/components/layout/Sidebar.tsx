@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Building2, BookOpen, Users, GraduationCap,
   CreditCard, Smartphone, Calendar, Clock, Award, UserCheck,
   FileText, Database, ChevronRight, Sparkles, Coffee, Shield,
-  Receipt, DollarSign, PieChart, Layers, Settings, X, LogOut, Send, FileCheck, Video
+  Receipt, DollarSign, PieChart, Layers, Settings, X, LogOut, Send, FileCheck, Video, Key
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -51,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               { id: 'staff_attendance', label: 'National Duty Register', icon: Clock },
               { id: 'staff_leaves', label: 'Leave & Off-Days Approvals', icon: Calendar, count: leaveRequests.filter(l => l.status === 'pending').length },
               { id: 'staff', label: 'Faculty & Staff Directory', icon: Users, count: profiles.filter(p => p.role !== 'student').length },
+              { id: 'portal_accounts', label: 'Portal Logins & Accounts', icon: Key },
             ],
           },
           {
@@ -81,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               { id: 'duty_register', label: 'Daily Duty Register', icon: Clock },
               { id: 'staff_leaves', label: 'Leave & Off-Days', icon: Calendar, count: leaveRequests.filter(l => l.branch_id === currentProfile.branch_id && l.status === 'pending').length },
               { id: 'staff_directory', label: 'Staff Directory', icon: Users, count: profiles.filter(p => (p.branch_id === currentProfile.branch_id || !p.branch_id) && p.role !== 'student').length },
+              { id: 'portal_accounts', label: 'Portal Logins & Accounts', icon: Key },
             ],
           },
           {

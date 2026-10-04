@@ -20,6 +20,7 @@ import { StudentRollCallAnalytics } from '../components/analytics/StudentRollCal
 import { CreateCourseModal } from '../components/modals/CreateCourseModal';
 import { InstitutionalCommunications } from '../components/analytics/InstitutionalCommunications';
 import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManagement';
+import { PortalCredentialsManager } from '../components/analytics/PortalCredentialsManager';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
 import { DeleteBranchModal } from '../components/modals/DeleteBranchModal';
@@ -44,6 +45,7 @@ type DashboardTab =
   | 'staff'
   | 'staff_attendance'
   | 'staff_leaves'
+  | 'portal_accounts'
   | 'attendance'
   | 'communications'
   | 'sms';
@@ -2020,6 +2022,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       {/* ========================================================================= */}
       {activeTab === 'staff_leaves' && (
         <StaffLeaveManagement />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ACADEMY PORTAL CREDENTIALS & ACCOUNTS HUB */}
+      {/* ========================================================================= */}
+      {activeTab === 'portal_accounts' && (
+        <PortalCredentialsManager />
       )}
 
       {/* ========================================================================= */}

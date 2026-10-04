@@ -5,8 +5,9 @@ import { generateUniqueDefaultPassword } from '../../lib/security';
 import {
   X, UserPlus, Key, Shield, Building, Coffee, Mail, Phone,
   CheckCircle2, Copy, Check, Eye, EyeOff, Sparkles, BookOpen,
-  Sparkle, Briefcase, UserCheck, ShieldOff
+  Sparkle, Briefcase, UserCheck, ShieldOff, Send
 } from 'lucide-react';
+import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
 
 interface AddStaffModalProps {
   onClose: () => void;
@@ -21,7 +22,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   presetBranchId,
   isBranchManagerMode = false,
 }) => {
-  const { currentProfile, branches, courses, cohorts, profiles, createStaffMember } = useApp();
+  const { currentProfile, branches, courses, cohorts, profiles, createStaffMember, sendBulkCommunication } = useApp();
 
   const isBranchManager = isBranchManagerMode || currentProfile?.role === 'branch_manager';
   const initialBranchId = isBranchManager && (currentProfile?.branch_id || presetBranchId)
@@ -61,6 +62,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<any | null>(null);
   const [copiedCreds, setCopiedCreds] = useState(false);
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [smsSentNotice, setSmsSentNotice] = useState<string | null>(null);
 
   // Generate distinct default password for each new staff member based on their name
   React.useEffect(() => {
@@ -82,10 +85,41 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   };
 
   const handleCopyCredentials = () => {
-    const text = `Aurevia Coffee Academy - Staff Credentials\nStaff ID: ${staffId}\nName: ${fullName}\nBranch: ${branchObj?.name}\n${staffCategory === 'system' ? `Login Email: ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}`;
+    const text = `Aurevia Academy Portal Access\nStaff Member: ${fullName}\nStaff ID / Login: ${staffId}\nBranch: ${branchObj?.name}\nPortal URL: ${PRODUCTION_PORTAL_URL}\n${staffCategory === 'system' ? `Login Identifier: ${staffId} or ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}\nPlease sign in and change your password on first login.`;
     navigator.clipboard.writeText(text);
     setCopiedCreds(true);
     setTimeout(() => setCopiedCreds(false), 2500);
+  };
+
+  const handleSendPortalSms = async () => {
+    if (!phone || phone.length < 8) {
+      alert('Please enter a valid phone number for this staff member.');
+      return;
+    }
+    setIsSendingSms(true);
+    try {
+      const msg = `Hello ${fullName}, your Aurevia Academy Portal account is active. Portal: ${PRODUCTION_PORTAL_URL} | Login ID: ${staffId} | Initial Password: ${initialPassword}. Tripple T Systems.`;
+      await sendBulkCommunication({
+        channel: 'sms',
+        purpose: 'admissions',
+        messageContent: msg,
+        audienceSegment: 'Staff Onboarding',
+        recipients: [
+          {
+            name: fullName,
+            phone,
+            branchId,
+            messageContent: msg,
+          },
+        ],
+      });
+      setSmsSentNotice(`Portal credentials SMS sent to ${phone}!`);
+      setTimeout(() => setSmsSentNotice(null), 5000);
+    } catch (e: any) {
+      alert('Error sending SMS: ' + e.message);
+    } finally {
+      setIsSendingSms(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -257,15 +291,43 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                   </div>
 
                   {createdProfile.system_access !== false && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-subtle)', paddingTop: '6px', marginTop: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Default Password:</span>
-                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#6EE7B7' }}>
-                        {createdProfile.initial_password || initialPassword}
-                      </span>
-                    </div>
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-subtle)', paddingTop: '6px', marginTop: '4px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Default Password:</span>
+                        <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#6EE7B7' }}>
+                          {createdProfile.initial_password || initialPassword}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Academy Portal:</span>
+                        <span style={{ fontWeight: 600, color: '#10B981', fontSize: '0.78rem' }}>
+                          {PRODUCTION_PORTAL_URL}
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
+
+              {createdProfile.system_access !== false && (
+                <div style={{ marginBottom: '20px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSendPortalSms}
+                    disabled={isSendingSms || !phone}
+                    style={{ fontSize: '0.82rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Send size={14} color="var(--crema-gold)" />
+                    <span>{isSendingSms ? 'Dispatching SMS...' : 'Send Portal Access SMS to Staff'}</span>
+                  </button>
+                  {smsSentNotice && (
+                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#10B981', fontWeight: 600 }}>
+                      ✓ {smsSentNotice}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button className="btn btn-primary" onClick={onClose}>
                 Close & View Staff Directory

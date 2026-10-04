@@ -19,6 +19,7 @@ import { StudentDetailModal } from '../components/modals/StudentDetailModal';
 import { StudentRollCallAnalytics } from '../components/analytics/StudentRollCallAnalytics';
 import { InstitutionalCommunications } from '../components/analytics/InstitutionalCommunications';
 import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManagement';
+import { PortalCredentialsManager } from '../components/analytics/PortalCredentialsManager';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
 import { Invoice, Profile, Cohort, StudentKYC } from '../types/database.types';
@@ -28,6 +29,7 @@ type ManagerTab =
   | 'duty_register'
   | 'staff_attendance'
   | 'staff_leaves'
+  | 'portal_accounts'
   | 'staff_directory'
   | 'staff'
   | 'timetable'
@@ -1093,6 +1095,13 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       {/* ========================================================================= */}
       {activeTab === 'staff_leaves' && (
         <StaffLeaveManagement isBranchManagerMode={true} />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ACADEMY PORTAL CREDENTIALS & ACCOUNTS HUB */}
+      {/* ========================================================================= */}
+      {activeTab === 'portal_accounts' && (
+        <PortalCredentialsManager isBranchManagerMode={true} />
       )}
 
       {/* ========================================================================= */}

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../../lib/store';
 import {
   X, UserPlus, Sparkles, CheckCircle2, ShieldCheck, Coffee,
-  Calendar, Phone, Mail, FileText, Heart, AlertTriangle, User, Globe
+  Calendar, Phone, Mail, FileText, Heart, AlertTriangle, User, Globe,
+  Copy, Check, Key, GraduationCap
 } from 'lucide-react';
+import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
 
 interface StudentKYCModalProps {
   onClose: () => void;
@@ -41,6 +43,8 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdRegNo, setCreatedRegNo] = useState<string | null>(null);
+  const [createdStudentDetails, setCreatedStudentDetails] = useState<{ regNumber: string; initialPassword?: string; studentName: string } | null>(null);
+  const [copiedCreds, setCopiedCreds] = useState(false);
 
   // Filter cohorts matching selected branch & course
   const availableCohorts = cohorts.filter(
@@ -83,6 +87,11 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
       });
 
       setCreatedRegNo(result.regNumber);
+      setCreatedStudentDetails({
+        regNumber: result.regNumber,
+        initialPassword: result.profile?.initial_password,
+        studentName: fullName,
+      });
       if (onSuccess) onSuccess(result.regNumber);
     } catch (err: any) {
       alert('Error registering student: ' + err.message);
@@ -168,32 +177,60 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--crema-gold)',
                   padding: '20px',
-                  maxWidth: '420px',
+                  maxWidth: '480px',
                   margin: '0 auto 24px',
+                  textAlign: 'left',
                 }}
               >
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Assigned Registration Number
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--crema-gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key size={14} />
+                    <span>ACADEMY PORTAL CREDENTIALS</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => {
+                      const text = `Aurevia Academy Portal Access\nStudent: ${fullName}\nPortal: ${PRODUCTION_PORTAL_URL}\nReg No / Login: ${createdRegNo}\nDefault Password: ${createdStudentDetails?.initialPassword || 'Aur@2026#Student'}\nSign in to access your course timetable, attendance register, and class resources.`;
+                      navigator.clipboard.writeText(text);
+                      setCopiedCreds(true);
+                      setTimeout(() => setCopiedCreds(false), 2500);
+                    }}
+                  >
+                    {copiedCreds ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
+                    <span>{copiedCreds ? 'Copied!' : 'Copy Login Details'}</span>
+                  </button>
                 </div>
-                <div
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 800,
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--crema-gold)',
-                    margin: '6px 0',
-                  }}
-                >
-                  {createdRegNo}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Student Reg Number (Login ID)</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', marginTop: '2px' }}>
+                      {createdRegNo}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Initial Portal Password</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginTop: '2px' }}>
+                      {createdStudentDetails?.initialPassword || 'Aur@2026#Student'}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {selectedCourse?.title} • {selectedBranch?.name}
+
+                <div style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ color: 'var(--text-muted)' }}>
+                    Portal: <strong style={{ color: '#10B981' }}>{PRODUCTION_PORTAL_URL}</strong>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    {selectedCourse?.title}
+                  </span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                 <button className="btn btn-primary" onClick={onClose}>
-                  Complete & View in Directory
+                  Done & View in Directory
                 </button>
               </div>
             </div>
