@@ -5,7 +5,7 @@ import {
   Calendar, Users, CheckCircle2, Clock, AlertTriangle, Search,
   Filter, BarChart3, TrendingUp, Building2, Sparkles, Check,
   X, ShieldCheck, Award, FileText, ArrowUpRight, Send, UserCheck,
-  Mail, ChevronLeft, ChevronRight
+  Mail, ChevronLeft, ChevronRight, Activity, LineChart
 } from 'lucide-react';
 import { ExportActionsMenu } from '../common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../../lib/exportUtils';
@@ -42,6 +42,7 @@ export const StudentRollCallAnalytics: React.FC<StudentRollCallAnalyticsProps> =
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [dateRangeFilter, setDateRangeFilter] = useState<'all' | '7d' | '14d' | '30d'>('all');
+  const [chartMode, setChartMode] = useState<'multiline' | 'bars'>('multiline');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
@@ -531,26 +532,204 @@ export const StudentRollCallAnalytics: React.FC<StudentRollCallAnalyticsProps> =
 
       {/* 4. Modern Interactive Graphs: Daily Histogram & Cohort Comparison */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
-        {/* Graph 1: Daily Roll-Call Attendance Trend */}
+        {/* Graph 1: Modern Multi-Linear Telemetry & Daily Roll-Call Performance */}
         <div className="glass-card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <h3 style={{ fontSize: '0.96rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={15} color="var(--crema-gold)" />
-                <span>Daily Lab Roll-Call Performance</span>
+                <Activity size={15} color="var(--crema-gold)" />
+                <span>Multi-Linear Attendance Telemetry</span>
               </h3>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                Percentage attendance achieved per practical laboratory session
+                Multi-metric trend tracking attendance rate %, punctuality index %, and absent counts over time
               </p>
             </div>
-            <span style={{ fontSize: '0.70rem', color: '#10B981', fontWeight: 600 }}>
-              Target: ≥85%
-            </span>
+            
+            {/* View Mode Toggle: Multi-Linear vs Histogram */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-surface-elevated)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              <button
+                type="button"
+                onClick={() => setChartMode('multiline')}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  border: 'none',
+                  background: chartMode === 'multiline' ? 'var(--crema-gold)' : 'transparent',
+                  color: chartMode === 'multiline' ? '#1A1412' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <LineChart size={12} />
+                <span>Multi-Linear</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMode('bars')}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  border: 'none',
+                  background: chartMode === 'bars' ? 'var(--crema-gold)' : 'transparent',
+                  color: chartMode === 'bars' ? '#1A1412' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <BarChart3 size={12} />
+                <span>Histogram</span>
+              </button>
+            </div>
           </div>
 
           {dailyTrend.length === 0 ? (
-            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.80rem' }}>
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.80rem' }}>
               No session logs recorded in selected date window.
+            </div>
+          ) : chartMode === 'multiline' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Legend */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.70rem', color: 'var(--text-secondary)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '10px', height: '3px', background: '#10B981', borderRadius: '2px' }} />
+                  Attendance Rate (%)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '10px', height: '3px', background: 'var(--crema-gold)', borderRadius: '2px' }} />
+                  Punctuality Index (%)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ width: '10px', height: '3px', background: '#EF4444', borderRadius: '2px', borderBottom: '1px dashed #EF4444' }} />
+                  Absent Count
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.66rem', color: 'var(--crema-gold)', opacity: 0.85 }}>
+                  85% Minimum Standard
+                </span>
+              </div>
+
+              {/* Multi-Linear Scalable Vector Graphic */}
+              <div style={{ position: 'relative', width: '100%', height: '170px', padding: '10px 0' }}>
+                {(() => {
+                  const width = 500;
+                  const height = 150;
+                  const padX = 24;
+                  const padY = 20;
+                  const usableW = width - padX * 2;
+                  const usableH = height - padY * 2;
+                  const count = dailyTrend.length;
+                  const stepX = count > 1 ? usableW / (count - 1) : usableW;
+
+                  // Coords for Attendance Rate
+                  const attPoints = dailyTrend.map((d, i) => {
+                    const x = padX + (count > 1 ? i * stepX : usableW / 2);
+                    const y = padY + usableH - (d.rate / 100) * usableH;
+                    return { x, y, data: d };
+                  });
+
+                  // Coords for Punctuality Rate
+                  const punctPoints = dailyTrend.map((d, i) => {
+                    const punctRate = Math.round((d.present / Math.max(1, d.present + d.late)) * 100);
+                    const x = padX + (count > 1 ? i * stepX : usableW / 2);
+                    const y = padY + usableH - (punctRate / 100) * usableH;
+                    return { x, y, punctRate };
+                  });
+
+                  // Coords for Absences
+                  const maxAbsent = Math.max(1, ...dailyTrend.map((d) => d.absent));
+                  const absentPoints = dailyTrend.map((d, i) => {
+                    const x = padX + (count > 1 ? i * stepX : usableW / 2);
+                    const y = padY + usableH - (d.absent / maxAbsent) * (usableH * 0.45);
+                    return { x, y, absent: d.absent };
+                  });
+
+                  const buildPath = (pts: { x: number; y: number }[]) => {
+                    if (pts.length === 0) return '';
+                    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y} h 10`;
+                    return pts.reduce((acc, pt, i) => {
+                      if (i === 0) return `M ${pt.x} ${pt.y}`;
+                      const prev = pts[i - 1];
+                      const cpX = (prev.x + pt.x) / 2;
+                      return `${acc} C ${cpX} ${prev.y}, ${cpX} ${pt.y}, ${pt.x} ${pt.y}`;
+                    }, '');
+                  };
+
+                  const attPath = buildPath(attPoints);
+                  const punctPath = buildPath(punctPoints);
+                  const absentPath = buildPath(absentPoints);
+
+                  const areaPath = attPoints.length > 1
+                    ? `${attPath} L ${attPoints[attPoints.length - 1].x} ${height - padY} L ${attPoints[0].x} ${height - padY} Z`
+                    : '';
+
+                  // 85% Benchmark y
+                  const benchY = padY + usableH - (85 / 100) * usableH;
+
+                  return (
+                    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="attAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid lines */}
+                      {[0, 25, 50, 75, 100].map((v) => {
+                        const y = padY + usableH - (v / 100) * usableH;
+                        return (
+                          <g key={v}>
+                            <line x1={padX} y1={y} x2={width - padX} y2={y} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                            <text x={padX - 6} y={y + 3} fill="var(--text-muted)" fontSize="8" textAnchor="end">{v}%</text>
+                          </g>
+                        );
+                      })}
+
+                      {/* 85% Target Line */}
+                      <line x1={padX} y1={benchY} x2={width - padX} y2={benchY} stroke="var(--crema-gold)" strokeWidth="1" strokeDasharray="4 3" opacity="0.6" />
+
+                      {/* Area Fill */}
+                      {areaPath && <path d={areaPath} fill="url(#attAreaGrad)" />}
+
+                      {/* Multi-Linear Paths */}
+                      <path d={absentPath} fill="none" stroke="#EF4444" strokeWidth="1.8" strokeDasharray="3 2" />
+                      <path d={punctPath} fill="none" stroke="var(--crema-gold)" strokeWidth="2" strokeOpacity="0.8" />
+                      <path d={attPath} fill="none" stroke="#10B981" strokeWidth="2.5" />
+
+                      {/* Circular Nodes */}
+                      {attPoints.map((pt, idx) => (
+                        <g key={idx}>
+                          <circle cx={pt.x} cy={pt.y} r="3.5" fill="#10B981" stroke="var(--bg-app)" strokeWidth="1.5" />
+                          <circle cx={punctPoints[idx].x} cy={punctPoints[idx].y} r="2.5" fill="var(--crema-gold)" stroke="var(--bg-app)" strokeWidth="1" />
+                          <text x={pt.x} y={height - 2} fill="var(--text-muted)" fontSize="8.5" textAnchor="middle">
+                            {pt.data.date.slice(5)}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              {/* Bottom Telemetry Insight */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.72rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Total Sessions Plotted: <strong style={{ color: 'var(--text-primary)' }}>{dailyTrend.length}</strong>
+                </span>
+                <span style={{ color: '#10B981', fontWeight: 600 }}>
+                  High Mark: {Math.max(...dailyTrend.map((d) => d.rate))}%
+                </span>
+                <span style={{ color: 'var(--crema-gold)', fontWeight: 600 }}>
+                  Mean Punctuality: {Math.round(dailyTrend.reduce((acc, d) => acc + (d.present / Math.max(1, d.present + d.late)), 0) / Math.max(1, dailyTrend.length) * 100)}%
+                </span>
+              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
