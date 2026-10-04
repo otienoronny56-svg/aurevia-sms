@@ -28,6 +28,7 @@ export interface Profile {
   department?: 'Academic & Training' | 'Campus Operations' | 'Hygiene & Facilities' | 'Marketing & Outreach' | 'Roastery & Logistics' | 'Security & Front Office';
   job_title?: string;
   password?: string;
+  password_hash?: string;
   initial_password?: string;
   password_changed?: boolean;
   assigned_courses?: string[];

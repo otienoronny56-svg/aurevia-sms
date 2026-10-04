@@ -637,7 +637,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const idKey = (p.id || '').trim().toLowerCase();
           const recoveredPwd =
             p.initial_password ||
-            (p.specialty && p.specialty.startsWith('Aur#') ? p.specialty : undefined) ||
             localStorage.getItem('aur_user_pwd_seed_' + p.id) ||
             localStorage.getItem('aur_student_pwd_' + regKey) ||
             localStorage.getItem('aur_student_pwd_' + emailKey) ||
@@ -650,8 +649,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return {
             ...p,
             initial_password: p.initial_password || recoveredPwd,
-            // Clean up specialty if it was accidentally saved as a password
-            specialty: (p.specialty && p.specialty.startsWith('Aur#')) ? 'Barista & Specialty Coffee' : p.specialty,
+            password_hash: p.password_hash || p.password || localStorage.getItem('aur_user_pwd_hash_' + p.id) || undefined,
+            password_changed: p.password_changed ?? (localStorage.getItem('aur_user_pwd_changed_' + p.id) === 'true'),
+            specialty: (p.specialty && p.specialty.startsWith('Aur#')) ? 'Barista & Specialty Coffee' : (p.specialty || 'Barista & Specialty Coffee'),
           };
         });
         const mergedProfiles: Profile[] = [...dbProfiles];
@@ -1116,7 +1116,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       matchedProfile.password_changed ||
       localStorage.getItem('aur_user_pwd_changed_' + matchedProfile.id) === 'true'
     );
-    const storedHashedPwd = matchedProfile.password || localStorage.getItem('aur_user_pwd_hash_' + matchedProfile.id);
+    const storedHashedPwd =
+      matchedProfile.password_hash ||
+      matchedProfile.password ||
+      localStorage.getItem('aur_user_pwd_hash_' + matchedProfile.id);
 
     // Recover initial seed password for both staff and students
     if (!matchedProfile.initial_password) {
@@ -1125,7 +1128,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
 
       matchedProfile.initial_password =
-        (matchedProfile.role === 'student' ? matchedProfile.specialty : undefined) ||
         (regKey ? localStorage.getItem('aur_student_pwd_' + regKey) : null) ||
         (emailKey ? localStorage.getItem('aur_student_pwd_' + emailKey) : null) ||
         (idKey ? localStorage.getItem('aur_staff_pwd_' + idKey) : null) ||
@@ -1133,24 +1135,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (regKey ? localStorage.getItem('aur_staff_pwd_' + regKey) : null) ||
         (staffKey ? localStorage.getItem('aur_staff_pwd_' + staffKey) : null) ||
         foundInInitial?.initial_password ||
-        (matchedProfile.role === 'student' ? matchedProfile.specialty : undefined) ||
         undefined;
     }
 
     const cleanEntered = enteredPass.trim();
 
     // Password verification:
-    // 1. If password was changed, ONLY the new hashed password is valid.
+    // 1. If password was changed, check against stored cryptographic hash:
     if (isPwdChanged && storedHashedPwd) {
       const isMatch = await verifyPassword(cleanEntered, storedHashedPwd);
       if (isMatch) {
         loginWithProfile(matchedProfile);
         return { success: true };
       }
-      return { success: false, error: INVALID };
     }
 
-    // 2. If password was NOT yet changed, verify against initial unique seed or standard initial default:
+    // 2. If password was NOT yet changed (or legacy seed exists), verify against initial seed or standard defaults:
     const expectedPassword = (
       matchedProfile.initial_password ||
       (regKey ? localStorage.getItem('aur_student_pwd_' + regKey) : null) ||
@@ -1176,7 +1176,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // 2b. Accept known default PINs for students before custom password change
+      // Check stored hash if set
+      if (storedHashedPwd) {
+        const isHashMatch = await verifyPassword(cleanEntered, storedHashedPwd);
+        if (isHashMatch) {
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
+      }
+
+      // 2b. Accept known default institutional PINs for students before custom password change
       if (matchedProfile.role === 'student') {
         const isKnownStudentPin =
           cleanEntered === 'Aur@2026#Student' ||
@@ -1192,7 +1201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // 2c. Accept known default PINs for staff before custom password change
+      // 2c. Accept known default institutional PINs for staff before custom password change
       if (matchedProfile.role !== 'student') {
         const isKnownStaffPin =
           cleanEntered === 'Aur@Staff#2026' ||
@@ -1204,7 +1213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // 3. Otherwise verify against Supabase Auth using the profile's email
+    // 3. Always attempt verification against Supabase Auth using the profile's email
     if (matchedProfile.email) {
       try {
         const { error } = await supabase.auth.signInWithPassword({
@@ -1401,6 +1410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // 2. Insert Profile into Supabase aur_profiles Table
+      const hashedStudentPwd = await hashPassword(studentDefaultPwd);
       const profilePayload: any = {
         role: 'student',
         branch_id: params.branchId,
@@ -1410,24 +1420,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reg_number: regNumber,
         specialty: 'Barista & Specialty Coffee',
         is_active: true,
+        initial_password: studentDefaultPwd,
+        password_hash: hashedStudentPwd,
+        password_changed: false,
       };
       if (authUserId) {
         profilePayload.id = authUserId;
       }
 
-      const { data: profData, error: profErr } = await supabase
-        .from('aur_profiles')
-        .insert(profilePayload)
-        .select()
-        .single();
+      let profData: any;
+      let profErr: any;
+      const res = await supabase.from('aur_profiles').insert(profilePayload).select().single();
+      profData = res.data;
+      profErr = res.error;
+
+      // Graceful fallback if database schema is missing the new password columns:
+      if (profErr && (profErr.message?.includes('column') || profErr.code === 'PGRST204')) {
+        delete profilePayload.initial_password;
+        delete profilePayload.password_hash;
+        delete profilePayload.password_changed;
+        const retryRes = await supabase.from('aur_profiles').insert(profilePayload).select().single();
+        profData = retryRes.data;
+        profErr = retryRes.error;
+      }
 
       if (profErr || !profData) {
         console.error('Failed to create profile in aur_profiles:', profErr);
         throw new Error(profErr?.message || 'Failed to create profile');
       }
+
+      try {
+        if (regNumber) localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
+        if (params.email) localStorage.setItem('aur_student_pwd_' + params.email.toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_user_pwd_seed_' + profData.id, studentDefaultPwd);
+        localStorage.setItem('aur_user_pwd_hash_' + profData.id, hashedStudentPwd);
+      } catch (_) {}
+
       createdProfile = {
         ...profData,
         initial_password: studentDefaultPwd,
+        password_hash: hashedStudentPwd,
         password_changed: false,
       };
 
@@ -3008,6 +3040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const regNumber = params.staff_id || params.reg_number || (params.role === 'branch_manager' ? `AUR/MGR/${Date.now().toString().slice(-4)}` : `AUR/INS/${Date.now().toString().slice(-4)}`);
 
+      const hashedStaffPwd = await hashPassword(staffDefaultPwd);
       const insertPayload: any = {
         role: params.role || 'instructor',
         branch_id: params.branch_id || branches[0].id,
@@ -3017,22 +3050,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reg_number: regNumber,
         specialty: params.specialty || params.job_title || 'Lead Trainer',
         is_active: true,
+        initial_password: staffDefaultPwd,
+        password_hash: hashedStaffPwd,
+        password_changed: false,
       };
       if (authUserId) {
         insertPayload.id = authUserId;
       }
 
-      const { data, error } = await supabase
-        .from('aur_profiles')
-        .insert(insertPayload)
-        .select()
-        .single();
+      let data: any;
+      let error: any;
+      const res = await supabase.from('aur_profiles').insert(insertPayload).select().single();
+      data = res.data;
+      error = res.error;
+
+      // Graceful fallback if database schema is missing the new password columns:
+      if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
+        delete insertPayload.initial_password;
+        delete insertPayload.password_hash;
+        delete insertPayload.password_changed;
+        const retryRes = await supabase.from('aur_profiles').insert(insertPayload).select().single();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
 
       if (error || !data) throw error;
       created = {
         ...data,
         staff_id: regNumber,
         initial_password: staffDefaultPwd,
+        password_hash: hashedStaffPwd,
         password_changed: false,
         assigned_courses: params.assigned_courses,
         assigned_cohorts: params.assigned_cohorts,
@@ -3042,6 +3089,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('aur_staff_pwd_' + created.id, staffDefaultPwd);
         if (created.email) localStorage.setItem('aur_staff_pwd_' + created.email.toLowerCase(), staffDefaultPwd);
         if (regNumber) localStorage.setItem('aur_staff_pwd_' + regNumber.toLowerCase(), staffDefaultPwd);
+        localStorage.setItem('aur_user_pwd_seed_' + created.id, staffDefaultPwd);
+        localStorage.setItem('aur_user_pwd_hash_' + created.id, hashedStaffPwd);
       } catch (_) {}
     } catch (e) {
       created = {
@@ -3193,7 +3242,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       INITIAL_PROFILES[initIdx].password_changed = true;
     }
 
-    // Update user auth credentials
+    // Update user auth credentials in local storage and in PostgreSQL
     try {
       localStorage.setItem('aur_user_pwd_hash_' + profileId, hashedPassword);
       localStorage.setItem('aur_user_pwd_changed_' + profileId, 'true');
@@ -3201,8 +3250,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (targetProfile.email) localStorage.removeItem('aur_staff_pwd_' + targetProfile.email.toLowerCase());
       if (targetProfile.reg_number) localStorage.removeItem('aur_staff_pwd_' + targetProfile.reg_number.toLowerCase());
 
+      // Update in Supabase aur_profiles table
+      await supabase
+        .from('aur_profiles')
+        .update({
+          password_hash: hashedPassword,
+          initial_password: null,
+          password_changed: true,
+        })
+        .eq('id', profileId);
+
       if (targetProfile.email) {
-        await supabase.auth.updateUser({ password: newPassword });
+        await supabase.auth.updateUser({ password: newPassword }).catch(() => {});
       }
     } catch (_) {}
 
