@@ -451,6 +451,9 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
     const branchName = branches.find((b) => b.id === recipient.branchId)?.name || currentBranch?.name || 'Aurevia Campus';
     return rawTemplate
       .replace(/{student_name}/g, recipient.name)
+      .replace(/{staff_name}/g, recipient.name)
+      .replace(/{recipient_name}/g, recipient.name)
+      .replace(/{name}/g, recipient.name)
       .replace(/{course_name}/g, recipient.courseName || 'Specialty Coffee Skills')
       .replace(/{cohort_name}/g, recipient.cohortName || 'Active Intake')
       .replace(/{campus_name}/g, branchName)
@@ -1402,14 +1405,20 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {[
-                    { tag: '{student_name}', label: 'Student Name' },
-                    { tag: '{balance_due}', label: 'Fee Balance Due' },
-                    { tag: '{course_name}', label: 'Course Title' },
-                    { tag: '{cohort_name}', label: 'Cohort Intake' },
-                    { tag: '{campus_name}', label: 'Campus Branch' },
-                    { tag: '{attendance_rate}', label: 'Attendance %' },
-                  ].map((item) => (
+                  {(targetAudience === 'staff'
+                    ? [
+                        { tag: '{staff_name}', label: 'Staff Full Name' },
+                        { tag: '{campus_name}', label: 'Assigned Campus' },
+                      ]
+                    : [
+                        { tag: '{student_name}', label: 'Student Name' },
+                        { tag: '{balance_due}', label: 'Fee Balance Due' },
+                        { tag: '{course_name}', label: 'Course Title' },
+                        { tag: '{cohort_name}', label: 'Cohort Intake' },
+                        { tag: '{campus_name}', label: 'Campus Branch' },
+                        { tag: '{attendance_rate}', label: 'Attendance %' },
+                      ]
+                  ).map((item) => (
                     <button
                       key={item.tag}
                       type="button"
