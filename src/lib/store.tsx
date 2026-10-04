@@ -714,80 +714,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const login = async (credentials: { identifier: string; password?: string }): Promise<{ success: boolean; error?: string }> => {
     const rawId = credentials.identifier.trim().toLowerCase();
-    const enteredPass = credentials.password?.trim() || '';
+    const enteredPass = credentials.password || '';
+    // Generic message — never reveal whether the account exists or which field was wrong
+    const INVALID = 'Incorrect login details. Check your email / ID and password, then try again.';
 
-    // 1. Look for staff / admin / trainee in profiles (by email, staff_id, or reg_number)
-    const matchedProfile = profiles.find((p) =>
+    if (!rawId || !enteredPass) {
+      return { success: false, error: 'Enter both your login ID and your password.' };
+    }
+
+    const matchesIdentifier = (p: Profile) =>
       p.email?.toLowerCase() === rawId ||
       p.staff_id?.toLowerCase() === rawId ||
-      p.reg_number?.toLowerCase() === rawId ||
-      p.full_name?.toLowerCase() === rawId
-    );
+      p.reg_number?.toLowerCase() === rawId;
 
-    // 2. Look for student in students directory by passport/national ID or ID
-    const matchedStudent = !matchedProfile
-      ? students.find((s) => s.id === rawId || s.national_id_or_passport?.toLowerCase() === rawId)
-      : null;
+    // 1. Local cache (staff / faculty)
+    let matchedProfile: Profile | undefined = profiles.find(matchesIdentifier);
 
-    if (matchedProfile) {
-      if (enteredPass && matchedProfile.initial_password) {
-        if (enteredPass !== matchedProfile.initial_password && enteredPass !== 'Aurevia@2026!') {
-          return { success: false, error: 'Incorrect password for this profile.' };
-        }
+    // 2. Supabase lookup (student profiles are not kept in the local cache)
+    if (!matchedProfile) {
+      try {
+        const safe = rawId.replace(/["\\]/g, '').replace(/[%_]/g, '\\$&');
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`email.ilike."${safe}",staff_id.ilike."${safe}",reg_number.ilike."${safe}"`)
+          .limit(1);
+        if (data && data.length > 0) matchedProfile = data[0] as Profile;
+      } catch (e) {
+        console.warn('Profile lookup failed:', e);
       }
+    }
+
+    // 3. Student national ID / passport number
+    if (!matchedProfile) {
+      const matchedStudent = students.find((s) => s.national_id_or_passport?.toLowerCase() === rawId);
+      if (matchedStudent?.profile_id) {
+        try {
+          const { data } = await supabase.from('profiles').select('*').eq('id', matchedStudent.profile_id).maybeSingle();
+          if (data) matchedProfile = data as Profile;
+        } catch (_) {}
+      }
+    }
+
+    if (!matchedProfile) return { success: false, error: INVALID };
+
+    if (matchedProfile.is_active === false) {
+      return { success: false, error: 'This account has been deactivated. Please contact your administrator.' };
+    }
+
+    // Password issued by the administrator (stored on the profile)
+    if (matchedProfile.initial_password) {
+      if (enteredPass !== matchedProfile.initial_password) return { success: false, error: INVALID };
       loginWithProfile(matchedProfile);
       return { success: true };
     }
 
-    if (matchedStudent) {
-      const studentProfile = profiles.find((p) => p.id === matchedStudent.profile_id);
-      if (studentProfile) {
-        loginWithProfile(studentProfile);
-        return { success: true };
-      }
-    }
-
-    // Try Supabase Auth sign in if user entered email + password
-    if (rawId.includes('@') && enteredPass) {
+    // Otherwise verify against Supabase Auth using the profile's email
+    if (matchedProfile.email) {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: rawId,
+        const { error } = await supabase.auth.signInWithPassword({
+          email: matchedProfile.email,
           password: enteredPass,
         });
-        if (error) {
-          return { success: false, error: error.message };
-        }
-        if (data.user) {
-          const userProfile: Profile = {
-            id: data.user.id,
-            role: 'super_admin',
-            full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Administrator',
-            email: data.user.email || rawId,
-            phone: data.user.phone || '',
-            branch_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-          };
-          loginWithProfile(userProfile);
+        if (!error) {
+          loginWithProfile(matchedProfile);
           return { success: true };
         }
-      } catch (authErr: any) {
-        return { success: false, error: authErr.message || 'Supabase authentication failed.' };
-      }
+      } catch (_) {}
     }
 
-    // Quick keyword fallback for admin testing
-    if (rawId === 'admin' || rawId === 'super_admin' || rawId === 'ronny') {
-      const adminProfile = profiles.find((p) => p.role === 'super_admin') || INITIAL_PROFILES[0];
-      loginWithProfile(adminProfile);
-      return { success: true };
-    }
-
-    return {
-      success: false,
-      error: 'No active profile found with this email, staff ID, or registration number.',
-    };
+    return { success: false, error: INVALID };
   };
+
 
   const checkGoogleOAuthConfigured = async (): Promise<boolean> => {
     try {
@@ -840,50 +838,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Listen for Supabase OAuth redirects on mount
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setIsAuthenticated(true);
-        localStorage.setItem('aur_auth_session', 'true');
-        const userEmail = session.user.email?.toLowerCase();
-        if (userEmail) {
-          const matched = profiles.find((p) => p.email?.toLowerCase() === userEmail);
-          if (matched) {
-            setCurrentProfile(matched);
-            setCurrentRole(matched.role);
-            localStorage.setItem('aur_current_profile', JSON.stringify(matched));
-          } else {
-            const googleProfile: Profile = {
-              id: session.user.id,
-              role: 'super_admin',
-              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Google User',
-              email: session.user.email || '',
-              phone: session.user.phone || '',
-              branch_id: null,
-              is_active: true,
-              created_at: new Date().toISOString(),
-            };
-            setCurrentProfile(googleProfile);
-            setCurrentRole('super_admin');
-            localStorage.setItem('aur_current_profile', JSON.stringify(googleProfile));
-          }
+    // Only sign in Google/Supabase users whose email belongs to a registered, active profile.
+    // Unknown emails are signed out — never auto-provisioned (previously they became super_admin).
+    const resolveAuthSession = async (session: any) => {
+      if (!session?.user) return;
+      const userEmail = session.user.email?.toLowerCase();
+
+      let matched: Profile | undefined = userEmail
+        ? profiles.find((p) => p.email?.toLowerCase() === userEmail)
+        : undefined;
+
+      // Local cache may be stale (and excludes students) — confirm against Supabase directly
+      if (!matched && userEmail) {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .ilike('email', userEmail.replace(/[%_\\]/g, '\\$&'))
+            .maybeSingle();
+          if (data) matched = data as Profile;
+        } catch (e) {
+          console.warn('Profile lookup for OAuth session failed:', e);
         }
       }
+
+      if (matched && matched.is_active !== false) {
+        loginWithProfile(matched);
+        return;
+      }
+
+      // Not registered (or deactivated): reject the session
+      await supabase.auth.signOut().catch(() => {});
+      setIsAuthenticated(false);
+      localStorage.removeItem('aur_auth_session');
+      localStorage.removeItem('aur_current_profile');
+      sessionStorage.setItem(
+        'aur_oauth_error',
+        matched
+          ? `The account ${userEmail} has been deactivated. Contact the administrator.`
+          : `${userEmail || 'This Google account'} is not registered in Aurevia. Ask an administrator to add your email to your staff/student profile.`
+      );
+      window.dispatchEvent(new Event('aur-oauth-error'));
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      resolveAuthSession(session);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setIsAuthenticated(true);
-        localStorage.setItem('aur_auth_session', 'true');
-        const userEmail = session.user.email?.toLowerCase();
-        if (userEmail) {
-          const matched = profiles.find((p) => p.email?.toLowerCase() === userEmail);
-          if (matched) {
-            setCurrentProfile(matched);
-            setCurrentRole(matched.role);
-            localStorage.setItem('aur_current_profile', JSON.stringify(matched));
-          }
-        }
-      }
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') resolveAuthSession(session);
     });
 
     return () => {

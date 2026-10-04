@@ -1,44 +1,136 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
-import { UserRole, Profile } from '../types/database.types';
 import {
-  Coffee, Lock, Mail, Key, Eye, EyeOff, ArrowRight,
-  Sparkles, Building2, Award, GraduationCap, CheckCircle2,
-  AlertCircle, LogIn, ShieldCheck, HelpCircle,
-  Copy, Check, ExternalLink, RefreshCw, X
+  Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
+  Info, ShieldCheck, Building2, GraduationCap, MapPin,
 } from 'lucide-react';
+import './LoginPage.css';
+
+type Portal = 'staff' | 'student';
+
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_SECONDS = 60;
+const LOCK_KEY = 'aur_login_lock';
+const SUPPORT_EMAIL = 'info@aureviacoffeeinstitute.co.ke';
+
+const GoogleLogo: React.FC = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+  </svg>
+);
+
+const Brand: React.FC = () => (
+  <div className="auth-brand">
+    <span className="auth-brand__mark">
+      <Coffee size={22} strokeWidth={2.4} aria-hidden="true" />
+    </span>
+    <span>
+      <span className="auth-brand__name">Aurevia</span>
+      <span className="auth-brand__sub">Coffee Institute</span>
+    </span>
+  </div>
+);
+
+/** Read & clear any OAuth error Supabase appended to the redirect URL. */
+const consumeOAuthUrlError = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search);
+  const code = hash.get('error') || query.get('error');
+  if (!code) return null;
+  const desc = hash.get('error_description') || query.get('error_description') || '';
+  window.history.replaceState(null, '', window.location.pathname);
+  if (code === 'access_denied') return 'Google sign-in was cancelled.';
+  return `Google sign-in failed${desc ? `: ${desc.replace(/\+/g, ' ')}` : '.'}`;
+};
 
 export const LoginPage: React.FC = () => {
-  const { login, loginWithGoogle, checkGoogleOAuthConfigured, loginWithProfile, profiles, students } = useApp();
+  const { login, loginWithGoogle } = useApp();
 
-  const [portalType, setPortalType] = useState<'staff' | 'student'>('staff');
+  const [portal, setPortal] = useState<Portal>('staff');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [capsLock, setCapsLock] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showForgot, setShowForgot] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number>(() => Number(localStorage.getItem(LOCK_KEY)) || 0);
+  const [now, setNow] = useState(Date.now());
 
-  // Google OAuth Guide & Quick Test Modal State
-  const [showGoogleGuideModal, setShowGoogleGuideModal] = useState(false);
-  const [isCopiedRedirect, setIsCopiedRedirect] = useState(false);
-  const [isRetryingLive, setIsRetryingLive] = useState(false);
-  const [liveCheckStatus, setLiveCheckStatus] = useState<'idle' | 'configured' | 'pending'>('idle');
+  const identifierRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
-  // Handle standard Email / ID / Reg No + Password login
-  const handleFormLogin = async (e: React.FormEvent) => {
+  const lockRemaining = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
+  const isLocked = lockRemaining > 0;
+  const busy = isLoading || isGoogleLoading;
+
+  useEffect(() => {
+    document.title = 'Sign in | Aurevia Coffee Institute';
+  }, []);
+
+  // OAuth errors: from the redirect URL, or a rejected (unregistered) Google account
+  useEffect(() => {
+    const urlError = consumeOAuthUrlError();
+    if (urlError) setError(urlError);
+
+    const showOAuthError = () => {
+      const msg = sessionStorage.getItem('aur_oauth_error');
+      if (msg) {
+        setError(msg);
+        setIsGoogleLoading(false);
+        sessionStorage.removeItem('aur_oauth_error');
+      }
+    };
+    showOAuthError();
+    window.addEventListener('aur-oauth-error', showOAuthError);
+    return () => window.removeEventListener('aur-oauth-error', showOAuthError);
+  }, []);
+
+  // Lockout countdown
+  useEffect(() => {
+    if (!isLocked) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [isLocked]);
+
+  useEffect(() => {
+    if (lockedUntil && !isLocked) {
+      localStorage.removeItem(LOCK_KEY);
+      setLockedUntil(0);
+      setFailedAttempts(0);
+      setError(null);
+    }
+  }, [isLocked, lockedUntil]);
+
+  const switchPortal = (next: Portal) => {
+    setPortal(next);
+    setError(null);
+    identifierRef.current?.focus();
+  };
+
+  const handleCapsLock = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLock(e.getModifierState?.('CapsLock') ?? false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-    setInfoMessage(null);
+    if (busy || isLocked) return;
+    setError(null);
 
     if (!identifier.trim()) {
-      setErrorMessage(
-        portalType === 'staff'
-          ? 'Please enter your staff email or staff login ID.'
-          : 'Please enter your Student Registration Number or email.'
-      );
+      setError(portal === 'staff' ? 'Enter your work email or staff ID.' : 'Enter your registration number or email.');
+      identifierRef.current?.focus();
+      return;
+    }
+    if (!password) {
+      setError('Enter your password.');
+      passwordRef.current?.focus();
       return;
     }
 
@@ -46,1061 +138,254 @@ export const LoginPage: React.FC = () => {
     try {
       const res = await login({ identifier: identifier.trim(), password });
       if (!res.success) {
-        setErrorMessage(res.error || 'Authentication failed. Please verify your credentials.');
+        const attempts = failedAttempts + 1;
+        setFailedAttempts(attempts);
+        setPassword('');
+        if (attempts >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_SECONDS * 1000;
+          localStorage.setItem(LOCK_KEY, String(until));
+          setLockedUntil(until);
+          setNow(Date.now());
+          setError('Too many failed attempts. For your security, sign-in is paused.');
+        } else {
+          const left = MAX_ATTEMPTS - attempts;
+          setError(`${res.error || 'Sign-in failed.'}${left <= 2 ? ` ${left} attempt${left === 1 ? '' : 's'} remaining.` : ''}`);
+          passwordRef.current?.focus();
+        }
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Login failed. Please try again.');
+    } catch {
+      setError('We could not reach the server. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Google OAuth login
-  const handleGoogleLogin = async () => {
-    setErrorMessage(null);
-    setInfoMessage(null);
+  const handleGoogle = async () => {
+    if (busy) return;
+    setError(null);
     setIsGoogleLoading(true);
-
     try {
       const res = await loginWithGoogle();
       if (!res.success) {
-        if (res.notConfigured) {
-          setShowGoogleGuideModal(true);
-        } else {
-          setErrorMessage(
-            res.error?.includes('provider') || res.error?.includes('disabled')
-              ? 'Google OAuth is pending activation in your Supabase Auth settings. Click "Google Setup" below for 1-click test access or setup instructions.'
-              : res.error || 'Unable to connect with Google OAuth.'
-          );
-        }
+        setError(
+          res.notConfigured
+            ? 'Google sign-in is temporarily unavailable. Please use your email and password.'
+            : res.error || 'Google sign-in failed. Please try again.'
+        );
+        setIsGoogleLoading(false);
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Google sign-in encountered an error.');
-    } finally {
+      // On success the browser redirects to Google — keep the loading state.
+    } catch {
+      setError('Google sign-in failed. Please try again.');
       setIsGoogleLoading(false);
     }
   };
 
-  // Instant Google Sign-in Test (Ronny Ronald - Super Admin)
-  const handleInstantGoogleRonnyLogin = () => {
-    const admin = profiles.find((p) => p.role === 'super_admin') || {
-      id: 'aur-ronny-superadmin',
-      role: 'super_admin' as UserRole,
-      full_name: 'Ronny Ronald (Google Admin)',
-      email: 'ronny@aurevia.ac.ke',
-      phone: '+254 700 000 000',
-      branch_id: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    };
-    loginWithProfile(admin);
-    setShowGoogleGuideModal(false);
-  };
-
-  // Copy OAuth Redirect URI for Google Cloud Console
-  const handleCopyRedirectUri = () => {
-    const callbackUri = 'https://evxmyqnsiapiojsukxmh.supabase.co/auth/v1/callback';
-    navigator.clipboard.writeText(callbackUri).then(() => {
-      setIsCopiedRedirect(true);
-      setTimeout(() => setIsCopiedRedirect(false), 2500);
-    });
-  };
-
-  // Check Supabase provider live & attempt OAuth
-  const handleRetryLiveGoogle = async () => {
-    setIsRetryingLive(true);
-    setLiveCheckStatus('idle');
-    try {
-      const isConfigured = await checkGoogleOAuthConfigured();
-      if (isConfigured) {
-        setLiveCheckStatus('configured');
-        setShowGoogleGuideModal(false);
-        await loginWithGoogle();
-      } else {
-        setLiveCheckStatus('pending');
-      }
-    } catch (e) {
-      setLiveCheckStatus('pending');
-    } finally {
-      setIsRetryingLive(false);
-    }
-  };
-
-  // Instant Quick Demo Sign-in
-  const handleQuickDemoLogin = (role: UserRole) => {
-    setErrorMessage(null);
-    const targetProfile = profiles.find((p) => p.role === role);
-    if (targetProfile) {
-      loginWithProfile(targetProfile);
-    } else {
-      // Fallback student profile if student role selected and not in faculty profiles
-      const studentProfile = profiles.find((p) => p.role === 'student') || {
-        id: 'f1000000-0000-0000-0000-000000000001',
-        role: 'student' as UserRole,
-        full_name: 'Faith Cherono',
-        email: 'faith.cherono@gmail.com',
-        phone: '0714767240',
-        branch_id: 'b1000000-0000-0000-0000-000000000001',
-        reg_number: 'AUR/NBO/2026/001',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
-      loginWithProfile(studentProfile);
-    }
-  };
+  const isStaff = portal === 'staff';
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        width: '100vw',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(ellipse at 50% 20%, #2A1D17 0%, #150F0D 60%, #0A0706 100%)',
-        color: 'var(--text-primary, #F5F1EE)',
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '24px 16px',
-        boxSizing: 'border-box',
-        fontFamily: 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
-      }}
-    >
-      {/* Background Ambience / Subtle Golden Glow Orbs */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-10%',
-          right: '15%',
-          width: '420px',
-          height: '420px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(212, 154, 91, 0.15) 0%, rgba(0, 0, 0, 0) 70%)',
-          filter: 'blur(60px)',
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '-10%',
-          left: '10%',
-          width: '500px',
-          height: '500px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(140, 90, 40, 0.12) 0%, rgba(0, 0, 0, 0) 70%)',
-          filter: 'blur(70px)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Main Glassmorphism Card */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '460px',
-          background: 'rgba(28, 20, 17, 0.78)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(212, 154, 91, 0.25)',
-          borderRadius: '16px',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.65), 0 0 40px rgba(212, 154, 91, 0.08)',
-          padding: 'clamp(24px, 5vw, 36px)',
-          zIndex: 10,
-          boxSizing: 'border-box',
-          position: 'relative',
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(212, 154, 91, 0.35)',
-              marginBottom: '14px',
-            }}
-          >
-            <Coffee size={28} color="#150F0D" strokeWidth={2.4} />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '4px' }}>
-            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#FDFBF7' }}>
-              Tripple T
-            </h1>
-            <span
-              style={{
-                fontSize: '0.62rem',
-                fontWeight: 800,
-                background: 'rgba(212, 154, 91, 0.2)',
-                color: '#D49A5B',
-                border: '1px solid rgba(212, 154, 91, 0.35)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Institutional
-            </span>
-          </div>
-
-          <div style={{ fontSize: '0.82rem', color: '#D49A5B', fontWeight: 600, marginBottom: '4px' }}>
-            Aurevia Coffee Institute
-          </div>
-
-          <p style={{ fontSize: '0.74rem', color: 'rgba(245, 241, 238, 0.65)', margin: 0 }}>
-            Specialty Academy & Multi-Campus Enterprise Portal
+    <div className="auth">
+      {/* ---------------- Brand / hero panel ---------------- */}
+      <aside className="auth-hero" aria-hidden="true">
+        <img className="auth-hero__img" src="/login-hero.jpg" alt="" />
+        <Brand />
+        <div className="auth-hero__copy">
+          <span className="auth-hero__eyebrow">
+            <Coffee size={13} /> Specialty Coffee Academy
+          </span>
+          <p className="auth-hero__title">
+            Where every cup is a <em>craft</em>, and every trainee a professional.
           </p>
+          <p className="auth-hero__lead">
+            One portal for admissions, classes, attendance, fees and certification across all Aurevia campuses.
+          </p>
+          <ul className="auth-campuses">
+            <li><MapPin size={13} /> Nairobi</li>
+            <li><MapPin size={13} /> Mombasa</li>
+            <li><MapPin size={13} /> Kigali</li>
+          </ul>
         </div>
+      </aside>
 
-        {/* Google Sign-In Button */}
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={isGoogleLoading || isLoading}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            padding: '11px 16px',
-            background: '#FFFFFF',
-            color: '#1F2937',
-            border: '1px solid #E5E7EB',
-            borderRadius: '8px',
-            fontSize: '0.86rem',
-            fontWeight: 600,
-            cursor: isGoogleLoading ? 'wait' : 'pointer',
-            transition: 'all 0.15s ease',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
-            marginBottom: '18px',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#F9FAFB')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
-        >
-          {isGoogleLoading ? (
-            <div
-              style={{
-                width: '18px',
-                height: '18px',
-                border: '2px solid #E5E7EB',
-                borderTopColor: '#4285F4',
-                borderRadius: '50%',
-                animation: 'spin 0.8s linear infinite',
-              }}
-            />
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-          )}
-          <span>{isGoogleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
-        </button>
+      {/* ---------------- Sign-in panel ---------------- */}
+      <main className="auth-panel">
+        <div className="auth-card">
+          <Brand />
 
-        {/* Google Sign-In Setup & 1-Click Test Link */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-8px', marginBottom: '16px' }}>
-          <button
-            type="button"
-            onClick={() => setShowGoogleGuideModal(true)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#D49A5B',
-              fontSize: '0.72rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#F5D7B5')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#D49A5B')}
-          >
-            <Sparkles size={12} />
-            <span style={{ textDecoration: 'underline', textUnderlineOffset: '3px' }}>
-              Google Setup Guide & 1-Click Ronny Test Sign-In
-            </span>
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '18px',
-            color: 'rgba(245, 241, 238, 0.45)',
-            fontSize: '0.68rem',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <div style={{ flex: 1, height: '1px', background: 'rgba(212, 154, 91, 0.18)' }} />
-          <span>or sign in with credentials</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(212, 154, 91, 0.18)' }} />
-        </div>
-
-        {/* Portal Type Switcher Tabs */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            background: 'rgba(15, 10, 8, 0.65)',
-            padding: '3px',
-            borderRadius: '8px',
-            border: '1px solid rgba(212, 154, 91, 0.2)',
-            marginBottom: '18px',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setPortalType('staff');
-              setErrorMessage(null);
-            }}
-            style={{
-              padding: '7px 12px',
-              fontSize: '0.76rem',
-              fontWeight: 700,
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              background: portalType === 'staff' ? 'rgba(212, 154, 91, 0.2)' : 'transparent',
-              color: portalType === 'staff' ? '#D49A5B' : 'rgba(245, 241, 238, 0.6)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Building2 size={13} />
-            <span>Staff & Faculty</span>
-          </button>
+          <h1 className="auth-card__title">Welcome back</h1>
+          <p className="auth-card__subtitle">Sign in to your Aurevia portal account.</p>
 
           <button
             type="button"
-            onClick={() => {
-              setPortalType('student');
-              setErrorMessage(null);
-            }}
-            style={{
-              padding: '7px 12px',
-              fontSize: '0.76rem',
-              fontWeight: 700,
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              background: portalType === 'student' ? 'rgba(212, 154, 91, 0.2)' : 'transparent',
-              color: portalType === 'student' ? '#D49A5B' : 'rgba(245, 241, 238, 0.6)',
-              transition: 'all 0.15s ease',
-            }}
+            id="google-signin-btn"
+            className="auth-google"
+            onClick={handleGoogle}
+            disabled={busy}
           >
-            <GraduationCap size={13} />
-            <span>Trainee Portal</span>
+            {isGoogleLoading ? <span className="auth-spinner auth-spinner--google" aria-hidden="true" /> : <GoogleLogo />}
+            <span>{isGoogleLoading ? 'Redirecting to Google…' : 'Continue with Google'}</span>
           </button>
-        </div>
 
-        {/* Error Alert Message */}
-        {errorMessage && (
-          <div
-            style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px',
-              color: '#FCA5A5',
-              fontSize: '0.76rem',
-              lineHeight: 1.4,
-            }}
-          >
-            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-            <div>{errorMessage}</div>
-          </div>
-        )}
+          <div className="auth-divider">or sign in with your password</div>
 
-        {/* Login Form */}
-        <form onSubmit={handleFormLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                color: 'rgba(245, 241, 238, 0.8)',
-                marginBottom: '6px',
-              }}
+          <div className="auth-segment" role="radiogroup" aria-label="Account type">
+            <button
+              type="button"
+              role="radio"
+              id="portal-staff-tab"
+              aria-checked={isStaff}
+              onClick={() => switchPortal('staff')}
             >
-              {portalType === 'staff' ? 'Work Email or Staff Login ID' : 'Registration Number or Email'}
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder={
-                  portalType === 'staff'
-                    ? 'e.g. ronny@aurevia.ac.ke or admin'
-                    : 'e.g. AUR/NBO/2026/001 or trainee email'
-                }
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '9px 12px 9px 36px',
-                  background: 'rgba(15, 10, 8, 0.6)',
-                  border: '1px solid rgba(212, 154, 91, 0.3)',
-                  borderRadius: '6px',
-                  color: '#FDFBF7',
-                  fontSize: '0.82rem',
-                  boxSizing: 'border-box',
-                  outline: 'none',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'rgba(212, 154, 91, 0.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {portalType === 'staff' ? <Mail size={15} /> : <GraduationCap size={15} />}
-              </div>
-            </div>
+              <Building2 size={15} aria-hidden="true" /> Staff &amp; Faculty
+            </button>
+            <button
+              type="button"
+              role="radio"
+              id="portal-student-tab"
+              aria-checked={!isStaff}
+              onClick={() => switchPortal('student')}
+            >
+              <GraduationCap size={15} aria-hidden="true" /> Trainee
+            </button>
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  color: 'rgba(245, 241, 238, 0.8)',
-                }}
-              >
-                Password
+          <div aria-live="assertive">
+            {error && (
+              <div className="auth-alert auth-alert--error" role="alert" id="login-error" key={error}>
+                <AlertCircle size={17} aria-hidden="true" />
+                <p>
+                  {error}
+                  {isLocked && <> Try again in <strong>{lockRemaining}s</strong>.</>}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit} noValidate>
+            <div className="auth-field">
+              <label htmlFor="login-identifier">
+                {isStaff ? 'Work email or staff ID' : 'Registration number or email'}
               </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setInfoMessage(
-                    portalType === 'staff'
-                      ? 'Staff initial password defaults to Aurevia@2026! or your customized password reset by the Super Admin.'
-                      : 'Students can sign in using their admission password or use the 1-click Trainee demo button below.'
-                  )
-                }
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '0.7rem',
-                  color: '#D49A5B',
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                }}
-              >
-                <HelpCircle size={11} />
-                <span>Forgot?</span>
-              </button>
-            </div>
-
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter account password..."
-                style={{
-                  width: '100%',
-                  padding: '9px 36px 9px 36px',
-                  background: 'rgba(15, 10, 8, 0.6)',
-                  border: '1px solid rgba(212, 154, 91, 0.3)',
-                  borderRadius: '6px',
-                  color: '#FDFBF7',
-                  fontSize: '0.82rem',
-                  boxSizing: 'border-box',
-                  outline: 'none',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'rgba(212, 154, 91, 0.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Lock size={15} />
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'rgba(245, 241, 238, 0.5)',
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          {infoMessage && (
-            <div
-              style={{
-                fontSize: '0.72rem',
-                color: '#E5D5C5',
-                background: 'rgba(212, 154, 91, 0.12)',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid rgba(212, 154, 91, 0.25)',
-              }}
-            >
-              {infoMessage}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', color: 'rgba(245, 241, 238, 0.7)' }}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ accentColor: '#D49A5B', cursor: 'pointer' }}
-              />
-              <span>Remember this workstation</span>
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '10px 16px',
-              background: 'linear-gradient(135deg, #D49A5B 0%, #B87D3B 100%)',
-              color: '#150F0D',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.84rem',
-              fontWeight: 700,
-              cursor: isLoading ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 16px rgba(212, 154, 91, 0.35)',
-              transition: 'all 0.15s ease',
-              marginTop: '4px',
-            }}
-          >
-            {isLoading ? (
-              <span>Authenticating...</span>
-            ) : (
-              <>
-                <LogIn size={15} strokeWidth={2.4} />
-                <span>Sign In to {portalType === 'staff' ? 'Faculty Hub' : 'Trainee Portal'}</span>
-                <ArrowRight size={14} />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Quick Demo Access Roles */}
-        <div style={{ marginTop: '22px', borderTop: '1px solid rgba(212, 154, 91, 0.18)', paddingTop: '16px' }}>
-          <div
-            style={{
-              fontSize: '0.66rem',
-              fontWeight: 800,
-              color: 'rgba(212, 154, 91, 0.85)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <Sparkles size={11} />
-            <span>Instant Role Redirection (1-Click Test)</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('super_admin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                background: 'rgba(212, 154, 91, 0.08)',
-                border: '1px solid rgba(212, 154, 91, 0.22)',
-                borderRadius: '6px',
-                color: '#F5F1EE',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.18)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.08)')}
-            >
-              <span style={{ fontSize: '1rem' }}>👑</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#D49A5B' }}>Super Admin</div>
-                <div style={{ fontSize: '0.64rem', color: 'rgba(245, 241, 238, 0.5)' }}>Director Dashboard</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('branch_manager')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                background: 'rgba(212, 154, 91, 0.08)',
-                border: '1px solid rgba(212, 154, 91, 0.22)',
-                borderRadius: '6px',
-                color: '#F5F1EE',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.18)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.08)')}
-            >
-              <span style={{ fontSize: '1rem' }}>🏢</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#6EE7B7' }}>Branch Manager</div>
-                <div style={{ fontSize: '0.64rem', color: 'rgba(245, 241, 238, 0.5)' }}>Campus Operations</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('instructor')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                background: 'rgba(212, 154, 91, 0.08)',
-                border: '1px solid rgba(212, 154, 91, 0.22)',
-                borderRadius: '6px',
-                color: '#F5F1EE',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.18)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.08)')}
-            >
-              <span style={{ fontSize: '1rem' }}>☕</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#38BDF8' }}>Instructor</div>
-                <div style={{ fontSize: '0.64rem', color: 'rgba(245, 241, 238, 0.5)' }}>Lab & Timetable</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin('student')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                background: 'rgba(212, 154, 91, 0.08)',
-                border: '1px solid rgba(212, 154, 91, 0.22)',
-                borderRadius: '6px',
-                color: '#F5F1EE',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.18)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(212, 154, 91, 0.08)')}
-            >
-              <span style={{ fontSize: '1rem' }}>🎓</span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#F472B6' }}>Trainee Portal</div>
-                <div style={{ fontSize: '0.64rem', color: 'rgba(245, 241, 238, 0.5)' }}>Student Dashboard</div>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Security / SSL Footer */}
-        <div
-          style={{
-            marginTop: '20px',
-            textAlign: 'center',
-            fontSize: '0.68rem',
-            color: 'rgba(245, 241, 238, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
-        >
-          <ShieldCheck size={13} color="#10B981" />
-          <span>256-bit Encrypted Session • Supabase Multi-Branch Cloud Auth</span>
-        </div>
-      </div>
-
-      {/* Google OAuth Setup & Instant Ronny Test Modal */}
-      {showGoogleGuideModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1000,
-            background: 'rgba(0, 0, 0, 0.78)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            boxSizing: 'border-box',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowGoogleGuideModal(false);
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '540px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              background: '#1A120E',
-              border: '1px solid rgba(212, 154, 91, 0.4)',
-              borderRadius: '16px',
-              padding: '28px',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(212, 154, 91, 0.15)',
-              position: 'relative',
-              boxSizing: 'border-box',
-              color: '#F5F1EE',
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '10px',
-                    background: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#FDFBF7' }}>
-                    Google Sign-In Configuration
-                  </h3>
-                  <div style={{ fontSize: '0.72rem', color: '#D49A5B', marginTop: '2px' }}>
-                    Supabase Project: <code style={{ background: 'rgba(212,154,91,0.15)', padding: '1px 5px', borderRadius: '4px' }}>evxmyqnsiapiojsukxmh</code>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGoogleGuideModal(false)}
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '8px',
-                  color: 'rgba(245,241,238,0.7)',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Instant 1-Click Access Card (Fast Lane) */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.22) 0%, rgba(140, 90, 40, 0.15) 100%)',
-                border: '1px solid rgba(212, 154, 91, 0.45)',
-                borderRadius: '10px',
-                padding: '16px',
-                marginBottom: '20px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                <Sparkles size={16} color="#D49A5B" />
-                <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#FDFBF7' }}>
-                  ⚡ Instant Sign-In as Ronny Ronald (No Waiting)
+              <div className="auth-input">
+                <span className="auth-input__icon">
+                  {isStaff ? <Mail size={17} aria-hidden="true" /> : <GraduationCap size={17} aria-hidden="true" />}
                 </span>
-              </div>
-              <p style={{ margin: '0 0 12px 0', fontSize: '0.74rem', color: '#E5D5C5', lineHeight: 1.45 }}>
-                Bypass Google Cloud setup right now and immediately enter the portal with a verified Google profile as <strong>Super Admin</strong>.
-              </p>
-              <button
-                type="button"
-                onClick={handleInstantGoogleRonnyLogin}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  background: 'linear-gradient(135deg, #D49A5B 0%, #B87D3B 100%)',
-                  color: '#150F0D',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(212, 154, 91, 0.35)',
-                }}
-              >
-                <CheckCircle2 size={16} strokeWidth={2.4} />
-                <span>Launch Portal as Ronny Ronald (Super Admin)</span>
-              </button>
-            </div>
-
-            {/* Why You Saw the 400 Error */}
-            <div
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginBottom: '18px',
-                fontSize: '0.74rem',
-                color: '#FECACA',
-                lineHeight: 1.45,
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', color: '#FCA5A5' }}>
-                <AlertCircle size={14} />
-                <span>Why Supabase returned "Unsupported provider: provider is not enabled"</span>
-              </div>
-              <div>
-                In your Supabase dashboard (as shown in your screenshot), the <strong>"Enable Sign in with Google"</strong> switch is turned ON, but the <strong>Client IDs</strong> and <strong>Client Secret</strong> inputs are empty. Supabase requires these two credentials from Google Cloud to activate the live OAuth service.
+                <input
+                  ref={identifierRef}
+                  id="login-identifier"
+                  name="username"
+                  type="text"
+                  inputMode={isStaff ? 'email' : 'text'}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                  required
+                  placeholder={isStaff ? 'name@aureviacoffeeinstitute.co.ke' : 'AUR/NBO/2026/001'}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  aria-invalid={!!error && !identifier.trim()}
+                  aria-describedby={error ? 'login-error' : undefined}
+                  disabled={isLocked}
+                />
               </div>
             </div>
 
-            {/* Step-by-Step Instructions */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#D49A5B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-                📋 3-Minute Live Setup in Google Cloud Console
+            <div className="auth-field">
+              <div className="auth-field__row">
+                <label htmlFor="login-password" style={{ margin: 0 }}>Password</label>
+                <button
+                  type="button"
+                  id="forgot-password-btn"
+                  className="auth-link"
+                  onClick={() => setShowForgot((v) => !v)}
+                  aria-expanded={showForgot}
+                  aria-controls="forgot-password-help"
+                >
+                  Forgot password?
+                </button>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.76rem', color: '#F5F1EE' }}>
-                {/* Step 1 */}
-                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>1</div>
-                  <div>
-                    <div>Open <strong>Google Cloud Console Credentials</strong>:</div>
-                    <a
-                      href="https://console.cloud.google.com/apis/credentials"
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: '#60A5FA', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px', textDecoration: 'underline' }}
-                    >
-                      <span>console.cloud.google.com/apis/credentials</span>
-                      <ExternalLink size={11} />
-                    </a>
-                  </div>
-                </div>
-
-                {/* Step 2 */}
-                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>2</div>
-                  <div>
-                    Click <strong>+ CREATE CREDENTIALS</strong> → <strong>OAuth client ID</strong>. Set Application type to <strong>Web application</strong>.
-                  </div>
-                </div>
-
-                {/* Step 3: Callback URI */}
-                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>3</div>
-                  <div style={{ width: '100%' }}>
-                    <div>Under <strong>Authorized redirect URIs</strong>, paste this exact callback URL:</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', background: 'rgba(0,0,0,0.5)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(212,154,91,0.25)' }}>
-                      <code style={{ fontSize: '0.7rem', color: '#D49A5B', wordBreak: 'break-all', flex: 1 }}>
-                        https://evxmyqnsiapiojsukxmh.supabase.co/auth/v1/callback
-                      </code>
-                      <button
-                        type="button"
-                        onClick={handleCopyRedirectUri}
-                        style={{
-                          background: isCopiedRedirect ? '#10B981' : 'rgba(212, 154, 91, 0.2)',
-                          color: isCopiedRedirect ? '#FFFFFF' : '#D49A5B',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '4px 8px',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          flexShrink: 0,
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {isCopiedRedirect ? <Check size={12} /> : <Copy size={12} />}
-                        <span>{isCopiedRedirect ? 'Copied!' : 'Copy'}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 4 */}
-                <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(212,154,91,0.2)', color: '#D49A5B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: '0.72rem' }}>4</div>
-                  <div>
-                    Click <strong>Create</strong>, then copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into the two empty fields in your Supabase screenshot, and click <strong>Save</strong>!
-                  </div>
-                </div>
+              <div className="auth-input">
+                <span className="auth-input__icon"><Lock size={17} aria-hidden="true" /></span>
+                <input
+                  ref={passwordRef}
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyUp={handleCapsLock}
+                  onKeyDown={handleCapsLock}
+                  onBlur={() => setCapsLock(false)}
+                  aria-invalid={!!error && !password}
+                  aria-describedby={capsLock ? 'caps-lock-hint' : error ? 'login-error' : undefined}
+                  disabled={isLocked}
+                />
+                <button
+                  type="button"
+                  className="auth-input__toggle"
+                  id="toggle-password-btn"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
               </div>
+              {capsLock && (
+                <div className="auth-hint" id="caps-lock-hint">
+                  <AlertCircle size={13} aria-hidden="true" /> Caps Lock is on
+                </div>
+              )}
             </div>
 
-            {/* Check Supabase Status Alert */}
-            {liveCheckStatus === 'pending' && (
-              <div
-                style={{
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#FDE68A',
-                  fontSize: '0.74rem',
-                }}
-              >
-                <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                <span>Supabase has not received the keys yet. Make sure you pasted Client ID & Secret and clicked <strong>Save</strong> in Supabase.</span>
+            {showForgot && (
+              <div className="auth-alert auth-alert--info" id="forgot-password-help" role="region" aria-label="Password help">
+                <Info size={17} aria-hidden="true" />
+                <div>
+                  <p>
+                    If your registered email is a Google account, use <strong>Continue with Google</strong>. You won't need a password.
+                  </p>
+                  <p>
+                    Otherwise, ask your branch manager or the system administrator to reset your password, or email{' '}
+                    <a href={`mailto:${SUPPORT_EMAIL}?subject=Portal%20password%20reset`}>{SUPPORT_EMAIL}</a>.
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Bottom Controls */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid rgba(212, 154, 91, 0.2)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                onClick={() => setShowGoogleGuideModal(false)}
-                style={{
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  border: '1px solid rgba(245, 241, 238, 0.25)',
-                  borderRadius: '6px',
-                  color: 'rgba(245, 241, 238, 0.8)',
-                  fontSize: '0.76rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
+            <button type="submit" id="login-submit-btn" className="auth-submit" disabled={busy || isLocked}>
+              {isLoading ? (
+                <>
+                  <span className="auth-spinner" aria-hidden="true" />
+                  <span>Signing in…</span>
+                </>
+              ) : isLocked ? (
+                <span>Try again in {lockRemaining}s</span>
+              ) : (
+                <>
+                  <span>Sign in</span>
+                  <ArrowRight size={18} className="auth-submit__arrow" aria-hidden="true" />
+                </>
+              )}
+            </button>
+          </form>
 
-              <button
-                type="button"
-                onClick={handleRetryLiveGoogle}
-                disabled={isRetryingLive}
-                style={{
-                  padding: '8px 16px',
-                  background: 'rgba(212, 154, 91, 0.18)',
-                  border: '1px solid rgba(212, 154, 91, 0.4)',
-                  borderRadius: '6px',
-                  color: '#D49A5B',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  cursor: isRetryingLive ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <RefreshCw size={13} className={isRetryingLive ? 'spin' : ''} />
-                <span>{isRetryingLive ? 'Checking Supabase...' : 'Check Supabase & Launch Google'}</span>
-              </button>
+          <footer className="auth-footer">
+            <span className="auth-footer__secure">
+              <ShieldCheck size={14} aria-hidden="true" /> Secured connection · Authorised users only
+            </span>
+            <div className="auth-footer__row">
+              <span>© {new Date().getFullYear()} Aurevia Coffee Institute</span>
+              <a href={`mailto:${SUPPORT_EMAIL}`}>Need help? Contact support</a>
             </div>
-          </div>
+          </footer>
         </div>
-      )}
+      </main>
     </div>
   );
 };
