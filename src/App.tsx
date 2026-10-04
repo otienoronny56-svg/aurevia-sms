@@ -157,17 +157,49 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 
   render() {
     if (this.state.hasError) {
+      const handleResetSuperAdmin = () => {
+        try {
+          localStorage.removeItem('aur_current_profile');
+          localStorage.removeItem('aur_auth_session');
+        } catch (_) {}
+        window.location.href = window.location.pathname;
+      };
+
       return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)', color: 'var(--text-primary)', padding: '24px' }}>
-          <div className="glass-card" style={{ maxWidth: '520px', padding: '32px', textAlign: 'center' }}>
+          <div className="glass-card" style={{ maxWidth: '540px', padding: '32px', textAlign: 'center' }}>
             <Coffee size={48} color="var(--crema-gold)" style={{ margin: '0 auto 16px' }} />
-            <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Aurevia Portal Active</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              System operating smoothly. Click below to refresh your dashboard session.
+            <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>Portal Session Recovery</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              A temporary display glitch was detected while rendering this view. Your records and credentials remain intact.
             </p>
-            <button className="btn btn-primary" onClick={() => window.location.reload()}>
-              Reload Session
-            </button>
+
+            {this.state.error && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#EF4444',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.78rem',
+                textAlign: 'left',
+                marginBottom: '20px',
+                fontFamily: 'monospace',
+                overflowX: 'auto',
+                maxHeight: '120px'
+              }}>
+                {this.state.error.message}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                Reload Dashboard
+              </button>
+              <button className="btn btn-secondary" onClick={handleResetSuperAdmin}>
+                Reset to Super Admin
+              </button>
+            </div>
           </div>
         </div>
       );

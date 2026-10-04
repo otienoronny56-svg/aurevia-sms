@@ -207,7 +207,7 @@ interface AppContextType {
 }
 
 const STORAGE_CLEAN_VERSION_KEY = 'aur_storage_version_2026';
-const CURRENT_STORAGE_VERSION = 'v5_aurevia_coffee_institute_fixed';
+const CURRENT_STORAGE_VERSION = 'v6_aurevia_coffee_institute_trainee_ready';
 
 if (typeof window !== 'undefined') {
   const currentVer = localStorage.getItem(STORAGE_CLEAN_VERSION_KEY);
@@ -306,7 +306,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cohorts, setCohorts] = useState<Cohort[]>(() => {
     const saved = localStorage.getItem('aur_cohorts');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_COHORTS;
   });
 
   const [profiles, setProfiles] = useState<Profile[]>(() => {
@@ -324,62 +330,134 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [students, setStudents] = useState<StudentKYC[]>(() => {
     const saved = localStorage.getItem('aur_students');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_STUDENTS;
   });
 
   const [enrollments, setEnrollments] = useState<Enrollment[]>(() => {
     const saved = localStorage.getItem('aur_enrollments');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_ENROLLMENTS;
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     const saved = localStorage.getItem('aur_invoices');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_INVOICES;
   });
 
   const [payments, setPayments] = useState<Payment[]>(() => {
     const saved = localStorage.getItem('aur_payments');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_PAYMENTS;
   });
 
   const [assessments, setAssessments] = useState<Assessment[]>(() => {
     const saved = localStorage.getItem('aur_assessments');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_ASSESSMENTS;
   });
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem('aur_attendance');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_ATTENDANCE;
   });
 
   const [staffClockins, setStaffClockins] = useState<StaffClockIn[]>(() => {
     const saved = localStorage.getItem('aur_staff_clockins');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_STAFF_CLOCKINS;
   });
 
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
     const saved = localStorage.getItem('aur_leave_requests');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_LEAVE_REQUESTS;
   });
 
   const [smsLogs, setSmsLogs] = useState<SMSLog[]>(() => {
     const saved = localStorage.getItem('aur_sms_logs');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_SMS_LOGS;
   });
 
   const [lessons, setLessons] = useState<TimetableLesson[]>(() => {
     const saved = localStorage.getItem('aur_lessons');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_LESSONS;
   });
 
   const [alumni, setAlumni] = useState<Alumni[]>(() => {
     const saved = localStorage.getItem('aur_alumni');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_ALUMNI;
   });
 
   const [liveSessions, setLiveSessions] = useState<LiveClassSession[]>(() => {
     const saved = localStorage.getItem('aur_live_sessions');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_LIVE_SESSIONS;
   });
 
   // Sync to localStorage
@@ -513,7 +591,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ? cRes.data
           : (localCourses || INITIAL_COURSES);
         setCourses(liveCourses);
-        setCohorts(hRes.data || []);
+        const liveCohorts = (hRes.data && hRes.data.length > 0) ? hRes.data : (cohorts.length > 0 ? cohorts : INITIAL_COHORTS);
+        setCohorts(liveCohorts);
 
         // Remove student profiles from faculty/staff profiles
         const cleanProfiles = (pRes.data && pRes.data.length > 0)
@@ -521,16 +600,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : INITIAL_PROFILES.filter((p) => p.role !== 'student');
         setProfiles(cleanProfiles);
 
-        setStudents(sRes.data || []);
-        setEnrollments(eRes.data || []);
-        setInvoices(normalizedInvoices);
-        setPayments(normalizedPayments);
-        setAssessments(assRes.data || []);
-        setAttendance(attRes.data || []);
-        setStaffClockins(scRes.data || []);
-        setLeaveRequests(lrRes.data || []);
-        setSmsLogs(normalizedSms);
-        setAlumni(alRes.data || []);
+        const liveStudents = (sRes.data && sRes.data.length > 0) ? sRes.data : (students.length > 0 ? students : INITIAL_STUDENTS);
+        setStudents(liveStudents);
+
+        const liveEnrollments = (eRes.data && eRes.data.length > 0) ? eRes.data : (enrollments.length > 0 ? enrollments : INITIAL_ENROLLMENTS);
+        setEnrollments(liveEnrollments);
+
+        const liveInvoices = (normalizedInvoices && normalizedInvoices.length > 0) ? normalizedInvoices : (invoices.length > 0 ? invoices : INITIAL_INVOICES);
+        setInvoices(liveInvoices);
+
+        const livePayments = (normalizedPayments && normalizedPayments.length > 0) ? normalizedPayments : (payments.length > 0 ? payments : INITIAL_PAYMENTS);
+        setPayments(livePayments);
+
+        const liveAssessments = (assRes.data && assRes.data.length > 0) ? assRes.data : (assessments.length > 0 ? assessments : INITIAL_ASSESSMENTS);
+        setAssessments(liveAssessments);
+
+        const liveAttendance = (attRes.data && attRes.data.length > 0) ? attRes.data : (attendance.length > 0 ? attendance : INITIAL_ATTENDANCE);
+        setAttendance(liveAttendance);
+
+        const liveStaffClockins = (scRes.data && scRes.data.length > 0) ? scRes.data : (staffClockins.length > 0 ? staffClockins : INITIAL_STAFF_CLOCKINS);
+        setStaffClockins(liveStaffClockins);
+
+        const liveLeaveRequests = (lrRes.data && lrRes.data.length > 0) ? lrRes.data : (leaveRequests.length > 0 ? leaveRequests : INITIAL_LEAVE_REQUESTS);
+        setLeaveRequests(liveLeaveRequests);
+
+        const liveSmsLogs = (normalizedSms && normalizedSms.length > 0) ? normalizedSms : (smsLogs.length > 0 ? smsLogs : INITIAL_SMS_LOGS);
+        setSmsLogs(liveSmsLogs);
+
+        const liveAlumni = (alRes.data && alRes.data.length > 0) ? alRes.data : (alumni.length > 0 ? alumni : INITIAL_ALUMNI);
+        setAlumni(liveAlumni);
 
         setLastSyncTime(new Date());
       } catch (err) {
@@ -694,12 +792,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
     }
+
+    if (role === 'student') {
+      const studentProfile = INITIAL_PROFILES.find((p) => p.role === 'student') || {
+        id: '00000000-0000-0000-0000-000000000010',
+        role: 'student' as UserRole,
+        full_name: 'Faith Cherono',
+        email: 'faith.cherono@aureviacoffeeinstitute.co.ke',
+        phone: '0714767240',
+        reg_number: 'AUR/NBO/2026/001',
+        branch_id: 'b1000000-0000-0000-0000-000000000001',
+        is_active: true,
+        created_at: '2026-02-10T00:00:00Z',
+      };
+      setCurrentProfile(studentProfile);
+      setCurrentRole('student');
+      return;
+    }
+
     const matchingProfile = profiles.find((p) => p.role === role);
     if (matchingProfile) {
-      const sanitized = matchingProfile.reg_number === 'AUR/NBO/2026/001' || matchingProfile.full_name === 'Faith Cherono'
-        ? { ...matchingProfile, phone: '0714767240' }
-        : matchingProfile;
-      setCurrentProfile(sanitized);
+      setCurrentProfile(matchingProfile);
     }
     setCurrentRole(role);
   };
