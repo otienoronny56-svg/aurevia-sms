@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
-  Info, ShieldCheck, MapPin, CheckCircle2, GraduationCap,
+  Info, ShieldCheck, CheckCircle2, GraduationCap,
 } from 'lucide-react';
 import { PasswordResetModal } from '../components/modals/PasswordResetModal';
 import { isPortalMode, switchDomainMode } from '../lib/domainConfig';
@@ -195,11 +195,6 @@ export const LoginPage: React.FC = () => {
           <p className="auth-hero__lead">
             Centralized platform for admissions, curriculum, payments, and multi-campus governance.
           </p>
-          <ul className="auth-campuses">
-            <li><MapPin size={13} /> Nairobi</li>
-            <li><MapPin size={13} /> Mombasa</li>
-            <li><MapPin size={13} /> Kigali</li>
-          </ul>
         </div>
       </aside>
 

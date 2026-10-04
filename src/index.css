@@ -522,28 +522,39 @@ input::placeholder {
 .grid-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
-  margin-bottom: 24px;
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.grid-side-by-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
 }
 
 @media (max-width: 1200px) {
   .grid-stats,
   .grid-metrics {
     grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
 }
 
 @media (max-width: 640px) {
   .grid-stats,
-  .grid-metrics,
+  .grid-metrics {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
   .grid-cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+    gap: 10px;
   }
 }
 
@@ -623,26 +634,54 @@ input::placeholder {
 
 @media (max-width: 768px) {
   .dashboard-container {
-    padding: 4px 2px !important;
+    padding: 6px 4px !important;
   }
 
   .glass-card {
-    padding: 14px !important;
+    padding: 12px 14px !important;
   }
 
+  /* Keep stats & metrics 2x2 side-by-side on tablet and mobile to eliminate wasted vertical height */
   .grid-stats,
   .grid-metrics {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
   }
 
+  .grid-stats .glass-card,
+  .grid-metrics .glass-card {
+    padding: 10px 12px !important;
+  }
+
+  /* Cards stay side-by-side whenever visible, compact on mobile */
   .grid-cards {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)) !important;
+    gap: 10px !important;
   }
 }
 
 @media (max-width: 640px) {
+  .grid-stats,
+  .grid-metrics {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .grid-stats .glass-card,
+  .grid-metrics .glass-card {
+    padding: 8px 10px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .grid-metrics .glass-card div[style*="font-size: 1.4rem"],
+  .grid-stats .glass-card div[style*="font-size: 1.4rem"],
+  .grid-metrics .glass-card div[style*="font-size: 1.1rem"] {
+    font-size: clamp(1rem, 3.4vw, 1.22rem) !important;
+    line-height: 1.2 !important;
+  }
+
   .header-role-text {
     display: none !important;
   }
@@ -667,7 +706,8 @@ input::placeholder {
   }
 
   .btn {
-    min-height: 38px;
+    min-height: 36px;
+    padding: 6px 12px;
   }
 }
 

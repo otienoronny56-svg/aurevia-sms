@@ -330,7 +330,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
     : myLessons.filter((l) => l.day_of_week === activeDayToDisplay);
 
   return (
-    <div className="dashboard-container" style={{ padding: '16px 12px' }}>
+    <div className="dashboard-container" style={{ padding: 'clamp(8px, 1.5vw, 14px)' }}>
       {/* Top Banner */}
       <div
         style={{
@@ -338,33 +338,33 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '14px',
-          marginBottom: '20px',
+          gap: '10px',
+          marginBottom: '14px',
         }}
       >
-        <div style={{ minWidth: '220px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <GraduationCap size={18} color="var(--crema-gold)" />
-            <span style={{ fontSize: '0.8rem', color: 'var(--crema-gold)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ minWidth: '200px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+            <GraduationCap size={16} color="var(--crema-gold)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--crema-gold)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Faculty & Instructor Portal
             </span>
           </div>
-          <h1 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.6rem)', fontWeight: 700, margin: '2px 0' }}>
+          <h1 style={{ fontSize: 'clamp(1.15rem, 3.5vw, 1.45rem)', fontWeight: 700, margin: '2px 0' }}>
             Welcome back, {currentProfile.full_name}
           </h1>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
             {currentProfile.specialty || 'Lead Instructor'} • {myBranch.name}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {myTodayClockIn ? (
             <button
               className="btn btn-secondary"
               onClick={() => clockOutStaff(myTodayClockIn.id)}
-              style={{ padding: '8px 14px', fontSize: '0.82rem' }}
+              style={{ padding: '6px 12px', fontSize: '0.78rem' }}
             >
-              <Clock size={15} color="#6EE7B7" />
+              <Clock size={14} color="#6EE7B7" />
               <span>
                 In: {new Date(myTodayClockIn.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 {myTodayClockIn.clock_out && ' (Done)'}
@@ -374,9 +374,9 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
             <button
               className="btn btn-primary"
               onClick={() => clockInStaff()}
-              style={{ padding: '8px 14px', fontSize: '0.82rem' }}
+              style={{ padding: '6px 12px', fontSize: '0.78rem' }}
             >
-              <Clock size={15} />
+              <Clock size={14} />
               <span>Clock In Today</span>
             </button>
           )}
@@ -384,18 +384,18 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           <button
             className="btn btn-secondary"
             onClick={() => setShowLeaveModal(true)}
-            style={{ padding: '8px 14px', fontSize: '0.82rem' }}
+            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
           >
-            <FileText size={15} />
+            <FileText size={14} />
             <span>Apply for Leave</span>
           </button>
 
           <button
             className="btn btn-primary"
             onClick={() => setShowScheduleLiveModal(true)}
-            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px', background: activeBroadcastingSession ? '#EF4444' : undefined }}
+            style={{ padding: '6px 12px', fontSize: '0.78rem', gap: '5px', background: activeBroadcastingSession ? '#EF4444' : undefined }}
           >
-            <Video size={15} />
+            <Video size={14} />
             <span>{activeBroadcastingSession ? 'Studio Live Now' : 'Go Live / Schedule'}</span>
           </button>
         </div>
@@ -602,13 +602,13 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
           {/* VIEW MODE 1: DAILY FOCUS VIEW */}
           {selectedDayFilter !== 'All' && (
-            <div style={{ maxWidth: '820px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>{selectedDayFilter === 'Today' ? `☀️ Today's Schedule (${todayDayName})` : `📅 ${selectedDayFilter} Schedule`}</span>
                   </h3>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     {filteredLessons.length} {filteredLessons.length === 1 ? 'session scheduled' : 'sessions scheduled'}
                   </p>
                 </div>
@@ -618,22 +618,22 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                 <div
                   className="glass-card"
                   style={{
-                    padding: '40px 20px',
+                    padding: '32px 16px',
                     textAlign: 'center',
                     color: 'var(--text-muted)',
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <Coffee size={36} color="var(--crema-gold)" style={{ opacity: 0.5, marginBottom: '10px' }} />
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <Coffee size={32} color="var(--crema-gold)" style={{ opacity: 0.5, marginBottom: '8px' }} />
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     No Teaching Sessions on {activeDayToDisplay}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     You have no scheduled classes for this day. Use the day buttons above to view other days.
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '10px' }}>
                   {filteredLessons.map((les) => {
                     const cohort = cohorts.find((c) => c.id === les.cohort_id);
                     const course = courses.find((c) => c.id === les.course_id);
@@ -651,116 +651,113 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                         key={les.id}
                         className="glass-card"
                         style={{
-                          padding: '18px 20px',
+                          padding: '12px 14px',
                           border: '1px solid var(--border-medium)',
                           borderRadius: 'var(--radius-md)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '12px',
+                          justifyContent: 'space-between',
+                          gap: '10px',
                         }}
                       >
                         {/* Header: Timing & Room */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span
                               style={{
                                 fontFamily: 'var(--font-mono)',
                                 fontWeight: 700,
-                                fontSize: '0.88rem',
+                                fontSize: '0.8rem',
                                 color: '#6EE7B7',
                                 background: 'rgba(110, 231, 183, 0.12)',
-                                padding: '4px 10px',
+                                padding: '3px 8px',
                                 borderRadius: 'var(--radius-sm)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
+                                gap: '4px',
                                 whiteSpace: 'nowrap',
                                 flexShrink: 0,
                               }}
                             >
-                              <Clock size={13} />
+                              <Clock size={12} />
                               {les.start_time} - {les.end_time}
                             </span>
 
                             <span
                               style={{
                                 fontWeight: 700,
-                                fontSize: '0.84rem',
+                                fontSize: '0.78rem',
                                 color: 'var(--crema-gold)',
                                 background: 'rgba(212, 154, 91, 0.12)',
-                                padding: '4px 10px',
+                                padding: '3px 8px',
                                 borderRadius: 'var(--radius-sm)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
+                                gap: '4px',
                               }}
                             >
-                              <MapPin size={13} />
+                              <MapPin size={12} />
                               {les.lab_location}
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                             {isMarkedToday && (
-                              <span className="badge badge-approved" style={{ fontSize: '0.7rem' }}>
-                                ✓ Signed Today ({markedTodayCount})
+                              <span className="badge badge-approved" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                                ✓ Signed ({markedTodayCount})
                               </span>
                             )}
-                            <span className="badge badge-paid" style={{ fontSize: '0.72rem' }}>
-                              {isVirtual ? '💻 Virtual' : '🔬 Physical Lab'}
+                            <span className="badge badge-paid" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                              {isVirtual ? '💻 Virtual' : '🔬 Lab'}
                             </span>
                           </div>
                         </div>
 
                         {/* Course & Cohort Details */}
                         <div>
-                          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '2px 0', wordBreak: 'break-word', lineHeight: 1.35 }}>
+                          <h4 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '2px 0', wordBreak: 'break-word', lineHeight: 1.3 }}>
                             {course?.title || les.topic_title}
-                          </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--crema-gold-light)', fontWeight: 600 }}>
+                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--crema-gold-light)', fontWeight: 600 }}>
                               {cohort?.name}
                             </span>
-                            {course && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                • Fee: KES {(Number(course.fee_amount) || 0).toLocaleString()}
-                              </span>
-                            )}
-                            <span style={{ fontSize: '0.78rem', color: '#6EE7B7', fontWeight: 600 }}>
-                              • {enrolled.length} Trainees in Attendance
+                            <span style={{ fontSize: '0.74rem', color: '#6EE7B7', fontWeight: 600 }}>
+                              • {enrolled.length} Trainees
                             </span>
                           </div>
                         </div>
 
                         {/* Tools / Equipment */}
                         {les.equipment_needed && (
-                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '4px' }}>
-                            <Wrench size={12} style={{ display: 'inline', marginRight: '5px' }} />
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '4px' }}>
+                            <Wrench size={11} style={{ display: 'inline', marginRight: '4px' }} />
                             Tools: {les.equipment_needed}
                           </div>
                         )}
 
                         {/* Roll-Call Button */}
-                        <div style={{ marginTop: '4px' }}>
+                        <div style={{ marginTop: '2px' }}>
                           <button
                             className={`btn ${isMarkedToday ? 'btn-secondary' : 'btn-primary'}`}
                             style={{
                               width: '100%',
-                              padding: '12px 16px',
-                              fontSize: '0.9rem',
+                              padding: '8px 12px',
+                              fontSize: '0.82rem',
                               fontWeight: 700,
                               display: 'flex',
                               justifyContent: 'center',
                               alignItems: 'center',
-                              gap: '8px',
+                              gap: '6px',
+                              minHeight: '36px',
                             }}
                             onClick={() => handleOpenAttendanceFromLesson(les)}
                           >
-                            <UserCheck size={18} color={isMarkedToday ? '#6EE7B7' : undefined} />
+                            <UserCheck size={16} color={isMarkedToday ? '#6EE7B7' : undefined} />
                             <span>
                               {isMarkedToday
-                                ? `Audit / View Today's Signed Roll-Call (${markedTodayCount})`
-                                : `Take Official Roll-Call (${enrolled.length} Trainees)`}
+                                ? `View Signed Roll-Call (${markedTodayCount})`
+                                : `Take Roll-Call (${enrolled.length} Trainees)`}
                             </span>
                           </button>
                         </div>
@@ -1128,7 +1125,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               }
 
               return (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '10px' }}>
                   {scheduledList.map((session) => {
                     const cohort = cohorts.find((c) => c.id === session.cohort_id);
                     const course = courses.find((c) => c.id === session.course_id);
@@ -1137,7 +1134,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                       <div
                         key={session.id}
                         className="glass-card"
-                        style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}
+                        style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}
                       >
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -1212,28 +1209,28 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
               const cohortEnrs = enrollments.filter((e) => e.cohort_id === cohort.id);
 
               return (
-                <div key={cohort.id} className="glass-card" style={{ padding: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                <div key={cohort.id} className="glass-card" style={{ padding: 'clamp(12px, 2vw, 16px)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div>
-                      <span className="badge badge-gold" style={{ marginBottom: '6px' }}>
+                      <span className="badge badge-gold" style={{ marginBottom: '4px', fontSize: '0.68rem' }}>
                         {course?.category}
                       </span>
-                      <h3 style={{ fontSize: '1.15rem', marginTop: '4px' }}>{cohort.name}</h3>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{course?.title}</p>
+                      <h4 style={{ fontSize: '1.05rem', margin: '2px 0 0 0', fontWeight: 700 }}>{cohort.name}</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>{course?.title}</p>
                     </div>
-                    <span className="badge badge-paid">In Session</span>
+                    <span className="badge badge-paid" style={{ fontSize: '0.68rem' }}>In Session</span>
                   </div>
 
                   <div
                     style={{
                       background: 'var(--bg-surface-elevated)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '12px',
-                      margin: '12px 0',
-                      fontSize: '0.82rem',
+                      padding: '8px 10px',
+                      margin: '8px 0',
+                      fontSize: '0.78rem',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '6px',
+                      gap: '4px',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1253,23 +1250,23 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '10px' }}>
                     <button
                       className="btn btn-secondary"
-                      style={{ padding: '10px 12px', fontSize: '0.85rem' }}
+                      style={{ padding: '7px 10px', fontSize: '0.8rem', minHeight: '34px' }}
                       onClick={() => setSelectedCohortForRoster(cohort)}
                     >
-                      <Users size={16} color="var(--crema-gold)" />
-                      <span>View Trainees</span>
+                      <Users size={14} color="var(--crema-gold)" />
+                      <span>Trainees</span>
                     </button>
 
                     <button
                       className="btn btn-primary"
-                      style={{ padding: '10px 12px', fontSize: '0.85rem' }}
+                      style={{ padding: '7px 10px', fontSize: '0.8rem', minHeight: '34px' }}
                       onClick={() => setSelectedCohortForGrading(cohort)}
                     >
-                      <Award size={16} />
-                      <span>Exam Marksheet</span>
+                      <Award size={14} />
+                      <span>Marksheet</span>
                     </button>
                   </div>
                 </div>
@@ -1283,7 +1280,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
       {/* TAB 3: CATS & EXAMINATION MARKSHEETS (WITH NAMES, EDIT & DELETE) */}
       {/* ========================================================================= */}
       {activeTab === 'grades' && (
-        <div className="glass-card" style={{ padding: '24px' }}>
+        <div className="glass-card" style={{ padding: 'clamp(12px, 2.5vw, 20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Academic Examination & CAT Marksheets</h3>
@@ -1612,7 +1609,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
           </div>
 
           {/* Grouped Session Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '8px', alignItems: 'start' }}>
             {filteredSessions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 No roll-call sessions recorded matching your filter. Use "Take Official Roll-Call" from your daily schedule to sign attendance.
@@ -1637,13 +1634,13 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                     <div
                       onClick={() => setExpandedSessionKey(isExpanded ? null : sess.key)}
                       style={{
-                        padding: '12px 16px',
+                        padding: '10px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         cursor: 'pointer',
                         background: isExpanded ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
-                        gap: '12px',
+                        gap: '8px',
                         flexWrap: 'wrap',
                       }}
                     >

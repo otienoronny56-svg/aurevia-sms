@@ -895,38 +895,38 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
           })()}
 
           <div className="grid-metrics">
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Enrolled Program</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{myCourse?.title || 'Barista Skills Foundation & Latte Art'}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--crema-gold)', marginTop: '4px' }}>{myCohort?.name || 'Cohort 12'}</div>
+            <div className="glass-card" style={{ padding: 'clamp(10px, 1.8vw, 16px)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px' }}>Enrolled Program</div>
+              <div style={{ fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)', fontWeight: 700 }}>{myCourse?.title || 'Barista Skills Foundation & Latte Art'}</div>
+              <div style={{ fontSize: '0.70rem', color: 'var(--crema-gold)', marginTop: '2px' }}>{myCohort?.name || 'Cohort 12'}</div>
             </div>
 
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Attendance Rate</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10B981' }}>
+            <div className="glass-card" style={{ padding: 'clamp(10px, 1.8vw, 16px)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px' }}>Attendance Rate</div>
+              <div style={{ fontSize: 'clamp(1.15rem, 3.2vw, 1.4rem)', fontWeight: 800, color: '#10B981' }}>
                 {hasAttendance ? `${attendanceRate}%` : '0%'}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {hasAttendance ? `${myAttendance.length} Sessions Logged` : 'No Classes Logged Yet'}
               </div>
             </div>
 
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Practical Average</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--crema-gold)' }}>
+            <div className="glass-card" style={{ padding: 'clamp(10px, 1.8vw, 16px)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px' }}>Practical Average</div>
+              <div style={{ fontSize: 'clamp(1.15rem, 3.2vw, 1.4rem)', fontWeight: 800, color: 'var(--crema-gold)' }}>
                 {hasAssessments ? `${avgPractical}%` : '--'}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {hasAssessments ? 'Barista Lab Executions' : 'Pending First Evaluation'}
               </div>
             </div>
 
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Fee Balance</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: (Number(myInvoice?.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981' }}>
+            <div className="glass-card" style={{ padding: 'clamp(10px, 1.8vw, 16px)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px' }}>Fee Balance</div>
+              <div style={{ fontSize: 'clamp(1.15rem, 3.2vw, 1.4rem)', fontWeight: 800, color: (Number(myInvoice?.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981' }}>
                 KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>{myInvoice?.status === 'paid' ? 'Fully Cleared' : 'Payment Required'}</div>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', marginTop: '2px' }}>{myInvoice?.status === 'paid' ? 'Fully Cleared' : 'Payment Required'}</div>
             </div>
           </div>
 
@@ -934,8 +934,8 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
           <div
             className="glass-card"
             style={{
-              padding: 'clamp(16px, 2.5vw, 24px)',
-              marginTop: '20px',
+              padding: 'clamp(12px, 2vw, 18px)',
+              marginTop: '14px',
               border: (myInvoice?.balance_due ?? 0) <= 0
                 ? '1px solid rgba(16, 185, 129, 0.3)'
                 : '1px solid rgba(0, 166, 81, 0.35)',
@@ -1089,9 +1089,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    gap: '8px',
                     flexWrap: 'wrap',
-                    marginBottom: '12px',
+                    marginBottom: '8px',
                   }}
                 >
                   <button
@@ -1099,17 +1099,17 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     className="btn btn-mpesa"
                     onClick={() => handleOpenPayment(myInvoice?.balance_due)}
                     style={{
-                      padding: '10px 20px',
-                      fontSize: '0.88rem',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
                       fontWeight: 700,
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       boxShadow: '0 4px 14px rgba(0, 166, 81, 0.3)',
                     }}
                   >
-                    <Smartphone size={17} />
-                    <span>Pay Full Balance via M-Pesa (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
+                    <Smartphone size={15} />
+                    <span>Pay Full Balance (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
                   </button>
 
                   {myInvoice && (Number(myInvoice.balance_due) || 0) >= 2000 && (
@@ -1117,7 +1117,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       type="button"
                       className="btn btn-secondary"
                       onClick={() => handleOpenPayment(Math.round((Number(myInvoice.balance_due) || 0) / 2))}
-                      style={{ padding: '9px 16px', fontSize: '0.82rem', gap: '6px' }}
+                      style={{ padding: '7px 12px', fontSize: '0.78rem', gap: '5px' }}
                     >
                       <span>Pay 50% (KES {Math.round((Number(myInvoice.balance_due) || 0) / 2).toLocaleString()})</span>
                     </button>
@@ -1127,11 +1127,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => setActiveTab('finance')}
-                    style={{ padding: '9px 16px', fontSize: '0.82rem', gap: '6px', marginLeft: 'auto' }}
+                    style={{ padding: '7px 12px', fontSize: '0.78rem', gap: '5px' }}
                   >
-                    <Receipt size={15} />
-                    <span>View Financial Ledger</span>
-                    <ArrowRight size={14} />
+                    <Receipt size={14} />
+                    <span>Ledger</span>
+                    <ArrowRight size={13} />
                   </button>
                 </div>
 
@@ -1399,39 +1399,43 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       {/* TAB: MODULES & SYLLABUS */}
       {/* ========================================================================= */}
       {activeTab === 'modules' && (
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+        <div className="glass-card" style={{ padding: 'clamp(12px, 2.5vw, 20px)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h3 style={{ fontSize: '1.15rem' }}>Course Curriculum & Syllabus Modules</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Course Curriculum & Syllabus Modules</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                 {myCourse?.title || 'Barista Skills Foundation & Latte Art'} • {myCourse?.duration_weeks || 2} Weeks Academic Program
               </p>
             </div>
-            <span className="badge badge-gold">{myCourse?.category || 'Barista Skills'}</span>
+            <span className="badge badge-gold" style={{ fontSize: '0.70rem' }}>{myCourse?.category || 'Barista Skills'}</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '10px' }}>
             {[
               { mod: 'Module 1: Specialty Coffee Origins & Green Bean Agronomy', desc: 'Botanical varieties, terroir, processing methods (Washed, Natural, Honey), and moisture analysis.' },
               { mod: 'Module 2: Espresso Extraction & Grind Calibration', desc: 'Dialing in grind size, brew ratios (1:2), contact time, TDS refractometer yield measurement, and channeling prevention.' },
               { mod: 'Module 3: Milk Chemistry & Free-Pour Latte Art', desc: 'Milk protein denaturation, microfoam texturing (60°C), pouring ergonomics: Heart, Tulip, and Rosetta patterns.' },
               { mod: 'Module 4: Sensory Analysis & SCA Cupping Protocols', desc: 'Olfactory triangulation, fragrance, aroma, flavor acidity, body, balance, and scoring using World Coffee Research standards.' },
               { mod: 'Module 5: Barista Workflow, Speed & Machine Maintenance', desc: 'Multi-order speed management, daily grouphead chemical backflushing, steam wand sanitation, and preventive care.' },
-            ].map((m, idx) => (
+            ].map((m) => (
               <div
                 key={m.mod}
                 style={{
                   background: 'var(--bg-surface-elevated)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: 'var(--radius-sm)',
-                  padding: '16px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '6px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{m.mod}</div>
-                  <span className="badge badge-paid">Active Module</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>{m.mod}</div>
+                  <span className="badge badge-paid" style={{ fontSize: '0.65rem', flexShrink: 0 }}>Active</span>
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>
                   {m.desc}
                 </p>
               </div>
@@ -1524,10 +1528,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               Modular Evaluation History
             </h4>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '8px' }}>
               {!hasAssessments ? (
-                <div style={{ padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>No modular assessments or instructor evaluation remarks have been posted yet.</p>
+                <div style={{ padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', textAlign: 'center', gridColumn: '1 / -1' }}>
+                  <p style={{ fontSize: '0.80rem', color: 'var(--text-muted)', margin: 0 }}>No modular assessments or instructor evaluation remarks have been posted yet.</p>
                 </div>
               ) : (
                 myAssessments.map((a) => (
@@ -1537,14 +1541,18 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       background: 'var(--bg-surface-elevated)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '14px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '4px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{a.module_name}</span>
-                      <span className="badge badge-paid">{a.grade} ({a.final_score}%)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{a.module_name}</span>
+                      <span className="badge badge-paid" style={{ fontSize: '0.68rem' }}>{a.grade} ({a.final_score}%)</span>
                     </div>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
                       "{a.instructor_remarks}"
                     </p>
                   </div>
@@ -1971,44 +1979,45 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
 
           {/* Payment Receipts History */}
-          <div className="glass-card" style={{ padding: 'clamp(16px, 3vw, 24px)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+          <div className="glass-card" style={{ padding: 'clamp(12px, 2vw, 18px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
               <div>
-                <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
+                <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>
                   Audited Payment Receipts & Transactions
                 </h3>
-                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '3px 0 0 0' }}>
+                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                   Real-time transaction receipts with instant PDF download and social sharing
                 </p>
               </div>
 
-              <span className="badge badge-paid" style={{ fontSize: '0.72rem' }}>
+              <span className="badge badge-paid" style={{ fontSize: '0.68rem' }}>
                 {myPayments.length} Verified Receipts
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '8px' }}>
               {myPayments.length === 0 ? (
                 <div
                   style={{
                     textAlign: 'center',
-                    padding: '30px 20px',
+                    padding: '24px 16px',
                     background: 'var(--bg-surface-elevated)',
                     borderRadius: '8px',
                     border: '1px solid var(--border-subtle)',
+                    gridColumn: '1 / -1',
                   }}
                 >
-                  <Receipt size={32} color="var(--text-muted)" style={{ margin: '0 auto 8px auto' }} />
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  <Receipt size={28} color="var(--text-muted)" style={{ margin: '0 auto 6px auto' }} />
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
                     No payment transactions logged yet for your student record.
                   </p>
                   <button
                     type="button"
                     className="btn btn-mpesa"
                     onClick={() => handleOpenPayment(myInvoice?.balance_due)}
-                    style={{ marginTop: '12px', padding: '8px 16px', fontSize: '0.82rem' }}
+                    style={{ marginTop: '10px', padding: '6px 14px', fontSize: '0.78rem' }}
                   >
-                    <Smartphone size={15} />
+                    <Smartphone size={14} />
                     <span>Make First Fee Installment</span>
                   </button>
                 </div>
@@ -2020,12 +2029,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       background: 'var(--bg-surface-elevated)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '12px 16px',
+                      padding: '10px 12px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       flexWrap: 'wrap',
-                      gap: '12px',
+                      gap: '8px',
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
