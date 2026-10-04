@@ -145,7 +145,7 @@ export interface Invoice {
   total_fee: number;
   amount_paid: number;
   balance_due: number;
-  status: 'unpaid' | 'partial' | 'paid';
+  status: 'unpaid' | 'partial' | 'paid' | 'pending' | 'partially_paid' | 'overdue';
   due_date: string;
   created_at: string;
   enrollment?: Enrollment;

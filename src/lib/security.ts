@@ -51,14 +51,17 @@ export async function verifyPassword(
 ): Promise<boolean> {
   if (!enteredPassword || !storedCredential) return false;
 
+  const cleanEntered = enteredPassword.trim();
+  const cleanStored = storedCredential.trim();
+
   // If storedCredential looks like a 64-char hex SHA-256 hash:
-  if (/^[a-f0-9]{64}$/i.test(storedCredential)) {
-    const computedHash = await hashPassword(enteredPassword);
-    return computedHash.toLowerCase() === storedCredential.toLowerCase();
+  if (/^[a-f0-9]{64}$/i.test(cleanStored)) {
+    const computedHash = await hashPassword(cleanEntered);
+    return computedHash.toLowerCase() === cleanStored.toLowerCase();
   }
 
-  // Exact plain-text comparison for initial unique seed
-  return enteredPassword === storedCredential;
+  // Exact plain-text comparison for initial unique seed (whitespace-tolerant)
+  return cleanEntered === cleanStored;
 }
 
 /**

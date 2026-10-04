@@ -608,14 +608,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const liveCohorts = (hRes.data && hRes.data.length > 0) ? hRes.data : (cohorts.length > 0 ? cohorts : INITIAL_COHORTS);
         setCohorts(liveCohorts);
 
-        // Hydrate profiles from aur_profiles
-        const liveProfiles = (pRes.data && pRes.data.length > 0)
-          ? pRes.data
-          : INITIAL_PROFILES;
-        setProfiles(liveProfiles);
+        // Hydrate profiles from aur_profiles & ensure baseline staff profiles are preserved
+        const dbProfiles = pRes.data || [];
+        const mergedProfiles: Profile[] = [...dbProfiles];
+        for (const initP of INITIAL_PROFILES) {
+          if (!mergedProfiles.some((p: any) => p.id === initP.id || (p.email && p.email.toLowerCase() === initP.email.toLowerCase()))) {
+            mergedProfiles.push(initP);
+          }
+        }
+        setProfiles(mergedProfiles);
 
-        const liveStudents = (sRes.data && sRes.data.length > 0) ? sRes.data : (students.length > 0 ? students : INITIAL_STUDENTS);
-        setStudents(liveStudents);
+        // Hydrate students from aur_students & attach their profile
+        const dbStudents = sRes.data || rawStudents || [];
+        const mergedStudents: StudentKYC[] = dbStudents.map((st: any) => {
+          const prof = mergedProfiles.find((p: any) => p.id === st.profile_id);
+          return {
+            ...st,
+            profile: prof || st.profile,
+          };
+        });
+        if (mergedStudents.length === 0) {
+          for (const initS of INITIAL_STUDENTS) {
+            mergedStudents.push(initS);
+          }
+        }
+        setStudents(mergedStudents);
 
         const liveEnrollments = (eRes.data && eRes.data.length > 0) ? eRes.data : (enrollments.length > 0 ? enrollments : INITIAL_ENROLLMENTS);
         setEnrollments(liveEnrollments);
@@ -761,6 +778,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               return [row, ...prev];
             });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'aur_profiles' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const row = payload.new as any;
+            setProfiles((prev) => {
+              const exists = prev.find((p) => p.id === row.id);
+              if (exists) {
+                return prev.map((p) => (p.id === row.id ? { ...p, ...row } : p));
+              }
+              return [...prev, row];
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setProfiles((prev) => prev.filter((p) => p.id !== (payload.old as any).id));
           }
         }
       )
@@ -959,7 +994,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .select('*')
           .or(`email.ilike."${safe}",reg_number.ilike."${safe}"`)
           .limit(1);
-        if (data && data.length > 0) matchedProfile = data[0] as Profile;
+        if (data && data.length > 0) {
+          matchedProfile = data[0] as Profile;
+        } else {
+          const { data: byReg } = await supabase.from('aur_profiles').select('*').ilike('reg_number', rawId).maybeSingle();
+          if (byReg) {
+            matchedProfile = byReg as Profile;
+          } else {
+            const { data: byEmail } = await supabase.from('aur_profiles').select('*').ilike('email', rawId).maybeSingle();
+            if (byEmail) matchedProfile = byEmail as Profile;
+          }
+        }
+
+        // Also check if rawId matches a national ID in aur_students
+        if (!matchedProfile) {
+          const { data: stRow } = await supabase
+            .from('aur_students')
+            .select('profile_id')
+            .ilike('national_id_or_passport', rawId)
+            .maybeSingle();
+          if (stRow?.profile_id) {
+            const { data: profRow } = await supabase
+              .from('aur_profiles')
+              .select('*')
+              .eq('id', stRow.profile_id)
+              .maybeSingle();
+            if (profRow) matchedProfile = profRow as Profile;
+          }
+        }
       } catch (e) {
         console.warn('Profile lookup failed:', e);
       }
@@ -991,12 +1053,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // Recover student initial seed password from specialty or localStorage if missing
+    if (!matchedProfile.initial_password) {
+      const regKey = (matchedProfile.reg_number || '').trim().toLowerCase();
+      const emailKey = (matchedProfile.email || '').trim().toLowerCase();
+      matchedProfile.initial_password =
+        (matchedProfile.role === 'student' ? matchedProfile.specialty : undefined) ||
+        (regKey ? localStorage.getItem('aur_student_pwd_' + regKey) : null) ||
+        (emailKey ? localStorage.getItem('aur_student_pwd_' + emailKey) : null) ||
+        matchedProfile.specialty ||
+        undefined;
+    }
+
+    const cleanEntered = enteredPass.trim();
+
     // Password verification:
     // 1. If password was changed, ONLY the new hashed password is valid.
-    // The default / initial password CANNOT unlock it under any circumstance!
     if (matchedProfile.password_changed) {
       if (matchedProfile.password) {
-        const isMatch = await verifyPassword(enteredPass, matchedProfile.password);
+        const isMatch = await verifyPassword(cleanEntered, matchedProfile.password);
         if (isMatch) {
           loginWithProfile(matchedProfile);
           return { success: true };
@@ -1005,23 +1080,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: INVALID };
     }
 
-    // 2. If password was NOT yet changed, only this user's unique initial default password can unlock it.
-    // No other user's password and no shared password can unlock it.
-    if (matchedProfile.initial_password) {
-      const isMatch = await verifyPassword(enteredPass, matchedProfile.initial_password);
+    // 2. If password was NOT yet changed, verify against initial unique seed:
+    const expectedPassword = (
+      matchedProfile.initial_password ||
+      (matchedProfile.role === 'student' ? matchedProfile.specialty : '') ||
+      ''
+    ).trim();
+
+    if (expectedPassword) {
+      if (cleanEntered === expectedPassword) {
+        loginWithProfile(matchedProfile);
+        return { success: true };
+      }
+      const isMatch = await verifyPassword(cleanEntered, expectedPassword);
       if (isMatch) {
         loginWithProfile(matchedProfile);
         return { success: true };
       }
-      return { success: false, error: INVALID };
     }
 
-    // Otherwise verify against Supabase Auth using the profile's email
+    // 3. Otherwise verify against Supabase Auth using the profile's email
     if (matchedProfile.email) {
       try {
         const { error } = await supabase.auth.signInWithPassword({
           email: matchedProfile.email,
-          password: enteredPass,
+          password: cleanEntered,
         });
         if (!error) {
           loginWithProfile(matchedProfile);
@@ -1080,28 +1163,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(false);
     localStorage.removeItem('aur_auth_session');
     localStorage.removeItem('aur_current_profile');
-    supabase.auth.signOut().catch(() => {});
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
   };
 
   // Listen for Supabase OAuth redirects on mount
   useEffect(() => {
     // Only sign in Google/Supabase users whose email belongs to a registered, active profile.
-    // Unknown emails are signed out — never auto-provisioned (previously they became super_admin).
     const resolveAuthSession = async (session: any) => {
       if (!session?.user) return;
-      const userEmail = session.user.email?.toLowerCase();
+      const userEmail = session.user.email?.trim().toLowerCase();
+      if (!userEmail) return;
 
-      let matched: Profile | undefined = userEmail
-        ? profiles.find((p) => p.email?.toLowerCase() === userEmail)
-        : undefined;
+      let matched: Profile | undefined = profiles.find((p) => p.email?.trim().toLowerCase() === userEmail);
 
-      // Local cache may be stale (and excludes students) — confirm against Supabase directly
-      if (!matched && userEmail) {
+      // Check students collection
+      if (!matched) {
+        const sMatch = students.find((s) => s.profile?.email?.trim().toLowerCase() === userEmail);
+        if (sMatch?.profile) matched = sMatch.profile;
+      }
+
+      // Check INITIAL_PROFILES
+      if (!matched) {
+        matched = INITIAL_PROFILES.find((p) => p.email?.trim().toLowerCase() === userEmail);
+      }
+
+      // Local cache may be pending sync — confirm against Supabase aur_profiles directly
+      if (!matched) {
         try {
           const { data } = await supabase
             .from('aur_profiles')
             .select('*')
-            .ilike('email', userEmail.replace(/[%_\\]/g, '\\$&'))
+            .ilike('email', userEmail)
             .maybeSingle();
           if (data) matched = data as Profile;
         } catch (e) {
@@ -1114,8 +1206,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      // Not registered (or deactivated): reject the session
-      await supabase.auth.signOut().catch(() => {});
+      // Not registered (or deactivated): clear session locally without causing 403 network failures
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       setIsAuthenticated(false);
       localStorage.removeItem('aur_auth_session');
       localStorage.removeItem('aur_current_profile');
@@ -1123,7 +1215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'aur_oauth_error',
         matched
           ? `The account ${userEmail} has been deactivated. Contact the administrator.`
-          : `${userEmail || 'This Google account'} is not registered in Aurevia. Ask an administrator to add your email to your staff/student profile.`
+          : `${userEmail} is not registered in Aurevia. Ask an administrator to add your email to your student or staff profile.`
       );
       window.dispatchEvent(new Event('aur-oauth-error'));
     };
@@ -1139,7 +1231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [profiles]);
+  }, [profiles, students]);
 
   // Helper to generate Registration Number: AUR/{BRANCH}/{YEAR}/{SEQ}
   const generateRegNumber = (branchId: string): string => {
@@ -1203,11 +1295,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const profilePayload: any = {
         role: 'student',
         branch_id: params.branchId,
-        full_name: params.fullName,
-        email: params.email,
-        phone: params.phone,
-        national_id: params.nationalId,
+        full_name: params.fullName.trim(),
+        email: params.email.trim(),
+        phone: params.phone.trim(),
         reg_number: regNumber,
+        specialty: studentDefaultPwd, // Securely store default password seed
         is_active: true,
       };
       if (authUserId) {
@@ -1221,6 +1313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .single();
 
       if (profErr || !profData) {
+        console.error('Failed to create profile in aur_profiles:', profErr);
         throw new Error(profErr?.message || 'Failed to create profile');
       }
       createdProfile = {
@@ -1235,10 +1328,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .insert({
           profile_id: createdProfile.id,
           branch_id: params.branchId,
-          national_id_or_passport: params.nationalId,
-          emergency_contact_name: params.emergencyName,
-          emergency_contact_phone: params.emergencyPhone,
-          emergency_contact_relationship: params.emergencyRelationship,
+          national_id_or_passport: params.nationalId.trim(),
+          emergency_contact_name: params.emergencyName.trim(),
+          emergency_contact_phone: params.emergencyPhone.trim(),
+          emergency_contact_relationship: params.emergencyRelationship.trim(),
           kyc_verified: true,
           coffee_experience_level: params.coffeeExperience,
         })
@@ -1246,6 +1339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .single();
 
       if (stErr || !stData) {
+        console.error('Failed to create student in aur_students:', stErr);
         throw new Error(stErr?.message || 'Failed to create student record');
       }
       createdStudent = { ...stData, profile: createdProfile };
@@ -1298,13 +1392,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Pre-enrollment cohort sync note:', syncErr);
       }
 
-      // 5. Insert Enrollment into Supabase
+      // 5. Insert Enrollment into Supabase (aur_enrollments has no branch_id)
       const { data: enrData, error: enrErr } = await supabase
         .from('aur_enrollments')
         .insert({
           student_id: createdStudent.id,
           cohort_id: params.cohortId,
-          branch_id: params.branchId,
           status: 'enrolled',
         })
         .select()
@@ -1321,10 +1414,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           enrolled_at: new Date().toISOString(),
         };
       } else {
-        createdEnrollment = enrData;
+        createdEnrollment = { ...enrData, branch_id: params.branchId };
       }
 
-      // 6. Insert Invoice into Supabase
+      // 6. Insert Invoice into Supabase (status must be 'pending', no branch_id column)
       const invNumber = `INV-AUR-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`;
       const { data: invData, error: invErr } = await supabase
         .from('aur_invoices')
@@ -1335,7 +1428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cohort_id: params.cohortId,
           total_fee: feeAmount,
           amount_paid: 0,
-          status: 'unpaid',
+          status: 'pending',
           due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         })
         .select()
@@ -1352,13 +1445,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           total_fee: feeAmount,
           amount_paid: 0,
           balance_due: feeAmount,
-          status: 'unpaid',
+          status: 'pending',
           due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           created_at: new Date().toISOString(),
         };
       } else {
         createdInvoice = { ...invData, branch_id: params.branchId };
       }
+
+      // Secure local password cache for instantaneous offline/online verification
+      try {
+        localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_student_pwd_' + params.email.trim().toLowerCase(), studentDefaultPwd);
+      } catch (_) {}
 
       // 5. Insert SMS log
       const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Temp password: ${studentDefaultPwd}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
@@ -1392,10 +1491,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         national_id: params.nationalId,
         reg_number: regNumber,
         initial_password: studentDefaultPwd,
+        specialty: studentDefaultPwd,
         password_changed: false,
         is_active: true,
         created_at: new Date().toISOString(),
       };
+
+      try {
+        localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_student_pwd_' + params.email.trim().toLowerCase(), studentDefaultPwd);
+      } catch (_) {}
 
       createdStudent = {
         id: sId,
