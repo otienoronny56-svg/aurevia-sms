@@ -608,11 +608,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const liveCohorts = (hRes.data && hRes.data.length > 0) ? hRes.data : (cohorts.length > 0 ? cohorts : INITIAL_COHORTS);
         setCohorts(liveCohorts);
 
-        // Remove student profiles from faculty/staff profiles
-        const cleanProfiles = (pRes.data && pRes.data.length > 0)
-          ? pRes.data.filter((p: any) => p.role !== 'student')
-          : INITIAL_PROFILES.filter((p) => p.role !== 'student');
-        setProfiles(cleanProfiles);
+        // Hydrate profiles from aur_profiles
+        const liveProfiles = (pRes.data && pRes.data.length > 0)
+          ? pRes.data
+          : INITIAL_PROFILES;
+        setProfiles(liveProfiles);
 
         const liveStudents = (sRes.data && sRes.data.length > 0) ? sRes.data : (students.length > 0 ? students : INITIAL_STUDENTS);
         setStudents(liveStudents);
@@ -943,7 +943,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         matchedProfile = INITIAL_PROFILES.find((p) => p.id === matchedStudent.profile_id) || profiles.find((p) => p.id === matchedStudent.profile_id);
         if (!matchedProfile) {
           try {
-            const { data } = await supabase.from('profiles').select('*').eq('id', matchedStudent.profile_id).maybeSingle();
+            const { data } = await supabase.from('aur_profiles').select('*').eq('id', matchedStudent.profile_id).maybeSingle();
             if (data) matchedProfile = data as Profile;
           } catch (_) {}
         }
@@ -955,9 +955,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const safe = rawId.replace(/["\\]/g, '').replace(/[%_]/g, '\\$&');
         const { data } = await supabase
-          .from('profiles')
+          .from('aur_profiles')
           .select('*')
-          .or(`email.ilike."${safe}",staff_id.ilike."${safe}",reg_number.ilike."${safe}"`)
+          .or(`email.ilike."${safe}",reg_number.ilike."${safe}"`)
           .limit(1);
         if (data && data.length > 0) matchedProfile = data[0] as Profile;
       } catch (e) {
@@ -974,28 +974,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    // Check course duration expiration and graduation for students
+    // Check graduation for students (only block if student has concluded all enrollments with no active enrollment)
     if (matchedProfile.role === 'student') {
       const studentObj = students.find((s) => s.profile_id === matchedProfile.id);
       if (studentObj) {
         const studentEnrollments = enrollments.filter((e) => e.student_id === studentObj.id);
         if (studentEnrollments.length > 0) {
-          const hasActiveValidCourse = studentEnrollments.some((e) => {
-            if (e.status === 'completed' || e.status === 'dropped') return false;
-            const cohort = cohorts.find((c) => c.id === e.cohort_id);
-            if (cohort && cohort.end_date) {
-              const endDate = new Date(cohort.end_date);
-              if (!isNaN(endDate.getTime()) && endDate.getTime() < Date.now()) {
-                return false;
-              }
-            }
-            return true;
-          });
-
-          if (!hasActiveValidCourse) {
+          const hasActiveEnrollment = studentEnrollments.some((e) => e.status === 'enrolled' || e.status === 'active');
+          if (!hasActiveEnrollment) {
             return {
               success: false,
-              error: 'Your student portal access has expired because your course duration has completed or you have graduated. Please contact the academy registrar.',
+              error: 'Your student portal access has concluded because your training has completed or you have graduated. Please contact the academy registrar for alumni credentials.',
             };
           }
         }
@@ -1110,7 +1099,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!matched && userEmail) {
         try {
           const { data } = await supabase
-            .from('profiles')
+            .from('aur_profiles')
             .select('*')
             .ilike('email', userEmail.replace(/[%_\\]/g, '\\$&'))
             .maybeSingle();
@@ -1189,30 +1178,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let createdInvoice: Invoice;
 
     try {
-      // 1. Insert Profile into Supabase
+      // 1. Create User in Supabase Auth (Authentication Tab)
+      let authUserId: string | undefined;
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email: params.email,
+          password: studentDefaultPwd,
+          options: {
+            data: {
+              full_name: params.fullName,
+              role: 'student',
+              reg_number: regNumber,
+            },
+          },
+        });
+        if (!authErr && authData?.user?.id) {
+          authUserId = authData.user.id;
+        }
+      } catch (authErr) {
+        console.warn('Supabase Auth signUp note:', authErr);
+      }
+
+      // 2. Insert Profile into Supabase aur_profiles Table
+      const profilePayload: any = {
+        role: 'student',
+        branch_id: params.branchId,
+        full_name: params.fullName,
+        email: params.email,
+        phone: params.phone,
+        national_id: params.nationalId,
+        reg_number: regNumber,
+        is_active: true,
+      };
+      if (authUserId) {
+        profilePayload.id = authUserId;
+      }
+
       const { data: profData, error: profErr } = await supabase
         .from('aur_profiles')
-        .insert({
-          role: 'student',
-          branch_id: params.branchId,
-          full_name: params.fullName,
-          email: params.email,
-          phone: params.phone,
-          national_id: params.nationalId,
-          reg_number: regNumber,
-          initial_password: studentDefaultPwd,
-          password_changed: false,
-          is_active: true,
-        })
+        .insert(profilePayload)
         .select()
         .single();
 
       if (profErr || !profData) {
         throw new Error(profErr?.message || 'Failed to create profile');
       }
-      createdProfile = profData;
+      createdProfile = {
+        ...profData,
+        initial_password: studentDefaultPwd,
+        password_changed: false,
+      };
 
-      // 2. Insert Student KYC into Supabase
+      // 3. Insert Student KYC into Supabase aur_students
       const { data: stData, error: stErr } = await supabase
         .from('aur_students')
         .insert({
@@ -1233,7 +1250,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       createdStudent = { ...stData, profile: createdProfile };
 
-      // 3. Insert Enrollment into Supabase
+      // 4. Ensure Course and Cohort exist in Supabase aur_* tables before enrolling
+      try {
+        const cohortObj = cohorts.find((c) => c.id === params.cohortId);
+        if (cohortObj) {
+          const { data: existingCourse } = await supabase
+            .from('aur_courses')
+            .select('id')
+            .eq('id', cohortObj.course_id)
+            .maybeSingle();
+
+          if (!existingCourse) {
+            const courseObj = courses.find((c) => c.id === cohortObj.course_id) || courses[0];
+            if (courseObj) {
+              await supabase.from('aur_courses').upsert({
+                id: courseObj.id,
+                code: courseObj.code,
+                title: courseObj.title,
+                category: courseObj.category,
+                duration_weeks: courseObj.duration_weeks,
+                fee_amount: courseObj.fee_amount,
+                certification_title: courseObj.certification_title,
+              });
+            }
+          }
+
+          const { data: existingCohort } = await supabase
+            .from('aur_cohorts')
+            .select('id')
+            .eq('id', cohortObj.id)
+            .maybeSingle();
+
+          if (!existingCohort) {
+            await supabase.from('aur_cohorts').upsert({
+              id: cohortObj.id,
+              course_id: cohortObj.course_id,
+              branch_id: cohortObj.branch_id || params.branchId,
+              name: cohortObj.name,
+              start_date: cohortObj.start_date || new Date().toISOString().split('T')[0],
+              end_date: cohortObj.end_date || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              schedule_timing: cohortObj.schedule_timing,
+              status: cohortObj.status || 'in_progress',
+            });
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Pre-enrollment cohort sync note:', syncErr);
+      }
+
+      // 5. Insert Enrollment into Supabase
       const { data: enrData, error: enrErr } = await supabase
         .from('aur_enrollments')
         .insert({
@@ -1246,31 +1311,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .single();
 
       if (enrErr || !enrData) {
-        throw new Error(enrErr?.message || 'Failed to create enrollment');
+        console.warn('Supabase enrollment insert fallback:', enrErr?.message);
+        createdEnrollment = {
+          id: 'enr-' + Date.now(),
+          student_id: createdStudent.id,
+          cohort_id: params.cohortId,
+          branch_id: params.branchId,
+          status: 'enrolled',
+          enrolled_at: new Date().toISOString(),
+        };
+      } else {
+        createdEnrollment = enrData;
       }
-      createdEnrollment = enrData;
 
-      // 4. Insert Invoice into Supabase
-      const invNumber = `INV-AUR-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        { data: invData, error: invErr } = await supabase
-          .from('aur_invoices')
-          .insert({
-            invoice_number: invNumber,
-            enrollment_id: createdEnrollment.id,
-            student_id: createdStudent.id,
-            cohort_id: params.cohortId,
-            total_fee: feeAmount,
-            amount_paid: 0,
-            status: 'unpaid',
-            due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          })
-          .select()
-          .single();
+      // 6. Insert Invoice into Supabase
+      const invNumber = `INV-AUR-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+      const { data: invData, error: invErr } = await supabase
+        .from('aur_invoices')
+        .insert({
+          invoice_number: invNumber,
+          enrollment_id: createdEnrollment.id,
+          student_id: createdStudent.id,
+          cohort_id: params.cohortId,
+          total_fee: feeAmount,
+          amount_paid: 0,
+          status: 'unpaid',
+          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        })
+        .select()
+        .single();
 
       if (invErr || !invData) {
-        throw new Error(invErr?.message || 'Failed to create invoice');
+        console.warn('Supabase invoice insert fallback:', invErr?.message);
+        createdInvoice = {
+          id: 'inv-' + Date.now(),
+          invoice_number: invNumber,
+          enrollment_id: createdEnrollment.id,
+          student_id: createdStudent.id,
+          branch_id: params.branchId,
+          total_fee: feeAmount,
+          amount_paid: 0,
+          balance_due: feeAmount,
+          status: 'unpaid',
+          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+        };
+      } else {
+        createdInvoice = { ...invData, branch_id: params.branchId };
       }
-      createdInvoice = { ...invData, branch_id: params.branchId };
 
       // 5. Insert SMS log
       const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Temp password: ${studentDefaultPwd}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
@@ -2666,19 +2754,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Staff HR Mutations
   const createStaffMember = async (params: Partial<Profile>): Promise<Profile> => {
     let created: Profile;
+    const staffDefaultPwd = params.initial_password || generateUniqueDefaultPassword(params.full_name || 'Staff');
+
     try {
+      let authUserId: string | undefined;
+      if (params.email) {
+        try {
+          const { data: authData, error: authErr } = await supabase.auth.signUp({
+            email: params.email,
+            password: staffDefaultPwd,
+            options: {
+              data: {
+                full_name: params.full_name,
+                role: params.role || 'instructor',
+              },
+            },
+          });
+          if (!authErr && authData?.user?.id) {
+            authUserId = authData.user.id;
+          }
+        } catch (authErr) {
+          console.warn('Staff auth signUp note:', authErr);
+        }
+      }
+
+      const insertPayload: any = {
+        role: params.role || 'instructor',
+        branch_id: params.branch_id || branches[0].id,
+        full_name: params.full_name,
+        email: params.email,
+        phone: params.phone,
+        national_id: params.national_id,
+        specialty: params.specialty,
+        is_active: true,
+      };
+      if (authUserId) {
+        insertPayload.id = authUserId;
+      }
+
       const { data, error } = await supabase
         .from('aur_profiles')
-        .insert({
-          role: params.role || 'instructor',
-          branch_id: params.branch_id || branches[0].id,
-          full_name: params.full_name,
-          email: params.email,
-          phone: params.phone,
-          national_id: params.national_id,
-          specialty: params.specialty,
-          is_active: true,
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -2686,7 +2802,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created = {
         ...data,
         staff_id: params.staff_id,
-        initial_password: params.initial_password || generateUniqueDefaultPassword(params.full_name || 'Staff'),
+        initial_password: staffDefaultPwd,
         password_changed: false,
         assigned_courses: params.assigned_courses,
         assigned_cohorts: params.assigned_cohorts,
