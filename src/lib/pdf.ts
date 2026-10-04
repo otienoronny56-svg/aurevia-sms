@@ -120,7 +120,7 @@ export function buildPaymentReceiptDoc(payment: Partial<Payment>, invoice: Parti
   doc.setTextColor(90, 90, 90);
   doc.text(`Verified via Safaricom Daraja C2B Gateway. Checkout Reference: ${payment.mpesa_receipt_number || 'STK-DIRECT'}.`, 22, 220);
   doc.text('This is an official computer-generated institutional receipt from Aurevia Institute of Coffee.', 22, 226);
-  doc.text('Inquiries: finance@aureviacoffee.com | Admissions Office, Nairobi & Mombasa.', 22, 232);
+  doc.text('Inquiries: finance@aureviacoffeeinstitute.co.ke | Admissions Office, Nairobi & Mombasa.', 22, 232);
 
   // Footer
   doc.setFontSize(8);
@@ -255,7 +255,7 @@ export function generateCertificatePDF(params: {
   doc.setFontSize(8);
   doc.setTextColor(140, 140, 140);
   doc.text(`Certificate Serial: ${params.serialNumber}`, 18, 192);
-  doc.text('Verify Online at: verify.aureviacoffee.com', 225, 192);
+  doc.text('Verify Online at: portal.aureviacoffeeinstitute.co.ke', 225, 192);
 
   doc.save(`Aurevia_Certificate_${params.serialNumber}.pdf`);
 }

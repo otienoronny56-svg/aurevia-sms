@@ -27,7 +27,9 @@ import { DeleteBranchModal } from '../components/modals/DeleteBranchModal';
 import { EditBranchModal } from '../components/modals/EditBranchModal';
 import { EditCourseModal } from '../components/modals/EditCourseModal';
 import { DeleteCourseModal } from '../components/modals/DeleteCourseModal';
-import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch, Course } from '../types/database.types';
+import { AlumniPerformanceModal } from '../components/modals/AlumniPerformanceModal';
+import { EditAlumniModal } from '../components/modals/EditAlumniModal';
+import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch, Course, Alumni } from '../types/database.types';
 
 type DashboardTab =
   | 'overview'
@@ -80,6 +82,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     createBranch,
     deleteStaffMember,
     reviewLeaveRequest,
+    updateAlumni,
+    deleteAlumni,
   } = useApp();
 
   const [localActiveTab, setLocalActiveTab] = useState<DashboardTab>('overview');
@@ -98,6 +102,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [deletingStaff, setDeletingStaff] = useState<Profile | null>(null);
   const [alumniSearch, setAlumniSearch] = useState('');
   const [alumniBranchFilter, setAlumniBranchFilter] = useState('ALL');
+  const [selectedAlumniForPerformance, setSelectedAlumniForPerformance] = useState<Alumni | null>(null);
+  const [selectedAlumniForEdit, setSelectedAlumniForEdit] = useState<Alumni | null>(null);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [inspectedStudent, setInspectedStudent] = useState<StudentKYC | null>(null);
   const [selectedBranchForRoster, setSelectedBranchForRoster] = useState<Branch | null>(null);
@@ -1803,6 +1809,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <th>Current Employer & Role</th>
                   <th>Employment Status</th>
                   <th>Certificate Serial No</th>
+                  <th style={{ textAlign: 'right', width: '170px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1822,7 +1829,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   if (filteredAlumni.length === 0) {
                     return (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
                           <GraduationCap size={32} style={{ opacity: 0.35, margin: '0 auto 8px auto', display: 'block' }} />
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                             No Alumni Records Found
@@ -1878,6 +1885,55 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         >
                           {a.certificate_serial_no}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '0.72rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              borderColor: 'rgba(212, 154, 91, 0.4)',
+                              color: 'var(--crema-gold)',
+                            }}
+                            onClick={() => setSelectedAlumniForPerformance(a)}
+                            title="View Trainee Transcript & Evaluation Results"
+                          >
+                            <Award size={13} />
+                            <span>Results</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 7px', fontSize: '0.72rem' }}
+                            onClick={() => setSelectedAlumniForEdit(a)}
+                            title="Edit Alumni Record"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '4px 7px',
+                              fontSize: '0.72rem',
+                              color: '#EF4444',
+                              borderColor: 'rgba(239, 68, 68, 0.3)',
+                            }}
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to remove ${a.full_name} from the alumni registry?`)) {
+                                deleteAlumni(a.id);
+                              }
+                            }}
+                            title="Delete Alumni Record"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ));
@@ -2402,6 +2458,27 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         <DeleteCourseModal
           course={courseToDelete}
           onClose={() => setCourseToDelete(null)}
+        />
+      )}
+
+      {/* Alumni Performance & Transcript Modal */}
+      {selectedAlumniForPerformance && (
+        <AlumniPerformanceModal
+          alumni={selectedAlumniForPerformance}
+          assessments={assessments}
+          courses={courses}
+          branches={branches}
+          onClose={() => setSelectedAlumniForPerformance(null)}
+        />
+      )}
+
+      {/* Edit Alumni Record Modal */}
+      {selectedAlumniForEdit && (
+        <EditAlumniModal
+          alumni={selectedAlumniForEdit}
+          onClose={() => setSelectedAlumniForEdit(null)}
+          onUpdate={updateAlumni}
+          onDelete={deleteAlumni}
         />
       )}
     </div>

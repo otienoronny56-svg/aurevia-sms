@@ -279,6 +279,11 @@ export interface Alumni {
   certificate_serial_no: string;
   current_employer: string;
   job_title: string;
-  employment_status: 'Employed' | 'Self-Employed / Cafe Owner' | 'Freelance Barista';
+  employment_status: 'Employed' | 'Self-Employed / Cafe Owner' | 'Freelance Barista' | 'Seeking Placement' | string;
+  final_grade?: string;
+  score_percentage?: number;
+  attendance_rate?: number;
+  student_id?: string;
+  profile_id?: string;
   created_at: string;
 }

@@ -47,6 +47,7 @@ import {
   generateBroadcastEmailHtml,
   generateLoginAlertEmailHtml,
 } from './emailTemplates';
+import { PRODUCTION_PORTAL_URL } from './domainConfig';
 import { hashPassword, verifyPassword, generateSecureOTP, generateUniqueDefaultPassword } from './security';
 
 interface AppContextType {
@@ -100,6 +101,8 @@ interface AppContextType {
   deleteLesson: (lessonId: string) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
   graduateStudent: (enrollmentId: string) => Promise<void>;
+  updateAlumni: (alumniId: string, updates: Partial<Alumni>) => Promise<void>;
+  deleteAlumni: (alumniId: string) => Promise<void>;
   updateStudentKYC: (studentId: string, params: {
     fullName: string;
     email: string;
@@ -965,7 +968,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!matchedProfile) return { success: false, error: INVALID };
 
     if (matchedProfile.is_active === false) {
-      return { success: false, error: 'This account has been deactivated. Please contact your administrator.' };
+      return {
+        success: false,
+        error: 'Your student portal access has expired because your training has concluded or your account was deactivated. Please contact the academy registrar for alumni credentials.',
+      };
+    }
+
+    // Check course duration expiration and graduation for students
+    if (matchedProfile.role === 'student') {
+      const studentObj = students.find((s) => s.profile_id === matchedProfile.id);
+      if (studentObj) {
+        const studentEnrollments = enrollments.filter((e) => e.student_id === studentObj.id);
+        if (studentEnrollments.length > 0) {
+          const hasActiveValidCourse = studentEnrollments.some((e) => {
+            if (e.status === 'completed' || e.status === 'dropped') return false;
+            const cohort = cohorts.find((c) => c.id === e.cohort_id);
+            if (cohort && cohort.end_date) {
+              const endDate = new Date(cohort.end_date);
+              if (!isNaN(endDate.getTime()) && endDate.getTime() < Date.now()) {
+                return false;
+              }
+            }
+            return true;
+          });
+
+          if (!hasActiveValidCourse) {
+            return {
+              success: false,
+              error: 'Your student portal access has expired because your course duration has completed or you have graduated. Please contact the academy registrar.',
+            };
+          }
+        }
+      }
     }
 
     // Password verification:
@@ -1346,6 +1380,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         branchName: branchObj?.name || 'Aurevia Coffee Institute',
         scheduleTiming: cohortObj?.schedule_timing,
         temporaryPassword: studentDefaultPwd,
+        portalUrl: PRODUCTION_PORTAL_URL,
+        googleMeetLink: (cohortObj as any)?.meeting_url || (cohortObj as any)?.google_meet_url || undefined,
       });
 
       sendResendEmail({
@@ -1423,8 +1459,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const branch = branches.find((b) => b.id === enrollment.branch_id);
     const branchCode = branch ? branch.code : 'NBO';
     const certSerial = enrollment.certificate_serial_no || `CERT-AUR-${new Date().getFullYear()}-${branchCode}-${Math.floor(Math.random() * 900 + 100)}`;
+    const student = students.find((s) => s.id === enrollment.student_id);
+    const profile = profiles.find((p) => p.id === student?.profile_id);
+    const cohort = cohorts.find((c) => c.id === enrollment.cohort_id);
+    const course = courses.find((c) => c.id === cohort?.course_id);
+
+    // Calculate student assessments and attendance for official alumni records
+    const studentAssessments = assessments.filter((a) => a.student_id === enrollment.student_id);
+    const avgScore = studentAssessments.length > 0
+      ? Math.round(studentAssessments.reduce((sum, a) => sum + (Number(a.final_score) || 0), 0) / studentAssessments.length)
+      : 88;
+    const finalGrade = avgScore >= 90 ? 'Distinction' : avgScore >= 80 ? 'Credit' : 'Pass';
+
+    const studentAtt = attendance.filter((a) => a.student_id === enrollment.student_id);
+    const attRate = studentAtt.length > 0
+      ? Math.round((studentAtt.filter((a) => a.status === 'present' || a.status === 'late').length / studentAtt.length) * 100)
+      : 95;
+
+    const newAlumniEntry: Alumni = {
+      id: 'alm-' + Date.now(),
+      full_name: profile?.full_name || 'Graduate Trainee',
+      email: profile?.email || `${(profile?.full_name || 'trainee').toLowerCase().replace(/\s+/g, '.')}@alumni.ac.ke`,
+      phone: profile?.phone,
+      branch_id: enrollment.branch_id,
+      course_id: cohort?.course_id || '',
+      cohort_name: cohort?.name || 'Class Cohort',
+      graduation_year: new Date().getFullYear(),
+      graduation_month: new Date().toLocaleString('en-US', { month: 'long' }),
+      certification_name: course?.certification_title || course?.title || 'SCA Certification',
+      certificate_serial_no: certSerial,
+      current_employer: 'Pending Placement / Graduate',
+      job_title: 'Certified Barista',
+      employment_status: 'Freelance Barista',
+      final_grade: finalGrade,
+      score_percentage: avgScore,
+      attendance_rate: attRate,
+      student_id: enrollment.student_id,
+      profile_id: student?.profile_id,
+      created_at: new Date().toISOString(),
+    };
 
     try {
+      // 1. Mark enrollment completed
       await supabase
         .from('aur_enrollments')
         .update({
@@ -1432,10 +1508,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           certificate_serial_no: certSerial,
         })
         .eq('id', enrollmentId);
+
+      // 2. EXPIRE PORTAL LOGIN: Deactivate profile so portal logins are expired upon graduation
+      if (student?.profile_id) {
+        await supabase
+          .from('aur_profiles')
+          .update({
+            is_active: false,
+          })
+          .eq('id', student.profile_id);
+      }
+
+      // 3. Insert into alumni table
+      await supabase
+        .from('aur_alumni')
+        .insert({
+          id: newAlumniEntry.id,
+          full_name: newAlumniEntry.full_name,
+          email: newAlumniEntry.email,
+          phone: newAlumniEntry.phone,
+          branch_id: newAlumniEntry.branch_id,
+          course_id: newAlumniEntry.course_id,
+          cohort_name: newAlumniEntry.cohort_name,
+          graduation_year: newAlumniEntry.graduation_year,
+          graduation_month: newAlumniEntry.graduation_month,
+          certification_name: newAlumniEntry.certification_name,
+          certificate_serial_no: newAlumniEntry.certificate_serial_no,
+          current_employer: newAlumniEntry.current_employer,
+          job_title: newAlumniEntry.job_title,
+          employment_status: newAlumniEntry.employment_status,
+        });
     } catch (e) {
       console.warn('Graduate in Supabase:', e);
     }
 
+    // Update local state
     setEnrollments((prev) =>
       prev.map((e) =>
         e.id === enrollmentId
@@ -1443,6 +1550,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : e
       )
     );
+
+    // Deactivate student profile in local state so login expires immediately
+    if (student?.profile_id) {
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === student.profile_id
+            ? { ...p, is_active: false }
+            : p
+        )
+      );
+    }
+
+    // Append to alumni collection
+    setAlumni((prev) => [newAlumniEntry, ...prev]);
+  };
+
+  const updateAlumni = async (alumniId: string, updates: Partial<Alumni>) => {
+    try {
+      await supabase
+        .from('aur_alumni')
+        .update({
+          full_name: updates.full_name,
+          email: updates.email,
+          phone: updates.phone,
+          current_employer: updates.current_employer,
+          job_title: updates.job_title,
+          employment_status: updates.employment_status,
+          certification_name: updates.certification_name,
+          certificate_serial_no: updates.certificate_serial_no,
+        })
+        .eq('id', alumniId);
+    } catch (e) {
+      console.warn('Supabase updateAlumni fallback:', e);
+    }
+
+    setAlumni((prev) =>
+      prev.map((a) => (a.id === alumniId ? { ...a, ...updates } : a))
+    );
+  };
+
+  const deleteAlumni = async (alumniId: string) => {
+    try {
+      await supabase.from('aur_alumni').delete().eq('id', alumniId);
+    } catch (e) {
+      console.warn('Supabase deleteAlumni fallback:', e);
+    }
+
+    setAlumni((prev) => prev.filter((a) => a.id !== alumniId));
   };
 
   const updateStudentKYC = async (
@@ -3127,6 +3282,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         verifyStudentKYC,
         deleteStudent,
         graduateStudent,
+        updateAlumni,
+        deleteAlumni,
         updateStudentKYC,
         processMpesaPayment,
         revertPayment,

@@ -91,6 +91,8 @@ const BUTTON_STYLES = `
   box-sizing: border-box;
 `;
 
+import { PRODUCTION_PORTAL_URL } from './domainConfig';
+
 export interface WelcomeAdmissionEmailParams {
   studentName: string;
   regNumber: string;
@@ -105,8 +107,8 @@ export interface WelcomeAdmissionEmailParams {
 }
 
 export function generateWelcomeAdmissionEmailHtml(params: WelcomeAdmissionEmailParams): string {
-  const portalUrl = params.portalUrl || 'https://aureviacoffee.com/student/portal';
-  const meetLink = params.googleMeetLink || 'https://meet.google.com/aur-sca-2026';
+  const portalUrl = params.portalUrl || PRODUCTION_PORTAL_URL;
+  const meetLink = params.googleMeetLink && params.googleMeetLink.trim().length > 0 ? params.googleMeetLink.trim() : null;
 
   return `
 <!DOCTYPE html>
@@ -151,10 +153,11 @@ export function generateWelcomeAdmissionEmailHtml(params: WelcomeAdmissionEmailP
               <td style="padding: 6px 0; color: #A89B8F;">Practical Lab Timing:</td>
               <td style="padding: 6px 0; color: #F5EBE1;">${params.scheduleTiming}</td>
             </tr>` : ''}
+            ${meetLink ? `
             <tr>
               <td style="padding: 6px 0; color: #A89B8F;">Virtual Classroom:</td>
-              <td style="padding: 6px 0;"><a href="${meetLink}" style="color: #38BDF8; text-decoration: none; font-weight: 600;">Open Google Meet Class</a></td>
-            </tr>
+              <td style="padding: 6px 0;"><a href="${meetLink}" target="_blank" rel="noopener noreferrer" style="color: #38BDF8; text-decoration: none; font-weight: 600;">Open Virtual Classroom</a></td>
+            </tr>` : ''}
           </table>
 
           ${params.temporaryPassword ? `
@@ -166,7 +169,11 @@ export function generateWelcomeAdmissionEmailHtml(params: WelcomeAdmissionEmailP
           </div>` : ''}
 
           <div style="text-align: center; margin: 26px 0;">
-            <a href="${portalUrl}" class="email-btn" style="${BUTTON_STYLES}">Access Student Portal & Dossier</a>
+            <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" class="email-btn" style="${BUTTON_STYLES}">Access Student Portal & Dossier</a>
+            <div style="margin-top: 8px;">
+              <span style="font-size: 12px; color: #8C7E74;">Direct Link: </span>
+              <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" style="color: #D49A5B; font-size: 12px; text-decoration: underline; font-family: monospace;">${portalUrl}</a>
+            </div>
           </div>
 
           <p style="font-size: 13px; color: #A89B8F; line-height: 1.5;">
