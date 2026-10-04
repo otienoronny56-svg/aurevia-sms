@@ -26,7 +26,7 @@ export const INITIAL_BRANCHES: Branch[] = [
     country: 'Kenya',
     phone: '+254 711 234 567',
     email: 'info@aureviacoffeeinstitute.co.ke',
-    manager_name: 'David Mutua',
+    manager_name: undefined,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
   },
@@ -39,7 +39,7 @@ export const INITIAL_BRANCHES: Branch[] = [
     country: 'Kenya',
     phone: '+254 722 345 678',
     email: 'mombasa@aureviacoffee.com',
-    manager_name: 'David Mutua',
+    manager_name: undefined,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
   },
@@ -52,7 +52,7 @@ export const INITIAL_BRANCHES: Branch[] = [
     country: 'Rwanda',
     phone: '+250 788 123 456',
     email: 'kigali@aureviacoffee.com',
-    manager_name: 'David Mutua',
+    manager_name: undefined,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
   },
@@ -115,7 +115,7 @@ export const INITIAL_COURSES: Course[] = [
   },
 ];
 
-// EXACTLY 1 SUPER ADMIN, 1 MANAGER, 1 TEACHER, 1 TRAINEE
+// SYSTEM OWNER FALLBACK ONLY
 export const INITIAL_PROFILES: Profile[] = [
   {
     id: '00000000-0000-0000-0000-000000000001',
@@ -130,53 +130,15 @@ export const INITIAL_PROFILES: Profile[] = [
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
   },
-  {
-    id: '00000000-0000-0000-0000-000000000002',
-    role: 'branch_manager',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    full_name: 'David Mutua',
-    email: 'david.mutua@aureviacoffeeinstitute.co.ke',
-    phone: '+254 711 234 567',
-    reg_number: 'AUR/MGR/NBO',
-    specialty: 'Head of Nairobi Operations',
-    initial_password: 'Aur#4219!Davi',
-    is_active: true,
-    created_at: '2026-01-02T00:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000004',
-    role: 'instructor',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    full_name: 'Wanjiku Kamau',
-    email: 'wanjiku.kamau@aureviacoffeeinstitute.co.ke',
-    phone: '+254 720 111 222',
-    reg_number: 'AUR/INS/001',
-    specialty: 'Licensed Q-Grader & Sensory Lead',
-    initial_password: 'Aur#6732!Wanj',
-    is_active: true,
-    created_at: '2026-01-05T00:00:00Z',
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000010',
-    role: 'student',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    full_name: 'Faith Cherono',
-    email: 'faith.cherono@aureviacoffeeinstitute.co.ke',
-    phone: '0714767240',
-    reg_number: 'AUR/NBO/2026/001',
-    initial_password: 'Aur#5184!Fait',
-    is_active: true,
-    created_at: '2026-02-10T00:00:00Z',
-  },
 ];
 
-// Single Active Cohort led by Teacher Wanjiku
+// Single Active Cohort
 export const INITIAL_COHORTS: Cohort[] = [
   {
     id: 'a1000000-0000-0000-0000-000000000001',
     course_id: 'c1000000-0000-0000-0000-000000000001',
     branch_id: 'b1000000-0000-0000-0000-000000000001',
-    instructor_id: '00000000-0000-0000-0000-000000000004',
+    instructor_id: undefined,
     name: 'NBO Barista Intensive - Cohort 12',
     start_date: '2026-10-01',
     end_date: '2026-11-30',
@@ -259,41 +221,9 @@ export const INITIAL_ASSESSMENTS: Assessment[] = [];
 
 export const INITIAL_ATTENDANCE: AttendanceRecord[] = [];
 
-export const INITIAL_STAFF_CLOCKINS: StaffClockIn[] = [
-  {
-    id: 'sc100000-0000-0000-0000-000000000001',
-    profile_id: '00000000-0000-0000-0000-000000000004', // Wanjiku Kamau
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    clock_in: '2026-09-03T08:00:00Z',
-    work_date: '2026-09-03',
-    location_notes: 'Main Campus Barista Lab 1',
-  },
-  {
-    id: 'sc200000-0000-0000-0000-000000000002',
-    profile_id: '00000000-0000-0000-0000-000000000002', // David Mutua
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    clock_in: '2026-09-03T07:45:00Z',
-    work_date: '2026-09-03',
-    location_notes: 'Manager Office - Nairobi',
-  },
-];
+export const INITIAL_STAFF_CLOCKINS: StaffClockIn[] = [];
 
-export const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [
-  {
-    id: 'lr100000-0000-0000-0000-000000000001',
-    profile_id: '00000000-0000-0000-0000-000000000004',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    leave_type: 'short',
-    start_date: '2026-09-10',
-    end_date: '2026-09-11',
-    days_count: 2,
-    reason: 'Attending AFCA Speciality Coffee Expo judge calibration',
-    status: 'approved',
-    reviewed_by: '00000000-0000-0000-0000-000000000001',
-    review_notes: 'Approved. Essential for institution representation.',
-    created_at: '2026-08-28T09:00:00Z',
-  },
-];
+export const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [];
 
 export const INITIAL_SMS_LOGS: SMSLog[] = [
   {

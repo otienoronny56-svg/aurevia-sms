@@ -243,7 +243,7 @@ export function generateCertificatePDF(params: {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text(params.directorName, 75, 178, { align: 'center' });
-  doc.text('Wanjiku Kamau (Q-Grader)', 222, 178, { align: 'center' });
+  doc.text('Lead Instructor & Faculty Examiner', 222, 178, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);

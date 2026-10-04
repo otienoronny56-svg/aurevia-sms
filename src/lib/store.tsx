@@ -366,7 +366,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((p: Profile) => p.role !== 'student');
+          const cleaned = parsed.filter((p: Profile) => 
+            p.role !== 'student' &&
+            !p.full_name?.toLowerCase().includes('wanjiku') &&
+            !p.full_name?.toLowerCase().includes('mutua') &&
+            !p.email?.toLowerCase().includes('wanjiku') &&
+            !p.email?.toLowerCase().includes('mutua')
+          );
+          localStorage.setItem('aur_profiles', JSON.stringify(cleaned));
+          return cleaned;
         }
       } catch (_) {}
     }
@@ -690,13 +698,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             specialty: (p.specialty && p.specialty.startsWith('Aur#')) ? 'Barista & Specialty Coffee' : (p.specialty || 'Barista & Specialty Coffee'),
           };
         });
-        const mergedProfiles: Profile[] = [...dbProfiles];
+        const mergedProfiles: Profile[] = [...dbProfiles].filter(
+          (p: any) =>
+            !p.full_name?.toLowerCase().includes('wanjiku') &&
+            !p.full_name?.toLowerCase().includes('mutua') &&
+            !p.email?.toLowerCase().includes('wanjiku') &&
+            !p.email?.toLowerCase().includes('mutua')
+        );
         for (const initP of INITIAL_PROFILES) {
           if (!mergedProfiles.some((p: any) => p.id === initP.id || (p.email && p.email.toLowerCase() === initP.email.toLowerCase()))) {
             mergedProfiles.push(initP);
           }
         }
         setProfiles(mergedProfiles);
+        localStorage.setItem('aur_profiles', JSON.stringify(mergedProfiles));
 
         // Hydrate students from aur_students & attach their profile
         const dbStudents = sRes.data || rawStudents || [];

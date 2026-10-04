@@ -277,7 +277,7 @@ export const EditBranchModal: React.FC<EditBranchModalProps> = ({
                   className="input-field"
                   value={managerName}
                   onChange={(e) => setManagerName(e.target.value)}
-                  placeholder="e.g. David Mutua"
+                  placeholder="e.g. Campus Manager Name"
                   style={{ width: '100%' }}
                 />
               </div>

@@ -1201,7 +1201,7 @@ export const StaffLeaveManagement: React.FC<StaffLeaveManagementProps> = ({
                 <textarea
                   className="form-input"
                   rows={3}
-                  placeholder="e.g. Approved. Instructor Mutua will cover practical cupping on Tuesday."
+                  placeholder="e.g. Approved. Assigned instructor will cover practical sessions."
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   style={{ fontSize: '0.84rem', resize: 'vertical' }}
