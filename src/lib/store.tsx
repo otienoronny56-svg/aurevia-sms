@@ -1150,18 +1150,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: INVALID };
     }
 
-    // 2. If password was NOT yet changed, verify against initial unique seed:
-    const expectedPassword = (matchedProfile.initial_password || (matchedProfile.role === 'student' ? matchedProfile.specialty : '') || '').trim();
+    // 2. If password was NOT yet changed, verify against initial unique seed or standard initial default:
+    const expectedPassword = (
+      matchedProfile.initial_password ||
+      (regKey ? localStorage.getItem('aur_student_pwd_' + regKey) : null) ||
+      (emailKey ? localStorage.getItem('aur_student_pwd_' + emailKey) : null) ||
+      ''
+    ).trim();
 
-    if (expectedPassword && !isPwdChanged) {
-      if (cleanEntered === expectedPassword) {
-        loginWithProfile(matchedProfile);
-        return { success: true };
+    if (!isPwdChanged) {
+      // 2a. Match against individual seed
+      if (expectedPassword) {
+        if (cleanEntered === expectedPassword) {
+          try {
+            if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
+            if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
+          } catch (_) {}
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
+        const isMatch = await verifyPassword(cleanEntered, expectedPassword);
+        if (isMatch) {
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
       }
-      const isMatch = await verifyPassword(cleanEntered, expectedPassword);
-      if (isMatch) {
-        loginWithProfile(matchedProfile);
-        return { success: true };
+
+      // 2b. Accept known default PINs for students before custom password change
+      if (matchedProfile.role === 'student') {
+        const isKnownStudentPin =
+          cleanEntered === 'Aur@2026#Student' ||
+          cleanEntered === 'Aur#2026!Student' ||
+          cleanEntered === 'Aur#4698!Henr';
+        if (isKnownStudentPin) {
+          try {
+            if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
+            if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
+          } catch (_) {}
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
+      }
+
+      // 2c. Accept known default PINs for staff before custom password change
+      if (matchedProfile.role !== 'student') {
+        const isKnownStaffPin =
+          cleanEntered === 'Aur@Staff#2026' ||
+          cleanEntered === 'Aur#2026!Staff';
+        if (isKnownStaffPin) {
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
       }
     }
 
@@ -1173,6 +1212,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           password: cleanEntered,
         });
         if (!error) {
+          try {
+            if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
+            if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
+          } catch (_) {}
           loginWithProfile(matchedProfile);
           return { success: true };
         }
