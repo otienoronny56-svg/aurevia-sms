@@ -366,8 +366,8 @@ export const LoginPage: React.FC = () => {
           {/* Clean Portal / SMS Link */}
           <div
             style={{
-              marginTop: '16px',
-              padding: '10px 14px',
+              marginTop: '12px',
+              padding: '8px 12px',
               borderRadius: '8px',
               background: 'var(--bg-surface-elevated)',
               border: '1px solid var(--border-subtle)',
@@ -377,7 +377,7 @@ export const LoginPage: React.FC = () => {
               gap: '8px',
             }}
           >
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
               {onPortal ? 'Management login?' : 'Student or teacher login?'}
             </div>
             <button
