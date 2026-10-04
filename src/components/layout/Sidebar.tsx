@@ -189,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                {isPortalMode() ? 'Aurevia Coffee Institute' : 'Management System'}
+                {myBranch?.name || (currentRole === 'super_admin' ? 'All Campus Branches' : 'Main Campus')}
               </div>
             </div>
           </div>

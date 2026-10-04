@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu size={20} />
         </button>
 
-        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
               fontSize: '0.78rem',
@@ -107,11 +107,31 @@ export const Header: React.FC<HeaderProps> = ({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              maxWidth: 'clamp(80px, 25vw, 160px)',
+              maxWidth: 'clamp(80px, 20vw, 150px)',
             }}
           >
             {getBreadcrumb()}
           </div>
+          {myBranch && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                background: 'rgba(212, 154, 91, 0.1)',
+                border: '1px solid rgba(212, 154, 91, 0.25)',
+                color: 'var(--crema-gold)',
+                fontSize: '0.70rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Building2 size={11} />
+              <span>{myBranch.name}</span>
+            </div>
+          )}
         </div>
       </div>
 

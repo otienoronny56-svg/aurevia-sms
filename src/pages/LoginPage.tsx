@@ -29,7 +29,7 @@ const Brand: React.FC = () => (
     </span>
     <span>
       <span className="auth-brand__name">Tripple T</span>
-      <span className="auth-brand__sub">Aurevia Coffee Institute</span>
+      <span className="auth-brand__sub">Institutional Management Platform</span>
     </span>
   </div>
 );
