@@ -2226,11 +2226,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         {staff.role !== 'super_admin' ? (
                           <button
                             className="btn btn-danger"
-                            style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                            style={{ padding: '4px 10px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                             onClick={() => setDeletingStaff(staff)}
                             title="Delete Staff Account"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={13} />
+                            <span>Delete</span>
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>HQ Admin</span>

@@ -3,7 +3,7 @@ import { useApp } from '../../lib/store';
 import {
   Users, GraduationCap, Key, Copy, Check, Send, Search,
   RefreshCw, ShieldCheck, ExternalLink, CheckCircle2, Lock,
-  Phone, Mail, Building2, AlertCircle, Sparkles, UserPlus
+  Phone, Mail, Building2, AlertCircle, Sparkles, UserPlus, Trash2
 } from 'lucide-react';
 import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
 import { INITIAL_PROFILES } from '../../lib/mockData';
@@ -20,6 +20,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
   isBranchManagerMode = false,
 }) => {
   const {
+    currentRole,
     currentProfile,
     profiles,
     students,
@@ -28,6 +29,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
     branches,
     selectedBranchId,
     sendBulkCommunication,
+    deleteStaffMember,
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'instructors' | 'students'>('instructors');
@@ -40,6 +42,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [staffForPasswordChange, setStaffForPasswordChange] = useState<any | null>(null);
+  const [staffToDelete, setStaffToDelete] = useState<Profile | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sendingSmsId, setSendingSmsId] = useState<string | null>(null);
@@ -457,6 +460,19 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                             <Lock size={12} />
                             <span>Reset</span>
                           </button>
+
+                          {currentRole === 'super_admin' && inst.role !== 'super_admin' && (
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => setStaffToDelete(inst)}
+                              style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Delete Faculty Staff Account"
+                            >
+                              <Trash2 size={12} />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -613,6 +629,37 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
             showNotification(`Password updated for ${staffForPasswordChange.full_name}!`);
           }}
         />
+      )}
+
+      {/* Staff Deletion Confirmation */}
+      {staffToDelete && (
+        <div className="modal-overlay" onClick={() => setStaffToDelete(null)} style={{ zIndex: 1200 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '24px' }}>
+            <h3 style={{ fontSize: '1.2rem', color: 'var(--cherry-red)', marginBottom: '12px' }}>
+              Remove Staff Account?
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Are you sure you want to remove <strong>{staffToDelete.full_name}</strong> ({staffToDelete.staff_id || staffToDelete.email}) from the faculty directory?
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setStaffToDelete(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={async () => {
+                  if (staffToDelete) {
+                    await deleteStaffMember(staffToDelete.id);
+                    showNotification(`Staff account ${staffToDelete.full_name} removed.`);
+                    setStaffToDelete(null);
+                  }
+                }}
+              >
+                Yes, Remove Staff
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
