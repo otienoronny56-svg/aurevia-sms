@@ -256,57 +256,84 @@ export const Header: React.FC<HeaderProps> = ({
                 animation: 'slideUp 0.15s ease-out',
               }}
             >
+              {/* User Account Info Header */}
               <div
                 style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  padding: '6px 10px',
+                  padding: '8px 10px',
                   borderBottom: '1px solid var(--border-subtle)',
-                  marginBottom: '4px',
+                  marginBottom: '6px',
                 }}
               >
-                Switch Role / View As
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {currentProfile.full_name}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: 'var(--crema-gold)', fontWeight: 600, marginTop: '2px' }}>
+                  {currentProfile.email || currentProfile.staff_id || currentProfile.reg_number || 'Signed In'}
+                </div>
+                <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {myBranch ? myBranch.name : 'All Campuses'} • {currentProfile.role.replace('_', ' ').toUpperCase()}
+                </div>
               </div>
 
-              {ROLES.map((r) => (
-                <button
-                  key={r.role}
-                  type="button"
-                  onClick={() => {
-                    switchRole(r.role);
-                    setShowRoleDropdown(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: currentRole === r.role ? 'var(--bg-active)' : 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1rem' }}>{r.icon}</span>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {r.title}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {r.desc}
-                      </div>
-                    </div>
+              {/* SUPER ADMIN ONLY: Preview & Role Inspection Tool */}
+              {currentProfile.role === 'super_admin' && (
+                <>
+                  <div
+                    style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 800,
+                      color: 'var(--text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      padding: '4px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Sparkles size={11} color="var(--crema-gold)" />
+                    <span>Admin View-As Preview</span>
                   </div>
 
-                  {currentRole === r.role && <CheckCircle2 size={14} color="var(--crema-gold)" />}
-                </button>
-              ))}
+                  {ROLES.map((r) => (
+                    <button
+                      key={r.role}
+                      type="button"
+                      onClick={() => {
+                        switchRole(r.role);
+                        setShowRoleDropdown(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: currentRole === r.role ? 'var(--bg-active)' : 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.95rem' }}>{r.icon}</span>
+                        <div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {r.title}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                            {r.desc}
+                          </div>
+                        </div>
+                      </div>
+
+                      {currentRole === r.role && <CheckCircle2 size={13} color="var(--crema-gold)" />}
+                    </button>
+                  ))}
+                </>
+              )}
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '6px', paddingTop: '6px' }}>
                 <button
