@@ -481,3 +481,87 @@ export function generateLoginAlertEmailHtml(params: LoginAlertEmailParams): stri
   `;
 }
 
+export interface StaffWelcomeEmailParams {
+  staffName: string;
+  staffId: string;
+  role: string;
+  department?: string;
+  branchName: string;
+  temporaryPassword: string;
+  portalUrl?: string;
+}
+
+export function generateStaffWelcomeEmailHtml(params: StaffWelcomeEmailParams): string {
+  const portalUrl = params.portalUrl || PRODUCTION_PORTAL_URL;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to the Aurevia Faculty & Staff Team</title>
+  ${RESPONSIVE_CSS}
+</head>
+<body style="${BASE_STYLES}">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #120E0C; padding: 12px 6px;">
+    <tr>
+      <td align="center">
+        <div class="email-card" style="${CARD_STYLES}">
+          <div style="${HEADER_STYLES}">
+            <div style="${LOGO_BADGE}">AUREVIA SPECIALTY COFFEE ACADEMY</div>
+            <h1 class="email-title" style="color: #F5EBE1; font-size: 24px; font-weight: 800; margin: 8px 0 4px 0;">Faculty & Staff Onboarding</h1>
+            <p style="color: #D49A5B; font-size: 13px; font-weight: 600; margin: 0; font-family: monospace;">STAFF ID: ${params.staffId}</p>
+          </div>
+
+          <p style="font-size: 15px; color: #E6E1DC;">Dear <strong>${params.staffName}</strong>,</p>
+          <p style="font-size: 14px; color: #C4B8AD; line-height: 1.6;">
+            Welcome to the team at <strong>Aurevia Specialty Coffee Academy</strong>! Your institutional employee profile has been officially created and granted access to the staff management portal.
+          </p>
+
+          <table class="detail-table" width="100%" style="background-color: #271E19; border: 1px solid #443429; border-radius: 6px; padding: 16px; margin: 20px 0; font-size: 13px; color: #E6E1DC;">
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F; width: 38%;">Assigned Designation:</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #F5EBE1;">${params.role}</td>
+            </tr>
+            ${params.department ? `
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F;">Department:</td>
+              <td style="padding: 6px 0; font-weight: 700; color: #D49A5B;">${params.department}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 6px 0; color: #A89B8F;">Campus / Branch:</td>
+              <td style="padding: 6px 0; color: #F5EBE1;">${params.branchName}</td>
+            </tr>
+          </table>
+
+          <div style="background-color: #271E19; border: 1px dashed #D49A5B; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+            <p style="color: #A89B8F; font-size: 11px; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;">Your Portal Login Credentials</p>
+            <p style="color: #F5EBE1; font-size: 14px; margin: 0 0 6px 0;">Login ID: <strong style="color: #D49A5B; font-family: monospace;">${params.staffId}</strong> or your email</p>
+            <p style="color: #F5EBE1; font-size: 14px; margin: 0;">Initial Password: <strong style="color: #38BDF8; font-family: monospace; letter-spacing: 1px;">${params.temporaryPassword}</strong></p>
+            <p style="color: #8C7E74; font-size: 11px; margin: 8px 0 0 0;">You can sign in using your Staff ID & Password, or click "Continue with Google" using this email.</p>
+          </div>
+
+          <div style="text-align: center; margin: 26px 0;">
+            <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" class="email-btn" style="${BUTTON_STYLES}">Sign In to Staff Portal</a>
+            <div style="margin-top: 8px;">
+              <span style="font-size: 12px; color: #8C7E74;">Portal Access URL: </span>
+              <a href="${portalUrl}" target="_blank" rel="noopener noreferrer" style="color: #D49A5B; font-size: 12px; text-decoration: underline; font-family: monospace;">${portalUrl}</a>
+            </div>
+          </div>
+
+          <div style="${FOOTER_STYLES}">
+            <p style="margin: 4px 0;"><strong>Aurevia Specialty Coffee Academy</strong></p>
+            <p style="margin: 4px 0;">Human Resources & Institutional Systems</p>
+            <p style="margin: 4px 0; color: #635850;">Nairobi • Mombasa • Eldoret • Kigali</p>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+

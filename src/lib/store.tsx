@@ -36,12 +36,14 @@ import {
   INITIAL_LIVE_SESSIONS,
 } from './mockData';
 import { INITIAL_ALUMNI } from './alumniData';
+import { createClient } from '@supabase/supabase-js';
 import { supabase, checkSupabaseConnection, supabaseUrl, supabaseAnonKey } from './supabase';
 import { generateMpesaReceiptNumber } from './mpesa';
 import { sendInstitutionalSMS, buildLoginAlertSMS } from './sms';
 import { sendResendEmail } from './resend';
 import {
   generateWelcomeAdmissionEmailHtml,
+  generateStaffWelcomeEmailHtml,
   generateTuitionReceiptEmailHtml,
   generateAgreementSignedEmailHtml,
   generateBroadcastEmailHtml,
@@ -49,6 +51,40 @@ import {
 } from './emailTemplates';
 import { PRODUCTION_PORTAL_URL } from './domainConfig';
 import { hashPassword, verifyPassword, generateSecureOTP, generateUniqueDefaultPassword } from './security';
+
+/**
+ * Registers an auth user in Supabase using an isolated client instance.
+ * Ensures the currently logged-in administrator's active browser session and localStorage
+ * are NEVER hijacked or logged out, and avoids triggering spurious login alerts.
+ */
+const registerAuthUserIsolated = async (
+  email: string,
+  password: string,
+  metadata: Record<string, any>
+): Promise<string | undefined> => {
+  try {
+    const isolatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+    const { data, error } = await isolatedClient.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata,
+      },
+    });
+    if (!error && data?.user?.id) {
+      return data.user.id;
+    }
+  } catch (e) {
+    console.warn('Isolated auth signUp note:', e);
+  }
+  return undefined;
+};
 
 interface AppContextType {
   // Authentication & Session
@@ -1334,6 +1370,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
+      // If the administrator or another user is already actively logged in, do not wipe their session!
+      const currentStoredSession = localStorage.getItem('aur_auth_session');
+      const currentStoredProfile = localStorage.getItem('aur_current_profile');
+      if (currentStoredSession && currentStoredProfile) {
+        try {
+          const parsed = JSON.parse(currentStoredProfile);
+          if (parsed && parsed.email && parsed.email.toLowerCase() !== userEmail) {
+            // An unrelated background auth event occurred — do NOT disturb the active administrator
+            return;
+          }
+        } catch (_) {}
+      }
+
       // Not registered (or deactivated): clear session locally without causing 403 network failures
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       setIsAuthenticated(false);
@@ -1398,25 +1447,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let createdInvoice: Invoice;
 
     try {
-      // 1. Create User in Supabase Auth (Authentication Tab)
+      // 1. Create User in Supabase Auth (Authentication Tab) via isolated client (never hijacks admin session)
       let authUserId: string | undefined;
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.signUp({
-          email: params.email,
-          password: studentDefaultPwd,
-          options: {
-            data: {
-              full_name: params.fullName,
-              role: 'student',
-              reg_number: regNumber,
-            },
-          },
+      if (params.email) {
+        authUserId = await registerAuthUserIsolated(params.email, studentDefaultPwd, {
+          full_name: params.fullName,
+          role: 'student',
+          reg_number: regNumber,
         });
-        if (!authErr && authData?.user?.id) {
-          authUserId = authData.user.id;
-        }
-      } catch (authErr) {
-        console.warn('Supabase Auth signUp note:', authErr);
       }
 
       // 2. Insert Profile into Supabase aur_profiles Table
@@ -3029,23 +3067,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       let authUserId: string | undefined;
       if (params.email) {
-        try {
-          const { data: authData, error: authErr } = await supabase.auth.signUp({
-            email: params.email,
-            password: staffDefaultPwd,
-            options: {
-              data: {
-                full_name: params.full_name,
-                role: params.role || 'instructor',
-              },
-            },
-          });
-          if (!authErr && authData?.user?.id) {
-            authUserId = authData.user.id;
-          }
-        } catch (authErr) {
-          console.warn('Staff auth signUp note:', authErr);
-        }
+        authUserId = await registerAuthUserIsolated(params.email, staffDefaultPwd, {
+          full_name: params.full_name,
+          role: params.role || 'instructor',
+        });
       }
 
       const regNumber = params.staff_id || params.reg_number || (params.role === 'branch_manager' ? `AUR/MGR/${Date.now().toString().slice(-4)}` : `AUR/INS/${Date.now().toString().slice(-4)}`);
@@ -3129,6 +3154,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setProfiles((prev) => [...prev, created]);
+
+    // Dispatch official Welcome Email to the staff member with their credentials via Resend
+    if (created.email && !created.email.includes('.local')) {
+      const branchObj = branches.find((b) => b.id === created.branch_id);
+      const branchName = branchObj?.name || 'Aurevia Coffee Institute';
+      const html = generateStaffWelcomeEmailHtml({
+        staffName: created.full_name,
+        staffId: created.staff_id || created.reg_number || 'Staff',
+        role: created.role === 'branch_manager' ? 'Branch Manager' : (created.specialty || 'Instructor'),
+        department: created.department,
+        branchName,
+        temporaryPassword: staffDefaultPwd,
+        portalUrl: PRODUCTION_PORTAL_URL,
+      });
+
+      sendResendEmail({
+        to: created.email,
+        subject: `Welcome to Aurevia Specialty Coffee Academy - Your Faculty Credentials (${created.staff_id || created.reg_number})`,
+        html,
+      }).catch((err) => console.warn('Staff welcome email dispatch note:', err));
+    }
+
+    // Dispatch SMS notification with credentials to staff member's phone
+    if (created.phone) {
+      sendInstitutionalSMS({
+        recipientPhone: created.phone,
+        recipientName: created.full_name,
+        message: `Welcome to Aurevia! Your faculty account is active. Staff ID: ${created.staff_id || created.reg_number}, Password: ${staffDefaultPwd}. Portal: sms.aureviacoffeeinstitute.co.ke`,
+        purpose: 'general',
+      }).catch(() => {});
+    }
+
     return created;
   };
 
