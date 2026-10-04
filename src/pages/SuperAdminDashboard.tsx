@@ -147,8 +147,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     : students.filter((s) => s.branch_id === selectedBranchId);
 
   // Aggregated KPIs
-  const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalDue = filteredInvoices.reduce((sum, i) => sum + i.balance_due, 0);
+  const totalRevenue = filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalDue = filteredInvoices.reduce((sum, i) => sum + (Number(i.balance_due) || 0), 0);
   const activeCohortsCount = filteredCohorts.filter((c) => c.status === 'in_progress').length;
 
   // Filtered trainees list for Trainees & KYC Directory
@@ -211,9 +211,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         p?.reg_number || 'N/A',
         crs?.title || 'General Course',
         coh?.name || 'General Intake',
-        (inv?.total_fee || 0).toLocaleString(),
-        (inv?.amount_paid || 0).toLocaleString(),
-        (inv?.balance_due || 0).toLocaleString(),
+        (Number(inv?.total_fee) || 0).toLocaleString(),
+        (Number(inv?.amount_paid) || 0).toLocaleString(),
+        (Number(inv?.balance_due) || 0).toLocaleString(),
         inv?.status?.toUpperCase() || (inv ? 'UNPAID' : 'NO INVOICE'),
         s.kyc_verified ? 'VERIFIED' : 'PENDING',
         p?.phone || 'N/A',
@@ -419,7 +419,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         .reduce((s, p) => s + p.amount, 0);
       const bBalance = invoices
         .filter((i) => i.branch_id === b.id || students.find((s) => s.id === i.student_id)?.branch_id === b.id)
-        .reduce((s, inv) => s + (inv.balance_due || 0), 0);
+        .reduce((s, inv) => s + (Number(inv.balance_due) || 0), 0);
 
       return [
         b.code,
@@ -428,8 +428,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         b.country,
         bStudents.length,
         bCohorts.length,
-        bRev.toLocaleString(),
-        bBalance.toLocaleString(),
+        (Number(bRev) || 0).toLocaleString(),
+        (Number(bBalance) || 0).toLocaleString(),
         b.phone || 'N/A',
         b.is_active ? 'ACTIVE' : 'INACTIVE',
       ];
@@ -645,7 +645,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <DollarSign size={18} color="#10B981" />
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#10B981' }}>
-                KES {totalRevenue.toLocaleString()}
+                KES {(Number(totalRevenue) || 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Direct M-Pesa & Cashier verified
@@ -658,7 +658,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <Clock size={18} color="var(--cherry-red)" />
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--cherry-red)' }}>
-                KES {totalDue.toLocaleString()}
+                KES {(Number(totalDue) || 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {invoices.filter(i => (i.balance_due || 0) > 0).length} pending clearance invoices
@@ -843,7 +843,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       title="Click to view fee collections for this campus"
                     >
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Fee Collections</div>
-                      <div style={{ fontWeight: 700, color: '#10B981' }}>KES {bRev.toLocaleString()} ↗</div>
+                      <div style={{ fontWeight: 700, color: '#10B981' }}>KES {(Number(bRev) || 0).toLocaleString()} ↗</div>
                     </div>
                     <div
                       onClick={() => {
@@ -857,10 +857,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       <div
                         style={{
                           fontWeight: 700,
-                          color: bBalanceDue > 0 ? '#F59E0B' : '#10B981',
+                          color: (Number(bBalanceDue) || 0) > 0 ? '#F59E0B' : '#10B981',
                         }}
                       >
-                        KES {bBalanceDue.toLocaleString()} ↗
+                        KES {(Number(bBalanceDue) || 0).toLocaleString()} ↗
                       </div>
                     </div>
                     <div
@@ -1096,7 +1096,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   >
                     <div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Tuition Fee</div>
-                      <div style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>KES {course.fee_amount.toLocaleString()}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>KES {(Number(course.fee_amount) || 0).toLocaleString()}</div>
                     </div>
                     <div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Total Trainees</div>
@@ -1367,10 +1367,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                 style={{
                                   fontWeight: 700,
                                   fontSize: '0.8rem',
-                                  color: invoice.balance_due > 0 ? 'var(--cherry-red)' : '#10B981',
+                                  color: (Number(invoice.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981',
                                 }}
                               >
-                                KES {invoice.balance_due.toLocaleString()}
+                                KES {(Number(invoice.balance_due) || 0).toLocaleString()}
                               </div>
                               <span className={`badge badge-${invoice.status}`} style={{ fontSize: '0.6rem' }}>
                                 {invoice.status}
@@ -1979,16 +1979,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           {profile?.reg_number}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 600 }}>KES {inv.total_fee.toLocaleString()}</td>
-                      <td style={{ fontWeight: 700, color: '#10B981' }}>KES {inv.amount_paid.toLocaleString()}</td>
-                      <td style={{ fontWeight: 700, color: inv.balance_due > 0 ? 'var(--cherry-red)' : '#10B981' }}>
-                        KES {inv.balance_due.toLocaleString()}
+                      <td style={{ fontWeight: 600 }}>KES {(Number(inv.total_fee) || 0).toLocaleString()}</td>
+                      <td style={{ fontWeight: 700, color: '#10B981' }}>KES {(Number(inv.amount_paid) || 0).toLocaleString()}</td>
+                      <td style={{ fontWeight: 700, color: (Number(inv.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981' }}>
+                        KES {(Number(inv.balance_due) || 0).toLocaleString()}
                       </td>
                       <td>
                         <span className={`badge badge-${inv.status}`}>{inv.status}</span>
                       </td>
                       <td>
-                        {inv.balance_due > 0 && (
+                        {(Number(inv.balance_due) || 0) > 0 && (
                           <button
                             className="btn btn-primary"
                             style={{ padding: '4px 10px', fontSize: '0.74rem' }}
@@ -2042,7 +2042,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       </td>
                       <td>{branch?.name || 'Nairobi Campus'}</td>
                       <td style={{ fontWeight: 700, color: '#10B981' }}>
-                        KES {p.amount.toLocaleString()}
+                        KES {(Number(p.amount) || 0).toLocaleString()}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         {new Date(p.created_at).toLocaleDateString()}

@@ -101,7 +101,7 @@ export const PublicReceiptView: React.FC<{ receiptRef: string; onBack?: () => vo
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Amount Credited</div>
               <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10B981' }}>
-                KES {payment.amount.toLocaleString()}
+                KES {(Number(payment.amount) || 0).toLocaleString()}
               </div>
             </div>
           </div>

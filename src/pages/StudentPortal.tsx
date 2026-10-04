@@ -913,8 +913,8 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Fee Balance</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: myInvoice?.balance_due ? 'var(--cherry-red)' : '#10B981' }}>
-                KES {(myInvoice?.balance_due || 0).toLocaleString()}
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: (Number(myInvoice?.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981' }}>
+                KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>{myInvoice?.status === 'paid' ? 'Fully Cleared' : 'Payment Required'}</div>
             </div>
@@ -1004,7 +1004,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Tuition</div>
                 <div className="metric-val" style={{ color: 'var(--text-primary)' }}>
-                  KES {(myInvoice?.total_fee || 35000).toLocaleString()}
+                  KES {(Number(myInvoice?.total_fee) || 35000).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   {myCourse?.title?.slice(0, 18) || 'Enrolled Course'}
@@ -1014,10 +1014,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Paid</div>
                 <div className="metric-val" style={{ color: '#10B981' }}>
-                  KES {(myInvoice?.amount_paid || 0).toLocaleString()}
+                  KES {(Number(myInvoice?.amount_paid) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: '#10B981', fontWeight: 600 }}>
-                  {Math.min(100, Math.round(((myInvoice?.amount_paid || 0) / (myInvoice?.total_fee || 1)) * 100))}% Cleared
+                  {Math.min(100, Math.round(((Number(myInvoice?.amount_paid) || 0) / (Number(myInvoice?.total_fee) || 1)) * 100))}% Cleared
                 </div>
               </div>
 
@@ -1026,10 +1026,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <div
                   className="metric-val"
                   style={{
-                    color: (myInvoice?.balance_due ?? 0) > 0 ? 'var(--cherry-red)' : '#10B981',
+                    color: (Number(myInvoice?.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981',
                   }}
                 >
-                  KES {(myInvoice?.balance_due || 0).toLocaleString()}
+                  KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   {(myInvoice?.balance_due ?? 0) <= 0 ? 'Certified for Exam' : 'Action Required'}
@@ -1099,17 +1099,17 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     }}
                   >
                     <Smartphone size={17} />
-                    <span>Pay Full Balance via M-Pesa (KES {myInvoice?.balance_due.toLocaleString()})</span>
+                    <span>Pay Full Balance via M-Pesa (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
                   </button>
 
-                  {myInvoice && myInvoice.balance_due >= 2000 && (
+                  {myInvoice && (Number(myInvoice.balance_due) || 0) >= 2000 && (
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      onClick={() => handleOpenPayment(Math.round(myInvoice.balance_due / 2))}
+                      onClick={() => handleOpenPayment(Math.round((Number(myInvoice.balance_due) || 0) / 2))}
                       style={{ padding: '9px 16px', fontSize: '0.82rem', gap: '6px' }}
                     >
-                      <span>Pay 50% (KES {Math.round(myInvoice.balance_due / 2).toLocaleString()})</span>
+                      <span>Pay 50% (KES {Math.round((Number(myInvoice.balance_due) || 0) / 2).toLocaleString()})</span>
                     </button>
                   )}
 
@@ -1637,7 +1637,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       gap: '6px',
                     }}
                   >
-                    <Clock size={14} /> Balance Due: KES {(myInvoice?.balance_due || 0).toLocaleString()}
+                    <Clock size={14} /> Balance Due: KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()}
                   </span>
                 )}
               </div>
@@ -1648,7 +1648,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Program Fee</div>
                 <div className="metric-val" style={{ color: 'var(--text-primary)' }}>
-                  KES {(myInvoice?.total_fee || 35000).toLocaleString()}
+                  KES {(Number(myInvoice?.total_fee) || 35000).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   Invoice #{myInvoice?.invoice_number || 'INV-001'}
@@ -1658,10 +1658,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Amount Paid</div>
                 <div className="metric-val" style={{ color: '#10B981' }}>
-                  KES {(myInvoice?.amount_paid || 0).toLocaleString()}
+                  KES {(Number(myInvoice?.amount_paid) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: '#10B981', fontWeight: 600 }}>
-                  {Math.min(100, Math.round(((myInvoice?.amount_paid || 0) / (myInvoice?.total_fee || 1)) * 100))}% Cleared
+                  {Math.min(100, Math.round(((Number(myInvoice?.amount_paid) || 0) / (Number(myInvoice?.total_fee) || 1)) * 100))}% Cleared
                 </div>
               </div>
 
@@ -1670,11 +1670,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <div
                   className="metric-val"
                   style={{
-                    color: (myInvoice?.balance_due ?? 0) > 0 ? 'var(--cherry-red)' : '#10B981',
+                    color: (Number(myInvoice?.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#10B981',
                     fontWeight: 800,
                   }}
                 >
-                  KES {(myInvoice?.balance_due || 0).toLocaleString()}
+                  KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   {(myInvoice?.balance_due ?? 0) <= 0 ? 'Certified for Exam' : 'Due Before Final Exam'}
@@ -1775,7 +1775,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   }}
                 >
                   <Smartphone size={18} />
-                  <span>Pay Balance with M-Pesa (KES {myInvoice?.balance_due.toLocaleString()})</span>
+                  <span>Pay Balance with M-Pesa (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
                 </button>
               </div>
 
@@ -1812,7 +1812,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       onClick={() => handleOpenPayment(Math.round(myInvoice.balance_due / 2))}
                       style={{ padding: '6px 12px', fontSize: '0.78rem' }}
                     >
-                      Pay 50% (KES {Math.round(myInvoice.balance_due / 2).toLocaleString()})
+                      Pay 50% (KES {Math.round((Number(myInvoice.balance_due) || 0) / 2).toLocaleString()})
                     </button>
                   )}
                   <button
@@ -2009,7 +2009,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.05rem', marginRight: '6px' }}>
-                        KES {pay.amount.toLocaleString()}
+                        KES {(Number(pay.amount) || 0).toLocaleString()}
                       </span>
 
                       {/* Download PDF Receipt */}

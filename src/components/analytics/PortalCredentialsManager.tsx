@@ -6,6 +6,8 @@ import {
   Phone, Mail, Building2, AlertCircle, Sparkles, UserPlus
 } from 'lucide-react';
 import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
+import { INITIAL_PROFILES } from '../../lib/mockData';
+import { Profile } from '../../types/database.types';
 import { AddStaffModal } from '../modals/AddStaffModal';
 import { StudentKYCModal } from '../modals/StudentKYCModal';
 import { StaffPasswordModal } from '../modals/StaffPasswordModal';
@@ -95,6 +97,45 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
       );
     });
 
+  const getStudentPassword = (prof?: Profile | null, stId?: string, regNo?: string): string => {
+    const rKey = (regNo || prof?.reg_number || '').trim().toLowerCase();
+    const eKey = (prof?.email || '').trim().toLowerCase();
+    const pId = (prof?.id || stId || '').trim();
+
+    const storedSeed =
+      prof?.initial_password ||
+      (pId ? localStorage.getItem('aur_user_pwd_seed_' + pId) : null) ||
+      (rKey ? localStorage.getItem('aur_student_pwd_' + rKey) : null) ||
+      (eKey ? localStorage.getItem('aur_student_pwd_' + eKey) : null) ||
+      (pId ? localStorage.getItem('aur_student_pwd_' + pId.toLowerCase()) : null);
+
+    if (storedSeed) return storedSeed;
+    if (prof?.password_changed) return '••••••••';
+    const initialMatch = INITIAL_PROFILES.find((ip) => ip.id === pId || (ip.email && ip.email.toLowerCase() === eKey));
+    if (initialMatch?.initial_password) return initialMatch.initial_password;
+
+    return 'Aur@2026#Student';
+  };
+
+  const getStaffPassword = (inst: Profile): string => {
+    const rKey = (inst.staff_id || inst.reg_number || '').trim().toLowerCase();
+    const eKey = (inst.email || '').trim().toLowerCase();
+    const pId = (inst.id || '').trim();
+
+    const storedSeed =
+      inst.initial_password ||
+      (pId ? localStorage.getItem('aur_staff_pwd_' + pId) : null) ||
+      (eKey ? localStorage.getItem('aur_staff_pwd_' + eKey) : null) ||
+      (rKey ? localStorage.getItem('aur_staff_pwd_' + rKey) : null);
+
+    if (storedSeed) return storedSeed;
+    if (inst.password_changed) return '••••••••';
+    const initialMatch = INITIAL_PROFILES.find((ip) => ip.id === pId || (ip.email && ip.email.toLowerCase() === eKey));
+    if (initialMatch?.initial_password) return initialMatch.initial_password;
+
+    return 'Aur#2026!Staff';
+  };
+
   const showNotification = (msg: string) => {
     setActionNotice(msg);
     setTimeout(() => setActionNotice(null), 5000);
@@ -163,7 +204,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
       const recipients = targetStudents.map((s) => {
         const p = s.profile;
         const loginId = p?.reg_number || p?.email || s.national_id_or_passport;
-        const pass = p?.initial_password || 'Aur@2026#Student';
+        const pass = getStudentPassword(p, s.id, p?.reg_number);
         return {
           name: p?.full_name || 'Student',
           phone: p?.phone || '',
@@ -352,7 +393,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                 {instructorsList.map((inst) => {
                   const sBranch = branches.find((b) => b.id === inst.branch_id);
                   const loginId = inst.staff_id || inst.email;
-                  const displayPass = inst.initial_password || (inst.password_changed ? '••••••••' : 'Aur@Staff#2026');
+                  const displayPass = getStaffPassword(inst);
 
                   return (
                     <tr key={inst.id}>
@@ -454,7 +495,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                   const prof = st.profile;
                   const sBranch = branches.find((b) => b.id === st.branch_id);
                   const regNo = prof?.reg_number || st.national_id_or_passport || 'REG-PENDING';
-                  const displayPass = prof?.initial_password || (prof?.password_changed ? '••••••••' : 'Aur@2026#Student');
+                  const displayPass = getStudentPassword(prof, st.id, regNo);
                   const loginId = regNo;
 
                   return (

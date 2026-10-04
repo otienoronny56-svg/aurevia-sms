@@ -723,7 +723,7 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
                             </span>
                             {course && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                • Fee: KES {course.fee_amount.toLocaleString()}
+                                • Fee: KES {(Number(course.fee_amount) || 0).toLocaleString()}
                               </span>
                             )}
                             <span style={{ fontSize: '0.78rem', color: '#6EE7B7', fontWeight: 600 }}>

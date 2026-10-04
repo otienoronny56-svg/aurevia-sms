@@ -119,8 +119,8 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const [selectedLogDate, setSelectedLogDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Computed branch KPIs
-  const branchTotalCollected = branchPayments.reduce((sum, p) => sum + p.amount, 0);
-  const branchTotalDue = branchInvoices.reduce((sum, i) => sum + i.balance_due, 0);
+  const branchTotalCollected = branchPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const branchTotalDue = branchInvoices.reduce((sum, i) => sum + (Number(i.balance_due) || 0), 0);
 
   // Quick Sign In / Out helpers
   const handleQuickSignIn = async (staff: Profile) => {
@@ -309,9 +309,9 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
         inv.invoice_number,
         prof?.full_name || 'N/A',
         course?.title || 'Specialty Coffee Course',
-        `KES ${inv.total_fee.toLocaleString()}`,
-        `KES ${inv.amount_paid.toLocaleString()}`,
-        `KES ${inv.balance_due.toLocaleString()}`,
+        `KES ${(Number(inv.total_fee) || 0).toLocaleString()}`,
+        `KES ${(Number(inv.amount_paid) || 0).toLocaleString()}`,
+        `KES ${(Number(inv.balance_due) || 0).toLocaleString()}`,
         inv.status.toUpperCase(),
         inv.due_date,
       ];
@@ -323,7 +323,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       exportToPDFReport(
         `Campus_Invoices_${myBranch.code}`,
         `CAMPUS INVOICES & FEES LEDGER - ${myBranch.name.toUpperCase()}`,
-        `Total Billed: KES ${branchInvoices.reduce((s, i) => s + i.total_fee, 0).toLocaleString()} • Outstanding: KES ${branchTotalDue.toLocaleString()}`,
+        `Total Billed: KES ${branchInvoices.reduce((s, i) => s + (Number(i.total_fee) || 0), 0).toLocaleString()} • Outstanding: KES ${(Number(branchTotalDue) || 0).toLocaleString()}`,
         headers,
         rows
       );
@@ -339,7 +339,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
         p.mpesa_receipt_number || p.id,
         prof?.full_name || 'N/A',
         p.mpesa_phone_number || prof?.phone || 'N/A',
-        `KES ${p.amount.toLocaleString()}`,
+        `KES ${(Number(p.amount) || 0).toLocaleString()}`,
         p.payment_method.toUpperCase(),
         new Date(p.created_at).toLocaleString(),
         p.status.toUpperCase(),
@@ -352,7 +352,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       exportToPDFReport(
         `Mpesa_Receipts_${myBranch.code}`,
         `M-PESA & TUITION FEE RECEIPTS - ${myBranch.name.toUpperCase()}`,
-        `Total Collections: KES ${branchTotalCollected.toLocaleString()} • Total Transactions: ${branchPayments.length}`,
+        `Total Collections: KES ${(Number(branchTotalCollected) || 0).toLocaleString()} • Total Transactions: ${branchPayments.length}`,
         headers,
         rows
       );
@@ -658,7 +658,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                 <DollarSign size={18} color="var(--coffee-green)" />
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#6EE7B7' }}>
-                KES {branchTotalCollected.toLocaleString()}
+                KES {(Number(branchTotalCollected) || 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 M-Pesa & Cashier verified at this branch
@@ -671,7 +671,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                 <DollarSign size={18} color="var(--amber-warning)" />
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--amber-warning)' }}>
-                KES {branchTotalDue.toLocaleString()}
+                KES {(Number(branchTotalDue) || 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Across {branchInvoices.filter((i) => i.status !== 'paid').length} active invoices
@@ -1314,7 +1314,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                             </span>
                             {course && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                • Fee: KES {course.fee_amount.toLocaleString()}
+                                • Fee: KES {(Number(course.fee_amount) || 0).toLocaleString()}
                               </span>
                             )}
                           </div>
@@ -1453,18 +1453,18 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                           <span
                             style={{
                               fontWeight: 700,
-                              color: inv.balance_due > 0 ? 'var(--cherry-red)' : '#6EE7B7',
+                              color: (Number(inv.balance_due) || 0) > 0 ? 'var(--cherry-red)' : '#6EE7B7',
                               fontSize: '0.85rem',
                             }}
                           >
-                            KES {inv.balance_due.toLocaleString()}
+                            KES {(Number(inv.balance_due) || 0).toLocaleString()}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>KES 0</span>
                         )}
                       </td>
                       <td>
-                        {inv && inv.balance_due > 0 ? (
+                        {inv && (Number(inv.balance_due) || 0) > 0 ? (
                           <button
                             className="btn btn-primary"
                             style={{ padding: '4px 10px', fontSize: '0.74rem' }}
@@ -1683,16 +1683,16 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                         {inv.invoice_number}
                       </td>
                       <td>{profile?.full_name || 'Trainee'}</td>
-                      <td>KES {inv.total_fee.toLocaleString()}</td>
-                      <td style={{ color: '#6EE7B7', fontWeight: 600 }}>KES {inv.amount_paid.toLocaleString()}</td>
-                      <td style={{ color: inv.balance_due > 0 ? 'var(--cherry-red)' : 'var(--text-muted)', fontWeight: 700 }}>
-                        KES {inv.balance_due.toLocaleString()}
+                      <td>KES {(Number(inv.total_fee) || 0).toLocaleString()}</td>
+                      <td style={{ color: '#6EE7B7', fontWeight: 600 }}>KES {(Number(inv.amount_paid) || 0).toLocaleString()}</td>
+                      <td style={{ color: (Number(inv.balance_due) || 0) > 0 ? 'var(--cherry-red)' : 'var(--text-muted)', fontWeight: 700 }}>
+                        KES {(Number(inv.balance_due) || 0).toLocaleString()}
                       </td>
                       <td>
                         <span className={`badge badge-${inv.status}`}>{inv.status}</span>
                       </td>
                       <td>
-                        {inv.balance_due > 0 ? (
+                        {(Number(inv.balance_due) || 0) > 0 ? (
                           <button
                             className="btn btn-primary"
                             style={{ padding: '3px 8px', fontSize: '0.75rem' }}
@@ -1760,7 +1760,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{profile?.reg_number}</div>
                         </td>
                         <td style={{ fontWeight: 700, color: '#10B981' }}>
-                          KES {p.amount.toLocaleString()}
+                          KES {(Number(p.amount) || 0).toLocaleString()}
                         </td>
                         <td style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 600 }}>
                           {p.payment_method}
@@ -1778,7 +1778,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                             onClick={async () => {
                               if (
                                 window.confirm(
-                                  `Void/Revert receipt ${p.mpesa_receipt_number || p.id} for KES ${p.amount.toLocaleString()} and restore student fee balance?`
+                                  `Void/Revert receipt ${p.mpesa_receipt_number || p.id} for KES ${(Number(p.amount) || 0).toLocaleString()} and restore student fee balance?`
                                 )
                               ) {
                                 await revertPayment(p.id);

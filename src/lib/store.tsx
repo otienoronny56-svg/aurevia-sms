@@ -369,7 +369,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((inv: any) => {
+            const tf = Number(inv.total_fee) || 0;
+            const ap = Number(inv.amount_paid) || 0;
+            const bd = (inv.balance_due !== undefined && inv.balance_due !== null && !isNaN(Number(inv.balance_due)))
+              ? Number(inv.balance_due)
+              : Math.max(0, tf - ap);
+            return {
+              ...inv,
+              total_fee: tf,
+              amount_paid: ap,
+              balance_due: bd,
+            };
+          });
+        }
       } catch (_) {}
     }
     return INITIAL_INVOICES;
@@ -541,16 +555,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const rawStudents = sRes.data || [];
         const rawCohorts = hRes.data || [];
 
-        // Normalize invoices to guarantee branch_id is always present
+        // Normalize invoices to guarantee branch_id is always present and numbers are strictly safe
         const rawInvoices = iRes.data || [];
         const normalizedInvoices: Invoice[] = rawInvoices.map((inv: any) => {
           const matchingStudent = rawStudents.find((s: any) => s.id === inv.student_id);
           const matchingCohort = rawCohorts.find((c: any) => c.id === inv.cohort_id);
           const branchId = inv.branch_id || matchingStudent?.branch_id || matchingCohort?.branch_id || 'b1000000-0000-0000-0000-000000000001';
+          const totalFee = Number(inv.total_fee) || 0;
+          const amountPaid = Number(inv.amount_paid) || 0;
+          const balanceDue = (inv.balance_due !== undefined && inv.balance_due !== null && !isNaN(Number(inv.balance_due)))
+            ? Number(inv.balance_due)
+            : Math.max(0, totalFee - amountPaid);
           return {
             ...inv,
             branch_id: branchId,
-            balance_due: inv.balance_due !== undefined ? Number(inv.balance_due) : Math.max(0, Number(inv.total_fee) - Number(inv.amount_paid || 0)),
+            total_fee: totalFee,
+            amount_paid: amountPaid,
+            balance_due: balanceDue,
           };
         });
 
@@ -558,6 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const rawPayments = payRes.data || [];
         const normalizedPayments: Payment[] = rawPayments.map((p: any) => ({
           ...p,
+          amount: Number(p.amount) || 0,
           mpesa_phone_number: p.payer_phone || p.mpesa_phone_number || '',
         }));
 
@@ -609,7 +631,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCohorts(liveCohorts);
 
         // Hydrate profiles from aur_profiles & ensure baseline staff profiles are preserved
-        const dbProfiles = pRes.data || [];
+        const dbProfiles = (pRes.data || []).map((p: any) => {
+          const regKey = (p.reg_number || '').trim().toLowerCase();
+          const emailKey = (p.email || '').trim().toLowerCase();
+          const idKey = (p.id || '').trim().toLowerCase();
+          const recoveredPwd =
+            p.initial_password ||
+            (p.specialty && p.specialty.startsWith('Aur#') ? p.specialty : undefined) ||
+            localStorage.getItem('aur_user_pwd_seed_' + p.id) ||
+            localStorage.getItem('aur_student_pwd_' + regKey) ||
+            localStorage.getItem('aur_student_pwd_' + emailKey) ||
+            localStorage.getItem('aur_student_pwd_' + idKey) ||
+            localStorage.getItem('aur_staff_pwd_' + regKey) ||
+            localStorage.getItem('aur_staff_pwd_' + emailKey) ||
+            localStorage.getItem('aur_staff_pwd_' + idKey) ||
+            INITIAL_PROFILES.find((ip) => ip.id === p.id || (ip.email && ip.email.toLowerCase() === emailKey))?.initial_password;
+
+          return {
+            ...p,
+            initial_password: p.initial_password || recoveredPwd,
+            // Clean up specialty if it was accidentally saved as a password
+            specialty: (p.specialty && p.specialty.startsWith('Aur#')) ? 'Barista & Specialty Coffee' : p.specialty,
+          };
+        });
         const mergedProfiles: Profile[] = [...dbProfiles];
         for (const initP of INITIAL_PROFILES) {
           if (!mergedProfiles.some((p: any) => p.id === initP.id || (p.email && p.email.toLowerCase() === initP.email.toLowerCase()))) {
@@ -727,10 +771,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const exists = prev.find((i) => i.id === row.id);
               const student = students.find((s) => s.id === row.student_id);
               const cohort = cohorts.find((c) => c.id === row.cohort_id);
+              const totalFee = Number(row.total_fee) || 0;
+              const amountPaid = Number(row.amount_paid) || 0;
+              const balanceDue = (row.balance_due !== undefined && row.balance_due !== null && !isNaN(Number(row.balance_due)))
+                ? Number(row.balance_due)
+                : Math.max(0, totalFee - amountPaid);
               const normalized: Invoice = {
                 ...row,
                 branch_id: row.branch_id || student?.branch_id || cohort?.branch_id || 'b1000000-0000-0000-0000-000000000001',
-                balance_due: row.balance_due !== undefined ? Number(row.balance_due) : Math.max(0, Number(row.total_fee) - Number(row.amount_paid || 0)),
+                total_fee: totalFee,
+                amount_paid: amountPaid,
+                balance_due: balanceDue,
               };
               if (exists) {
                 return prev.map((i) => (i.id === row.id ? { ...i, ...normalized } : i));
@@ -1314,7 +1365,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: params.email.trim(),
         phone: params.phone.trim(),
         reg_number: regNumber,
-        specialty: studentDefaultPwd, // Securely store default password seed
+        specialty: 'Barista & Specialty Coffee',
         is_active: true,
       };
       if (authUserId) {
@@ -1443,6 +1494,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cohort_id: params.cohortId,
           total_fee: feeAmount,
           amount_paid: 0,
+          balance_due: feeAmount,
           status: 'pending',
           due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         })
@@ -1465,13 +1517,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           created_at: new Date().toISOString(),
         };
       } else {
-        createdInvoice = { ...invData, branch_id: params.branchId };
+        const totalFee = Number(invData.total_fee) || feeAmount;
+        const amountPaid = Number(invData.amount_paid) || 0;
+        const balanceDue = (invData.balance_due !== undefined && invData.balance_due !== null && !isNaN(Number(invData.balance_due)))
+          ? Number(invData.balance_due)
+          : Math.max(0, totalFee - amountPaid);
+        createdInvoice = {
+          ...invData,
+          branch_id: params.branchId,
+          total_fee: totalFee,
+          amount_paid: amountPaid,
+          balance_due: balanceDue,
+        };
       }
 
       // Secure local password cache for instantaneous offline/online verification
       try {
         localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
         localStorage.setItem('aur_student_pwd_' + params.email.trim().toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_student_pwd_' + createdProfile.id.toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_user_pwd_seed_' + createdProfile.id, studentDefaultPwd);
       } catch (_) {}
 
       // 5. Insert SMS log

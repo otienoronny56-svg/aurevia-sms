@@ -231,9 +231,9 @@ const MainApp: React.FC = () => {
   }
 
   // Domain Boundary Enforcement:
-  // If user signs into SMS Management, but their account is a student or instructor:
-  // Strictly route them to the Academy Portal. No backdoor preview bypass.
-  if (!onPortal && (currentRole === 'student' || currentRole === 'instructor')) {
+  // Only route through gatekeeper if explicitly on a dedicated "sms." management subdomain
+  const isDedicatedSmsSubdomain = typeof window !== 'undefined' && window.location.hostname.toLowerCase().startsWith('sms.');
+  if (isDedicatedSmsSubdomain && !onPortal && (currentRole === 'student' || currentRole === 'instructor')) {
     return <DomainGatekeeperPage />;
   }
 

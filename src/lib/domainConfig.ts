@@ -80,25 +80,13 @@ export function isSmsMode(): boolean {
 export function switchDomainMode(targetMode: AppDomainMode) {
   if (typeof window === 'undefined') return;
 
-  const currentHost = window.location.hostname.toLowerCase();
-  const isProductionDomain = currentHost.includes('aureviacoffeeinstitute');
-
-  if (isProductionDomain) {
-    if (targetMode === 'portal') {
-      window.location.href = PRODUCTION_PORTAL_URL;
-    } else {
-      window.location.href = PRODUCTION_SMS_URL;
-    }
-    return;
-  }
-
-  // Non-production (localhost, vercel preview, IP)
   try {
     localStorage.setItem(MODE_STORAGE_KEY, targetMode);
   } catch (_) {}
 
   const url = new URL(window.location.href);
   url.searchParams.set('mode', targetMode);
+  url.hash = ''; // Clear OAuth hashes to prevent token re-evaluation
   window.location.href = url.toString();
 }
 
