@@ -1032,7 +1032,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (matchedProfile.is_active === false) {
       return {
         success: false,
-        error: 'Your student portal access has expired because your training has concluded or your account was deactivated. Please contact the academy registrar for alumni credentials.',
+        error: matchedProfile.role === 'student'
+          ? 'Your student portal access has expired because your training has concluded or your account was deactivated. Please contact the academy registrar for alumni credentials.'
+          : 'Your staff account has been deactivated. Please contact the system administrator.',
       };
     }
 
@@ -1053,15 +1055,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    // Recover student initial seed password from specialty or localStorage if missing
+    const regKey = (matchedProfile.reg_number || '').trim().toLowerCase();
+    const emailKey = (matchedProfile.email || '').trim().toLowerCase();
+    const staffKey = (matchedProfile.staff_id || '').trim().toLowerCase();
+    const idKey = (matchedProfile.id || '').trim().toLowerCase();
+
+    // Check if password was changed
+    const isPwdChanged = Boolean(
+      matchedProfile.password_changed ||
+      localStorage.getItem('aur_user_pwd_changed_' + matchedProfile.id) === 'true'
+    );
+    const storedHashedPwd = matchedProfile.password || localStorage.getItem('aur_user_pwd_hash_' + matchedProfile.id);
+
+    // Recover initial seed password for both staff and students
     if (!matchedProfile.initial_password) {
-      const regKey = (matchedProfile.reg_number || '').trim().toLowerCase();
-      const emailKey = (matchedProfile.email || '').trim().toLowerCase();
+      const foundInInitial = INITIAL_PROFILES.find(
+        (p) => p.id === matchedProfile?.id || (p.email && p.email.toLowerCase() === emailKey) || (p.reg_number && p.reg_number.toLowerCase() === regKey)
+      );
+
       matchedProfile.initial_password =
         (matchedProfile.role === 'student' ? matchedProfile.specialty : undefined) ||
         (regKey ? localStorage.getItem('aur_student_pwd_' + regKey) : null) ||
         (emailKey ? localStorage.getItem('aur_student_pwd_' + emailKey) : null) ||
-        matchedProfile.specialty ||
+        (idKey ? localStorage.getItem('aur_staff_pwd_' + idKey) : null) ||
+        (emailKey ? localStorage.getItem('aur_staff_pwd_' + emailKey) : null) ||
+        (regKey ? localStorage.getItem('aur_staff_pwd_' + regKey) : null) ||
+        (staffKey ? localStorage.getItem('aur_staff_pwd_' + staffKey) : null) ||
+        foundInInitial?.initial_password ||
+        (matchedProfile.role === 'student' ? matchedProfile.specialty : undefined) ||
         undefined;
     }
 
@@ -1069,25 +1090,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Password verification:
     // 1. If password was changed, ONLY the new hashed password is valid.
-    if (matchedProfile.password_changed) {
-      if (matchedProfile.password) {
-        const isMatch = await verifyPassword(cleanEntered, matchedProfile.password);
-        if (isMatch) {
-          loginWithProfile(matchedProfile);
-          return { success: true };
-        }
+    if (isPwdChanged && storedHashedPwd) {
+      const isMatch = await verifyPassword(cleanEntered, storedHashedPwd);
+      if (isMatch) {
+        loginWithProfile(matchedProfile);
+        return { success: true };
       }
       return { success: false, error: INVALID };
     }
 
     // 2. If password was NOT yet changed, verify against initial unique seed:
-    const expectedPassword = (
-      matchedProfile.initial_password ||
-      (matchedProfile.role === 'student' ? matchedProfile.specialty : '') ||
-      ''
-    ).trim();
+    const expectedPassword = (matchedProfile.initial_password || (matchedProfile.role === 'student' ? matchedProfile.specialty : '') || '').trim();
 
-    if (expectedPassword) {
+    if (expectedPassword && !isPwdChanged) {
       if (cleanEntered === expectedPassword) {
         loginWithProfile(matchedProfile);
         return { success: true };
@@ -2883,14 +2898,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      const regNumber = params.staff_id || params.reg_number || (params.role === 'branch_manager' ? `AUR/MGR/${Date.now().toString().slice(-4)}` : `AUR/INS/${Date.now().toString().slice(-4)}`);
+
       const insertPayload: any = {
         role: params.role || 'instructor',
         branch_id: params.branch_id || branches[0].id,
-        full_name: params.full_name,
-        email: params.email,
-        phone: params.phone,
-        national_id: params.national_id,
-        specialty: params.specialty,
+        full_name: (params.full_name || 'Staff Member').trim(),
+        email: (params.email || '').trim().toLowerCase(),
+        phone: (params.phone || '').trim(),
+        reg_number: regNumber,
+        specialty: params.specialty || params.job_title || 'Lead Trainer',
         is_active: true,
       };
       if (authUserId) {
@@ -2906,12 +2923,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error || !data) throw error;
       created = {
         ...data,
-        staff_id: params.staff_id,
+        staff_id: regNumber,
         initial_password: staffDefaultPwd,
         password_changed: false,
         assigned_courses: params.assigned_courses,
         assigned_cohorts: params.assigned_cohorts,
       };
+
+      try {
+        localStorage.setItem('aur_staff_pwd_' + created.id, staffDefaultPwd);
+        if (created.email) localStorage.setItem('aur_staff_pwd_' + created.email.toLowerCase(), staffDefaultPwd);
+        if (regNumber) localStorage.setItem('aur_staff_pwd_' + regNumber.toLowerCase(), staffDefaultPwd);
+      } catch (_) {}
     } catch (e) {
       created = {
         id: 'prof-' + Date.now(),
@@ -2930,6 +2953,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         is_active: true,
         created_at: new Date().toISOString(),
       };
+
+      try {
+        localStorage.setItem('aur_staff_pwd_' + created.id, staffDefaultPwd);
+        if (created.email) localStorage.setItem('aur_staff_pwd_' + created.email.toLowerCase(), staffDefaultPwd);
+        if (created.staff_id) localStorage.setItem('aur_staff_pwd_' + created.staff_id.toLowerCase(), staffDefaultPwd);
+      } catch (_) {}
     }
 
     setProfiles((prev) => [...prev, created]);
@@ -2938,17 +2967,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateStaffProfile = async (profileId: string, updates: Partial<Profile>) => {
     try {
+      const dbUpdates: any = {};
+      if (updates.full_name !== undefined) dbUpdates.full_name = updates.full_name.trim();
+      if (updates.email !== undefined) dbUpdates.email = updates.email.trim().toLowerCase();
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone.trim();
+      if (updates.specialty !== undefined) dbUpdates.specialty = updates.specialty;
+      if (updates.role !== undefined) dbUpdates.role = updates.role;
+      if (updates.branch_id !== undefined) dbUpdates.branch_id = updates.branch_id;
+      if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
+      if (updates.reg_number || updates.staff_id) {
+        dbUpdates.reg_number = updates.staff_id || updates.reg_number;
+      }
+
       await supabase
         .from('aur_profiles')
-        .update({
-          full_name: updates.full_name,
-          email: updates.email,
-          phone: updates.phone,
-          national_id: updates.national_id,
-          specialty: updates.specialty,
-          role: updates.role,
-          branch_id: updates.branch_id,
-        })
+        .update(dbUpdates)
         .eq('id', profileId);
     } catch (e) {
       console.warn('Update staff in Supabase:', e);
@@ -2963,6 +2996,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetStaffPassword = async (profileId: string, newPassword: string) => {
     const hashedPassword = await hashPassword(newPassword);
+
+    try {
+      localStorage.setItem('aur_user_pwd_hash_' + profileId, hashedPassword);
+      localStorage.setItem('aur_user_pwd_changed_' + profileId, 'true');
+      localStorage.removeItem('aur_staff_pwd_' + profileId);
+    } catch (_) {}
 
     setProfiles((prev) =>
       prev.map((p) =>
@@ -2980,16 +3019,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    try {
-      await supabase
-        .from('aur_profiles')
-        .update({
-          password: hashedPassword,
-          initial_password: null,
-          password_changed: true,
-        })
-        .eq('id', profileId);
-    } catch (_) {}
+    const targetProf = profiles.find((p) => p.id === profileId);
+    if (targetProf?.email) {
+      try {
+        await supabase.auth.updateUser({ password: newPassword });
+      } catch (_) {}
+    }
   };
 
   const changeUserPassword = async (
@@ -3050,16 +3085,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       INITIAL_PROFILES[initIdx].password_changed = true;
     }
 
-    // Update Supabase if cloud connected: initial_password set to null
+    // Update user auth credentials
     try {
-      await supabase
-        .from('aur_profiles')
-        .update({
-          password: hashedPassword,
-          initial_password: null,
-          password_changed: true,
-        })
-        .eq('id', profileId);
+      localStorage.setItem('aur_user_pwd_hash_' + profileId, hashedPassword);
+      localStorage.setItem('aur_user_pwd_changed_' + profileId, 'true');
+      localStorage.removeItem('aur_staff_pwd_' + profileId);
+      if (targetProfile.email) localStorage.removeItem('aur_staff_pwd_' + targetProfile.email.toLowerCase());
+      if (targetProfile.reg_number) localStorage.removeItem('aur_staff_pwd_' + targetProfile.reg_number.toLowerCase());
 
       if (targetProfile.email) {
         await supabase.auth.updateUser({ password: newPassword });
