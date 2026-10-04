@@ -255,48 +255,9 @@ export const INITIAL_PAYMENTS: Payment[] = [
   },
 ];
 
-// ONLY FAITH'S ASSESSMENTS
-export const INITIAL_ASSESSMENTS: Assessment[] = [
-  {
-    id: 'a1000000-0000-0000-0000-000000000001',
-    enrollment_id: 'e1000000-0000-0000-0000-000000000001',
-    student_id: 'f1000000-0000-0000-0000-000000000001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    module_name: 'Test 1: Espresso Extraction & Calibration',
-    practical_score: 94,
-    theory_score: 88,
-    sensory_score: 92,
-    final_score: 92,
-    grade: 'A',
-    instructor_remarks: 'Exceptional extraction yield consistency. Flawless tamping technique.',
-    graded_by: '00000000-0000-0000-0000-000000000004',
-    graded_at: '2026-08-30T14:00:00Z',
-  },
-  {
-    id: 'a2000000-0000-0000-0000-000000000002',
-    enrollment_id: 'e1000000-0000-0000-0000-000000000001',
-    student_id: 'f1000000-0000-0000-0000-000000000001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    module_name: 'Practical on Milk Steaming & Latte Art',
-    practical_score: 90,
-    theory_score: 86,
-    sensory_score: 88,
-    final_score: 88,
-    grade: 'A',
-    instructor_remarks: 'Glossy wet-paint microfoam texture; symmetrical tulip pattern.',
-    graded_by: '00000000-0000-0000-0000-000000000004',
-    graded_at: '2026-09-01T14:30:00Z',
-  },
-];
+export const INITIAL_ASSESSMENTS: Assessment[] = [];
 
-// ONLY FAITH'S ATTENDANCE
-export const INITIAL_ATTENDANCE: AttendanceRecord[] = [
-  { id: 'att-260825-01', cohort_id: 'a1000000-0000-0000-0000-000000000001', student_id: 'f1000000-0000-0000-0000-000000000001', session_date: '2026-08-25', session_title: 'Espresso Basics & Dialing Calibration', status: 'present', notes: 'On-time arrival; calibrated Mazzer grinder within 4 shots', created_at: '2026-08-25T08:35:00Z' },
-  { id: 'att-260826-01', cohort_id: 'a1000000-0000-0000-0000-000000000001', student_id: 'f1000000-0000-0000-0000-000000000001', session_date: '2026-08-26', session_title: 'Milk Chemistry & Microfoam Dynamics', status: 'present', notes: 'Mastered vortex formation; 62°C stretch temperature', created_at: '2026-08-26T08:30:00Z' },
-  { id: 'att-260827-01', cohort_id: 'a1000000-0000-0000-0000-000000000001', student_id: 'f1000000-0000-0000-0000-000000000001', session_date: '2026-08-27', session_title: 'Latte Art Patterns & Contrast Lab', status: 'present', notes: 'Clean monk head canvas and symmetrical tulip', created_at: '2026-08-27T08:30:00Z' },
-  { id: 'att-260829-01', cohort_id: 'a1000000-0000-0000-0000-000000000001', student_id: 'f1000000-0000-0000-0000-000000000001', session_date: '2026-08-29', session_title: 'SCA Cupping Protocols & Triangulation', status: 'present', notes: 'Identified all 3 odd cups in sensory triangulation test', created_at: '2026-08-29T08:30:00Z' },
-  { id: 'att-260901-01', cohort_id: 'a1000000-0000-0000-0000-000000000001', student_id: 'f1000000-0000-0000-0000-000000000001', session_date: '2026-09-01', session_title: 'Filter Brew Control Chart & V60 TDS', status: 'present', notes: 'Achieved 20.1% extraction yield at 1.35% TDS', created_at: '2026-09-01T08:30:00Z' },
-];
+export const INITIAL_ATTENDANCE: AttendanceRecord[] = [];
 
 export const INITIAL_STAFF_CLOCKINS: StaffClockIn[] = [
   {

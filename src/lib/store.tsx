@@ -405,10 +405,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((a: any) => !a.id?.startsWith('a1000000-'));
       } catch (_) {}
     }
-    return INITIAL_ASSESSMENTS;
+    return [];
   });
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
@@ -416,10 +416,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((att: any) => !att.id?.startsWith('att-260825-'));
       } catch (_) {}
     }
-    return INITIAL_ATTENDANCE;
+    return [];
   });
 
   const [staffClockins, setStaffClockins] = useState<StaffClockIn[]>(() => {
@@ -471,10 +471,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter((a: any) => !a.id?.startsWith('a8000000-'));
       } catch (_) {}
     }
-    return INITIAL_ALUMNI;
+    return [];
   });
 
   const [liveSessions, setLiveSessions] = useState<LiveClassSession[]>(() => {
@@ -687,22 +687,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const livePayments = (normalizedPayments && normalizedPayments.length > 0) ? normalizedPayments : (payments.length > 0 ? payments : INITIAL_PAYMENTS);
         setPayments(livePayments);
 
-        const liveAssessments = (assRes.data && assRes.data.length > 0) ? assRes.data : (assessments.length > 0 ? assessments : INITIAL_ASSESSMENTS);
+        const liveAssessments = (assRes.data !== null && assRes.data !== undefined)
+          ? assRes.data
+          : (assessments.length > 0 ? assessments : []);
         setAssessments(liveAssessments);
 
-        const liveAttendance = (attRes.data && attRes.data.length > 0) ? attRes.data : (attendance.length > 0 ? attendance : INITIAL_ATTENDANCE);
+        const liveAttendance = (attRes.data !== null && attRes.data !== undefined)
+          ? attRes.data
+          : (attendance.length > 0 ? attendance : []);
         setAttendance(liveAttendance);
 
-        const liveStaffClockins = (scRes.data && scRes.data.length > 0) ? scRes.data : (staffClockins.length > 0 ? staffClockins : INITIAL_STAFF_CLOCKINS);
+        const liveStaffClockins = (scRes.data !== null && scRes.data !== undefined)
+          ? scRes.data
+          : (staffClockins.length > 0 ? staffClockins : []);
         setStaffClockins(liveStaffClockins);
 
-        const liveLeaveRequests = (lrRes.data && lrRes.data.length > 0) ? lrRes.data : (leaveRequests.length > 0 ? leaveRequests : INITIAL_LEAVE_REQUESTS);
+        const liveLeaveRequests = (lrRes.data !== null && lrRes.data !== undefined)
+          ? lrRes.data
+          : (leaveRequests.length > 0 ? leaveRequests : []);
         setLeaveRequests(liveLeaveRequests);
 
         const liveSmsLogs = (normalizedSms && normalizedSms.length > 0) ? normalizedSms : (smsLogs.length > 0 ? smsLogs : INITIAL_SMS_LOGS);
         setSmsLogs(liveSmsLogs);
 
-        const liveAlumni = (alRes.data && alRes.data.length > 0) ? alRes.data : (alumni.length > 0 ? alumni : INITIAL_ALUMNI);
+        const liveAlumni = (alRes.data !== null && alRes.data !== undefined)
+          ? alRes.data
+          : (alumni.length > 0 ? alumni : []);
         setAlumni(liveAlumni);
 
         setLastSyncTime(new Date());

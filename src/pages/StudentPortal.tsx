@@ -379,20 +379,22 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     });
   };
 
-  // Compute average academic performance
-  const avgPractical = myAssessments.length > 0
-    ? Math.round(myAssessments.reduce((sum, a) => sum + a.practical_score, 0) / myAssessments.length)
-    : 92;
-  const avgTheory = myAssessments.length > 0
-    ? Math.round(myAssessments.reduce((sum, a) => sum + a.theory_score, 0) / myAssessments.length)
-    : 88;
-  const avgSensory = myAssessments.length > 0
-    ? Math.round(myAssessments.reduce((sum, a) => sum + a.sensory_score, 0) / myAssessments.length)
-    : 90;
+  // Compute real average academic performance from database
+  const hasAssessments = myAssessments.length > 0;
+  const avgPractical = hasAssessments
+    ? Math.round(myAssessments.reduce((sum, a) => sum + (Number(a.practical_score) || 0), 0) / myAssessments.length)
+    : 0;
+  const avgTheory = hasAssessments
+    ? Math.round(myAssessments.reduce((sum, a) => sum + (Number(a.theory_score) || 0), 0) / myAssessments.length)
+    : 0;
+  const avgSensory = hasAssessments
+    ? Math.round(myAssessments.reduce((sum, a) => sum + (Number(a.sensory_score) || 0), 0) / myAssessments.length)
+    : 0;
 
-  const attendanceRate = myAttendance.length > 0
+  const hasAttendance = myAttendance.length > 0;
+  const attendanceRate = hasAttendance
     ? Math.round((myAttendance.filter((a) => a.status === 'present').length / myAttendance.length) * 100)
-    : 100;
+    : 0;
 
   const handleDownloadReceipt = (payment: Payment) => {
     if (myInvoice) {
@@ -901,14 +903,22 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Attendance Rate</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10B981' }}>{attendanceRate}%</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>Official Roll-Calls Logged</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10B981' }}>
+                {hasAttendance ? `${attendanceRate}%` : '0%'}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {hasAttendance ? `${myAttendance.length} Sessions Logged` : 'No Classes Logged Yet'}
+              </div>
             </div>
 
             <div className="glass-card" style={{ padding: '20px' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Practical Average</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--crema-gold)' }}>{avgPractical}%</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>Barista Lab Executions</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--crema-gold)' }}>
+                {hasAssessments ? `${avgPractical}%` : '--'}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {hasAssessments ? 'Barista Lab Executions' : 'Pending First Evaluation'}
+              </div>
             </div>
 
             <div className="glass-card" style={{ padding: '20px' }}>
@@ -1446,48 +1456,67 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
           </div>
 
           {/* Sensory Metrics Radar Meters */}
-          <div
-            style={{
-              background: 'var(--bg-surface-elevated)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-md)',
-              padding: '18px',
-              marginBottom: '20px',
-            }}
-          >
-            {/* Practical Barista Meter */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span>Practical Barista / Roasting Execution (50%)</span>
-                <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgPractical}%</span>
-              </div>
-              <div className="sensory-meter">
-                <div className="sensory-meter-fill" style={{ width: `${avgPractical}%` }} />
-              </div>
+          {!hasAssessments ? (
+            <div
+              style={{
+                background: 'var(--bg-surface-elevated)',
+                border: '1px dashed var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: '32px 20px',
+                textAlign: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <Award size={36} color="var(--crema-gold)" style={{ margin: '0 auto 12px auto', opacity: 0.6 }} />
+              <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>No Continuous Assessment Marks Posted Yet</h4>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '460px', margin: '0 auto', lineHeight: 1.5 }}>
+                You have not yet completed any practical barista evaluations, theory CATs, or sensory cupping assessments. Your grades and radar meters will activate here in real-time as your assigned instructors grade your sessions.
+              </p>
             </div>
+          ) : (
+            <div
+              style={{
+                background: 'var(--bg-surface-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: '18px',
+                marginBottom: '20px',
+              }}
+            >
+              {/* Practical Barista Meter */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
+                  <span>Practical Barista / Roasting Execution (50%)</span>
+                  <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgPractical}%</span>
+                </div>
+                <div className="sensory-meter">
+                  <div className="sensory-meter-fill" style={{ width: `${avgPractical}%` }} />
+                </div>
+              </div>
 
-            {/* Theory Score */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span>Coffee Chemistry & Theory Knowledge (25%)</span>
-                <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgTheory}%</span>
+              {/* Theory Score */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
+                  <span>Coffee Chemistry & Theory Knowledge (25%)</span>
+                  <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgTheory}%</span>
+                </div>
+                <div className="sensory-meter">
+                  <div className="sensory-meter-fill" style={{ width: `${avgTheory}%` }} />
+                </div>
               </div>
-              <div className="sensory-meter">
-                <div className="sensory-meter-fill" style={{ width: `${avgTheory}%` }} />
-              </div>
-            </div>
 
-            {/* Sensory Cupping Score */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span>Sensory Cupping & Aroma Triangulation (25%)</span>
-                <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgSensory}%</span>
-              </div>
-              <div className="sensory-meter">
-                <div className="sensory-meter-fill" style={{ width: `${avgSensory}%` }} />
+              {/* Sensory Cupping Score */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
+                  <span>Sensory Cupping & Aroma Triangulation (25%)</span>
+                  <span style={{ fontWeight: 700, color: 'var(--crema-gold)' }}>{avgSensory}%</span>
+                </div>
+                <div className="sensory-meter">
+                  <div className="sensory-meter-fill" style={{ width: `${avgSensory}%` }} />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Module Breakdown */}
           <div>
@@ -1496,8 +1525,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {myAssessments.length === 0 ? (
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No marks posted yet.</p>
+              {!hasAssessments ? (
+                <div style={{ padding: '16px', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>No modular assessments or instructor evaluation remarks have been posted yet.</p>
+                </div>
               ) : (
                 myAssessments.map((a) => (
                   <div
@@ -1533,7 +1564,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             <div>
               <h3 style={{ fontSize: '1.15rem' }}>My Official Attendance Log</h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Digital roll-call attendance rate: <strong>{attendanceRate}%</strong>
+                {hasAttendance ? (
+                  <>Digital roll-call attendance rate: <strong>{attendanceRate}%</strong> ({myAttendance.length} session{myAttendance.length !== 1 ? 's' : ''})</>
+                ) : (
+                  <>No roll-call sessions logged yet for your profile.</>
+                )}
               </p>
             </div>
           </div>
