@@ -207,12 +207,12 @@ interface AppContextType {
 }
 
 const STORAGE_CLEAN_VERSION_KEY = 'aur_storage_version_2026';
-const CURRENT_STORAGE_VERSION = 'v6_aurevia_coffee_institute_trainee_ready';
+const CURRENT_STORAGE_VERSION = 'v7_clean_minimal_mock_data';
 
 if (typeof window !== 'undefined') {
   const currentVer = localStorage.getItem(STORAGE_CLEAN_VERSION_KEY);
   if (currentVer !== CURRENT_STORAGE_VERSION) {
-    // Purge cached test data and stale branch cache to load Aurevia Coffee Institute
+    // Purge cached test data and stale cache to load minimal mock data
     [
       'aur_branches',
       'aur_courses',
@@ -229,6 +229,8 @@ if (typeof window !== 'undefined') {
       'aur_leave_requests',
       'aur_lessons',
       'aur_live_sessions',
+      'aur_profiles',
+      'aur_current_profile',
     ].forEach((k) => localStorage.removeItem(k));
     localStorage.setItem(STORAGE_CLEAN_VERSION_KEY, CURRENT_STORAGE_VERSION);
   }

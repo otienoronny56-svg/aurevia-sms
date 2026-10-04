@@ -122,22 +122,46 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     certificate_serial_no: 'CERT-AUR-2026-NBO-001',
   };
 
-  // Find student entity matching current logged-in profile
-  const student = students.find((s) => s.profile_id === currentProfile?.id) || students[0] || fallbackStudent;
+  // Check if current user is super admin previewing the portal or a real student
+  const isSuperAdminPreview = currentProfile?.role === 'super_admin';
+
+  // Find student entity strictly matching current logged-in profile (no leak fallback for real students)
+  const student = students.find((s) => s.profile_id === currentProfile?.id) || (
+    isSuperAdminPreview
+      ? (students[0] || fallbackStudent)
+      : {
+          id: `student-${currentProfile?.id || 'guest'}`,
+          profile_id: currentProfile?.id || '',
+          branch_id: currentProfile?.branch_id || 'b1000000-0000-0000-0000-000000000001',
+          emergency_contact_name: '',
+          emergency_contact_phone: '',
+          emergency_contact_relationship: '',
+          coffee_experience_level: 'Beginner',
+          national_id_or_passport: currentProfile?.national_id || '',
+          dob: '',
+          gender: 'Female',
+          nationality: 'Kenyan',
+          terms_accepted: false,
+          media_consent: false,
+          kyc_verified: false,
+          created_at: currentProfile?.created_at || new Date().toISOString(),
+        }
+  );
+
   const profile = currentProfile?.role === 'student' ? currentProfile : (student?.profile || currentProfile);
-  const myBranch = branches.find((b) => b.id === student?.branch_id) || branches[0] || fallbackBranch;
+  const myBranch = branches.find((b) => b.id === student?.branch_id) || branches.find((b) => b.id === currentProfile?.branch_id) || fallbackBranch;
 
-  // Enrollments for this student
-  const myEnrollment = enrollments.find((e) => e.student_id === student?.id) || enrollments[0] || fallbackEnrollment;
-  const myCohort = cohorts.find((c) => c.id === myEnrollment?.cohort_id) || cohorts[0] || fallbackCohort;
-  const myCourse = courses.find((c) => c.id === myCohort?.course_id) || courses[0] || fallbackCourse;
+  // Enrollments strictly scoped to this student
+  const myEnrollment = enrollments.find((e) => e.student_id === student?.id) || (isSuperAdminPreview ? (enrollments[0] || fallbackEnrollment) : undefined);
+  const myCohort = cohorts.find((c) => c.id === myEnrollment?.cohort_id) || (isSuperAdminPreview ? (cohorts[0] || fallbackCohort) : undefined);
+  const myCourse = courses.find((c) => c.id === myCohort?.course_id) || (isSuperAdminPreview ? (courses[0] || fallbackCourse) : undefined);
 
-  // Invoices & payments
+  // Invoices & payments strictly scoped to this student
   const studentInvoices = invoices.filter((i) => i.student_id === student?.id);
-  const myInvoice = studentInvoices.find((i) => i.balance_due > 0) || studentInvoices[0] || invoices[0];
-  const myPayments = payments.filter((p) => p.student_id === student?.id || (myInvoice && p.invoice_id === myInvoice.id));
+  const myInvoice = studentInvoices.find((i) => i.balance_due > 0) || studentInvoices[0] || (isSuperAdminPreview ? invoices[0] : undefined);
+  const myPayments = payments.filter((p) => p.student_id === student?.id);
 
-  // Academic marks
+  // Academic marks & attendance strictly scoped to this student
   const myAssessments = assessments.filter((a) => a.student_id === student?.id);
   const myAttendance = attendance.filter((a) => a.student_id === student?.id);
 
