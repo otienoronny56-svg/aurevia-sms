@@ -722,20 +722,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             profile: prof || st.profile,
           };
         });
-        if (mergedStudents.length === 0) {
-          for (const initS of INITIAL_STUDENTS) {
-            mergedStudents.push(initS);
-          }
-        }
         setStudents(mergedStudents);
 
-        const liveEnrollments = (eRes.data && eRes.data.length > 0) ? eRes.data : (enrollments.length > 0 ? enrollments : INITIAL_ENROLLMENTS);
+        const liveEnrollments = (eRes.data && eRes.data.length > 0) ? eRes.data : (enrollments.length > 0 ? enrollments : []);
         setEnrollments(liveEnrollments);
 
-        const liveInvoices = (normalizedInvoices && normalizedInvoices.length > 0) ? normalizedInvoices : (invoices.length > 0 ? invoices : INITIAL_INVOICES);
+        const liveInvoices = (normalizedInvoices && normalizedInvoices.length > 0) ? normalizedInvoices : (invoices.length > 0 ? invoices : []);
         setInvoices(liveInvoices);
 
-        const livePayments = (normalizedPayments && normalizedPayments.length > 0) ? normalizedPayments : (payments.length > 0 ? payments : INITIAL_PAYMENTS);
+        const livePayments = (normalizedPayments && normalizedPayments.length > 0) ? normalizedPayments : (payments.length > 0 ? payments : []);
         setPayments(livePayments);
 
         const liveAssessments = (assRes.data !== null && assRes.data !== undefined)
@@ -758,7 +753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : (leaveRequests.length > 0 ? leaveRequests : []);
         setLeaveRequests(liveLeaveRequests);
 
-        const liveSmsLogs = (normalizedSms && normalizedSms.length > 0) ? normalizedSms : (smsLogs.length > 0 ? smsLogs : INITIAL_SMS_LOGS);
+        const liveSmsLogs = (normalizedSms && normalizedSms.length > 0) ? normalizedSms : (smsLogs.length > 0 ? smsLogs : []);
         setSmsLogs(liveSmsLogs);
 
         const liveAlumni = (alRes.data !== null && alRes.data !== undefined)

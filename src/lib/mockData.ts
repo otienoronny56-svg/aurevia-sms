@@ -151,71 +151,13 @@ export const INITIAL_COHORTS: Cohort[] = [
   },
 ];
 
-// ONLY FAITH CHERONO
-export const INITIAL_STUDENTS: StudentKYC[] = [
-  {
-    id: 'f1000000-0000-0000-0000-000000000001',
-    profile_id: '00000000-0000-0000-0000-000000000010',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    national_id_or_passport: '34892104',
-    emergency_contact_name: 'Mary Cherono',
-    emergency_contact_phone: '+254 712 111 000',
-    emergency_contact_relationship: 'Mother',
-    kyc_verified: true,
-    coffee_experience_level: 'Home Brewer',
-    terms_accepted: true,
-    media_consent: true,
-    terms_accepted_at: '2026-08-20T00:00:00Z',
-    created_at: '2026-02-10T00:00:00Z',
-    profile: INITIAL_PROFILES[3],
-  },
-];
+export const INITIAL_STUDENTS: StudentKYC[] = [];
 
-// ONLY FAITH'S ENROLLMENT
-export const INITIAL_ENROLLMENTS: Enrollment[] = [
-  {
-    id: 'e1000000-0000-0000-0000-000000000001',
-    student_id: 'f1000000-0000-0000-0000-000000000001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    status: 'active',
-    enrolled_at: '2026-08-20T00:00:00Z',
-    certificate_serial_no: 'CERT-AUR-2026-NBO-001',
-  },
-];
+export const INITIAL_ENROLLMENTS: Enrollment[] = [];
 
-// ONLY FAITH'S INVOICE
-export const INITIAL_INVOICES: Invoice[] = [
-  {
-    id: 'd1000000-0000-0000-0000-000000000001',
-    invoice_number: 'INV-AUR-2026-0001',
-    enrollment_id: 'e1000000-0000-0000-0000-000000000001',
-    student_id: 'f1000000-0000-0000-0000-000000000001',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    total_fee: 35000,
-    amount_paid: 15000,
-    balance_due: 20000,
-    status: 'partial',
-    due_date: '2026-09-08',
-    created_at: '2026-08-20T10:00:00Z',
-  },
-];
+export const INITIAL_INVOICES: Invoice[] = [];
 
-// ONLY FAITH'S PAYMENT
-export const INITIAL_PAYMENTS: Payment[] = [
-  {
-    id: 'b5000000-0000-0000-0000-000000000001',
-    invoice_id: 'd1000000-0000-0000-0000-000000000001',
-    student_id: 'f1000000-0000-0000-0000-000000000001',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    amount: 15000,
-    payment_method: 'mpesa',
-    mpesa_receipt_number: 'TCH71LKM24',
-    mpesa_phone_number: '0714767240',
-    status: 'completed',
-    created_at: '2026-08-20T11:15:00Z',
-  },
-];
+export const INITIAL_PAYMENTS: Payment[] = [];
 
 export const INITIAL_ASSESSMENTS: Assessment[] = [];
 
@@ -225,92 +167,8 @@ export const INITIAL_STAFF_CLOCKINS: StaffClockIn[] = [];
 
 export const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [];
 
-export const INITIAL_SMS_LOGS: SMSLog[] = [
-  {
-    id: 'sms10000-0000-0000-0000-000000000001',
-    channel: 'sms',
-    recipient_phone: '0714767240',
-    recipient_email: 'faith.cherono@aureviacoffeeinstitute.co.ke',
-    recipient_name: 'Faith Cherono',
-    subject: 'Admission Confirmation - Barista Skills Foundation',
-    message_content: 'Aurevia Admission Alert: Welcome to Barista Skills Foundation! Reg: AUR/NBO/2026/001. Class starts Mon 08:30 AM at Nairobi Roastery Lab 1.',
-    purpose: 'admissions',
-    delivery_status: 'delivered',
-    gateway_reference: 'AT-SMS-892104-NBO',
-    sent_at: '2026-08-20T10:05:00Z',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    audience_segment: 'Admitted Trainees',
-  },
-  {
-    id: 'sms20000-0000-0000-0000-000000000002',
-    channel: 'sms',
-    recipient_phone: '0714767240',
-    recipient_email: 'faith.cherono@aureviacoffeeinstitute.co.ke',
-    recipient_name: 'Faith Cherono',
-    subject: 'Payment Receipt: INV-AUR-2026-0001',
-    message_content: 'Confirmed KES 15,000 received for Invoice INV-AUR-2026-0001. M-Pesa Ref: TCH71LKM24. Aurevia Institute of Coffee.',
-    purpose: 'fee_receipt',
-    delivery_status: 'delivered',
-    gateway_reference: 'AT-SMS-892105-NBO',
-    sent_at: '2026-08-20T11:15:00Z',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    audience_segment: 'Paid Student',
-  },
-];
+export const INITIAL_SMS_LOGS: SMSLog[] = [];
 
-export const INITIAL_LESSONS: TimetableLesson[] = [
-  {
-    id: 'les10000-0000-0000-0000-000000000001',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    course_id: 'c1000000-0000-0000-0000-000000000001',
-    instructor_id: '00000000-0000-0000-0000-000000000004',
-    topic_title: 'Barista Skills Foundation & Latte Art',
-    day_of_week: 'Monday',
-    start_time: '08:30',
-    end_time: '12:30',
-    lesson_mode: 'physical_lab',
-    lab_location: 'Lab 1',
-    equipment_needed: 'Scales, Portafilters, Tampers, Specialty Beans',
-    sms_reminder_enabled: true,
-    is_recurring: true,
-    created_at: '2026-08-20T00:00:00Z',
-  },
-  {
-    id: 'les20000-0000-0000-0000-000000000002',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    course_id: 'c1000000-0000-0000-0000-000000000001',
-    instructor_id: '00000000-0000-0000-0000-000000000004',
-    topic_title: 'Milk Chemistry & Microfoam Pouring',
-    day_of_week: 'Wednesday',
-    start_time: '08:30',
-    end_time: '12:30',
-    lesson_mode: 'physical_lab',
-    lab_location: 'Lab 1',
-    equipment_needed: 'Nuova Simonelli Aurelia, Fresh Whole Milk',
-    sms_reminder_enabled: true,
-    is_recurring: true,
-    created_at: '2026-08-20T00:00:00Z',
-  },
-];
+export const INITIAL_LESSONS: TimetableLesson[] = [];
 
-export const INITIAL_LIVE_SESSIONS: LiveClassSession[] = [
-  {
-    id: 'live-sess-001',
-    cohort_id: 'a1000000-0000-0000-0000-000000000001',
-    course_id: 'c1000000-0000-0000-0000-000000000001',
-    instructor_id: '00000000-0000-0000-0000-000000000004',
-    branch_id: 'b1000000-0000-0000-0000-000000000001',
-    title: 'SCA Espresso Extraction Chemistry & Calibration Theory',
-    description: 'Deep dive into extraction yields, total dissolved solids (TDS), grind distribution dynamics, and water temperature variables before practical lab.',
-    scheduled_start: new Date().toISOString(),
-    duration_minutes: 60,
-    status: 'scheduled',
-    room_type: 'aurevia_embedded',
-    room_name: 'aurevia-barista-extraction-lab',
-    meeting_url: 'https://meet.jit.si/aurevia-barista-extraction-lab',
-    attendees_count: 0,
-    created_at: new Date().toISOString(),
-  },
-];
+export const INITIAL_LIVE_SESSIONS: LiveClassSession[] = [];

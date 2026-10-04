@@ -1014,7 +1014,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Tuition</div>
                 <div className="metric-val" style={{ color: 'var(--text-primary)' }}>
-                  KES {(Number(myInvoice?.total_fee) || 35000).toLocaleString()}
+                  KES {(Number(myInvoice?.total_fee) || Number(myCourse?.fee_amount) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   {myCourse?.title?.slice(0, 18) || 'Enrolled Course'}
@@ -1683,7 +1683,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               <div className="bursar-metric-cell">
                 <div className="metric-label">Total Program Fee</div>
                 <div className="metric-val" style={{ color: 'var(--text-primary)' }}>
-                  KES {(Number(myInvoice?.total_fee) || 35000).toLocaleString()}
+                  KES {(Number(myInvoice?.total_fee) || Number(myCourse?.fee_amount) || 0).toLocaleString()}
                 </div>
                 <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
                   Invoice #{myInvoice?.invoice_number || 'INV-001'}

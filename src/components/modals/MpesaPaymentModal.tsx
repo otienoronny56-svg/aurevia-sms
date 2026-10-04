@@ -226,6 +226,11 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
       return;
     }
 
+    if (activeInvoice.balance_due > 0 && amount > activeInvoice.balance_due) {
+      setErrorMessage(`Amount entered (KES ${amount.toLocaleString()}) cannot exceed the balance due of KES ${activeInvoice.balance_due.toLocaleString()}`);
+      return;
+    }
+
     setErrorMessage('');
 
     if (paymentMethod === 'mpesa') {
@@ -596,6 +601,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   min={1}
+                  max={activeInvoice?.balance_due && activeInvoice.balance_due > 0 ? activeInvoice.balance_due : undefined}
                   required
                 />
                 <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
