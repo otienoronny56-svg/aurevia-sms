@@ -212,7 +212,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 
 const MainApp: React.FC = () => {
   const { isAuthenticated, currentRole } = useApp();
-  const [bypassGatekeeper, setBypassGatekeeper] = useState(false);
   const onPortal = isPortalMode();
 
   const [receiptRef, setReceiptRef] = useState<string | null>(() => {
@@ -232,10 +231,10 @@ const MainApp: React.FC = () => {
   }
 
   // Domain Boundary Enforcement:
-  // If user is on the SMS domain (Management), but their account is a student or instructor:
-  // Guide them to the Academy Portal (with a developer preview bypass option).
-  if (!onPortal && (currentRole === 'student' || currentRole === 'instructor') && !bypassGatekeeper) {
-    return <DomainGatekeeperPage onBypassDev={() => setBypassGatekeeper(true)} />;
+  // If user signs into SMS Management, but their account is a student or instructor:
+  // Strictly route them to the Academy Portal. No backdoor preview bypass.
+  if (!onPortal && (currentRole === 'student' || currentRole === 'instructor')) {
+    return <DomainGatekeeperPage />;
   }
 
   return <DashboardRouter />;

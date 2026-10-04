@@ -30,9 +30,9 @@ export const DomainModeBanner: React.FC = () => {
       ) : (
         <Coffee size={13} />
       )}
-      <span>{currentMode === 'portal' ? 'Academy Portal' : 'SMS Management'}</span>
+      <span>{currentMode === 'portal' ? 'Academy Portal' : 'Tripple T SMS'}</span>
 
-      {/* Switcher button visible for Admins/Managers or in dev */}
+      {/* Switcher button visible for Admins/Managers */}
       {isStaffOrAdmin && (
         <button
           type="button"
@@ -49,7 +49,7 @@ export const DomainModeBanner: React.FC = () => {
             opacity: 0.85,
             transition: 'opacity 0.15s ease',
           }}
-          title={`Switch to ${currentMode === 'portal' ? 'Aurevia SMS Management' : 'Academy Portal'}`}
+          title={currentMode === 'portal' ? 'Switch to Tripple T SMS' : 'Switch to Academy Portal'}
         >
           <ArrowRightLeft size={11} />
         </button>

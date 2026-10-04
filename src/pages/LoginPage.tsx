@@ -28,8 +28,8 @@ const Brand: React.FC = () => (
       <Coffee size={22} strokeWidth={2.4} aria-hidden="true" />
     </span>
     <span>
-      <span className="auth-brand__name">Aurevia</span>
-      <span className="auth-brand__sub">Coffee Institute</span>
+      <span className="auth-brand__name">Tripple T</span>
+      <span className="auth-brand__sub">Aurevia Coffee Institute</span>
     </span>
   </div>
 );
@@ -75,8 +75,8 @@ export const LoginPage: React.FC = () => {
 
   useEffect(() => {
     document.title = onPortal
-      ? 'Sign in | Aurevia Academy Portal'
-      : 'Sign in | Aurevia Management System (SMS)';
+      ? 'Sign In | Academy Portal'
+      : 'Sign In | Tripple T SMS';
   }, [onPortal]);
 
   // OAuth errors: from the redirect URL, or a rejected (unregistered) Google account
@@ -123,12 +123,12 @@ export const LoginPage: React.FC = () => {
     setError(null);
 
     if (!identifier.trim()) {
-      setError('Enter your email, staff ID, or student registration number.');
+      setError('Please enter your account identifier.');
       identifierRef.current?.focus();
       return;
     }
     if (!password) {
-      setError('Enter your password.');
+      setError('Please enter your password.');
       passwordRef.current?.focus();
       return;
     }
@@ -145,15 +145,15 @@ export const LoginPage: React.FC = () => {
           localStorage.setItem(LOCK_KEY, String(until));
           setLockedUntil(until);
           setNow(Date.now());
-          setError('Too many failed attempts. For your security, sign-in is paused.');
+          setError('Too many failed attempts. For your security, sign-in is temporarily paused.');
         } else {
           const left = MAX_ATTEMPTS - attempts;
-          setError(`${res.error || 'Sign-in failed.'}${left <= 2 ? ` ${left} attempt${left === 1 ? '' : 's'} remaining.` : ''}`);
+          setError(`${res.error || 'Invalid credentials.'}${left <= 2 ? ` ${left} attempt${left === 1 ? '' : 's'} remaining.` : ''}`);
           passwordRef.current?.focus();
         }
       }
     } catch {
-      setError('We could not reach the server. Check your connection and try again.');
+      setError('Connection error. Please check your network and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -168,12 +168,11 @@ export const LoginPage: React.FC = () => {
       if (!res.success) {
         setError(
           res.notConfigured
-            ? 'Google sign-in is temporarily unavailable. Please use your email and password.'
+            ? 'Google sign-in is temporarily unavailable. Please enter your credentials.'
             : res.error || 'Google sign-in failed. Please try again.'
         );
         setIsGoogleLoading(false);
       }
-      // On success the browser redirects to Google — keep the loading state.
     } catch {
       setError('Google sign-in failed. Please try again.');
       setIsGoogleLoading(false);
@@ -188,13 +187,13 @@ export const LoginPage: React.FC = () => {
         <Brand />
         <div className="auth-hero__copy">
           <span className="auth-hero__eyebrow">
-            <Coffee size={13} /> Specialty Coffee Academy
+            <Coffee size={13} /> Tripple T Systems
           </span>
           <p className="auth-hero__title">
-            Where every cup is a <em>craft</em>, and every trainee a professional.
+            Empowering institutions with precision management and learning excellence.
           </p>
           <p className="auth-hero__lead">
-            One portal for admissions, classes, attendance, fees and certification across all Aurevia campuses.
+            Centralized platform for admissions, curriculum, payments, and multi-campus governance.
           </p>
           <ul className="auth-campuses">
             <li><MapPin size={13} /> Nairobi</li>
@@ -211,16 +210,14 @@ export const LoginPage: React.FC = () => {
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '16px', background: onPortal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(212, 154, 91, 0.12)', color: onPortal ? '#10B981' : 'var(--crema-gold)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '8px 0 10px 0' }}>
             {onPortal ? <GraduationCap size={13} /> : <Coffee size={13} />}
-            <span>{onPortal ? 'Academy Learning Portal' : 'Operations Management (SMS)'}</span>
+            <span>{onPortal ? 'Academy Portal' : 'Tripple T SMS'}</span>
           </div>
 
           <h1 className="auth-card__title">
-            {onPortal ? 'Welcome to Academy Portal' : 'Aurevia SMS Management'}
+            {onPortal ? 'Sign In to Academy Portal' : 'Sign In to Management'}
           </h1>
           <p className="auth-card__subtitle">
-            {onPortal
-              ? 'Sign in to access your course timetable, attendance roll-call, and student records.'
-              : 'Sign in to manage campuses, student admissions, fee payments, and faculty HR.'}
+            Enter your credentials below to access your account.
           </p>
 
           <button
@@ -231,10 +228,10 @@ export const LoginPage: React.FC = () => {
             disabled={busy}
           >
             {isGoogleLoading ? <span className="auth-spinner auth-spinner--google" aria-hidden="true" /> : <GoogleLogo />}
-            <span>{isGoogleLoading ? 'Redirecting to Google…' : 'Continue with Google'}</span>
+            <span>{isGoogleLoading ? 'Connecting…' : 'Continue with Google'}</span>
           </button>
 
-          <div className="auth-divider">or sign in with your credentials</div>
+          <div className="auth-divider">or sign in with credentials</div>
 
           <div aria-live="assertive">
             {error && (
@@ -272,7 +269,7 @@ export const LoginPage: React.FC = () => {
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <div className="auth-field">
               <label htmlFor="login-identifier">
-                {onPortal ? 'Student Reg Number, Staff ID, or Email' : 'Manager Email or Staff ID'}
+                Username or Email
               </label>
               <div className="auth-input">
                 <span className="auth-input__icon">
@@ -289,7 +286,7 @@ export const LoginPage: React.FC = () => {
                   spellCheck={false}
                   autoFocus
                   required
-                  placeholder={onPortal ? 'e.g. AUR/NBO/2026/01 or teacher@aurevia...' : 'e.g. manager@aureviacoffeeinstitute.co.ke'}
+                  placeholder="Enter your ID or email"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   aria-invalid={!!error && !identifier.trim()}
@@ -349,21 +346,6 @@ export const LoginPage: React.FC = () => {
               )}
             </div>
 
-            {showForgot && (
-              <div className="auth-alert auth-alert--info" id="forgot-password-help" role="region" aria-label="Password help">
-                <Info size={17} aria-hidden="true" />
-                <div>
-                  <p>
-                    If your registered email is a Google account, use <strong>Continue with Google</strong>. You won't need a password.
-                  </p>
-                  <p>
-                    Otherwise, ask your branch manager or the system administrator to reset your password, or email{' '}
-                    <a href={`mailto:${SUPPORT_EMAIL}?subject=Portal%20password%20reset`}>{SUPPORT_EMAIL}</a>.
-                  </p>
-                </div>
-              </div>
-            )}
-
             <button type="submit" id="login-submit-btn" className="auth-submit" disabled={busy || isLocked}>
               {isLoading ? (
                 <>
@@ -374,14 +356,14 @@ export const LoginPage: React.FC = () => {
                 <span>Try again in {lockRemaining}s</span>
               ) : (
                 <>
-                  <span>Sign in</span>
+                  <span>Sign In</span>
                   <ArrowRight size={18} className="auth-submit__arrow" aria-hidden="true" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Domain Cross-Link Switcher Card */}
+          {/* Clean Portal / SMS Link */}
           <div
             style={{
               marginTop: '16px',
@@ -393,11 +375,10 @@ export const LoginPage: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '8px',
-              flexWrap: 'wrap',
             }}
           >
-            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-              {onPortal ? 'Campus Director or Branch Manager?' : 'Student or Faculty Instructor?'}
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {onPortal ? 'Management login?' : 'Student or teacher login?'}
             </div>
             <button
               type="button"
@@ -406,7 +387,7 @@ export const LoginPage: React.FC = () => {
                 background: 'none',
                 border: 'none',
                 color: 'var(--crema-gold)',
-                fontSize: '0.76rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 padding: '2px 4px',
@@ -416,18 +397,18 @@ export const LoginPage: React.FC = () => {
                 gap: '4px',
               }}
             >
-              <span>{onPortal ? 'Go to SMS Hub' : 'Go to Academy Portal'}</span>
+              <span>{onPortal ? 'Go to SMS' : 'Go to Academy Portal'}</span>
               <ArrowRight size={13} />
             </button>
           </div>
 
           <footer className="auth-footer">
             <span className="auth-footer__secure">
-              <ShieldCheck size={14} aria-hidden="true" /> Secured connection · Authorised users only
+              <ShieldCheck size={14} aria-hidden="true" /> Encrypted connection · Authorized access only
             </span>
             <div className="auth-footer__row">
-              <span>© {new Date().getFullYear()} Aurevia Coffee Institute</span>
-              <a href={`mailto:${SUPPORT_EMAIL}`}>Need help? Contact support</a>
+              <span>© {new Date().getFullYear()} Tripple T Systems</span>
+              <a href={`mailto:${SUPPORT_EMAIL}`}>Support</a>
             </div>
           </footer>
         </div>

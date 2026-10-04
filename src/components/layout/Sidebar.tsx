@@ -183,13 +183,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span>Aurevia</span>
+                <span>{isPortalMode() ? 'Academy Portal' : 'Tripple T'}</span>
                 <span style={{ fontSize: '0.65rem', background: isPortalMode() ? 'rgba(16, 185, 129, 0.15)' : 'var(--primary-accent-bg)', color: isPortalMode() ? '#10B981' : 'var(--primary-accent)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
                   {isPortalMode() ? 'PORTAL' : 'SMS'}
                 </span>
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                {isPortalMode() ? 'Academy Learning Hub' : 'System Management'}
+                {isPortalMode() ? 'Aurevia Coffee Institute' : 'Management System'}
               </div>
             </div>
           </div>
