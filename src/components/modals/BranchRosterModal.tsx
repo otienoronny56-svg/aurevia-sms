@@ -68,52 +68,107 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1200 }}>
       <div
         className="modal-card"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '880px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        style={{
+          maxWidth: '880px',
+          width: '95%',
+          maxHeight: '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#16120E',
+          border: '1.5px solid rgba(212, 154, 91, 0.28)',
+          borderRadius: '20px',
+          boxShadow: '0 25px 70px -15px rgba(0, 0, 0, 0.95), 0 0 40px rgba(212, 154, 91, 0.1)',
+          overflow: 'hidden',
+        }}
       >
         {/* MODAL HEADER */}
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid var(--border-color)',
+            background: 'linear-gradient(180deg, #1E1712 0%, #17120E 100%)',
+            borderBottom: '1px solid rgba(212, 154, 91, 0.15)',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             gap: '16px',
           }}
         >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span className="badge badge-gold" style={{ fontSize: '0.72rem' }}>
-                CAMPUS CODE: {branch.code}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {branch.city} • {branch.address}
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.2), rgba(212, 154, 91, 0.05))',
+                border: '1px solid rgba(212, 154, 91, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--crema-gold)',
+                flexShrink: 0,
+              }}
+            >
+              <Building2 size={22} />
             </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-              {branch.name}
-            </h2>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(212, 154, 91, 0.18)',
+                    color: 'var(--crema-gold)',
+                    border: '1px solid rgba(212, 154, 91, 0.3)',
+                  }}
+                >
+                  CAMPUS CODE: {branch.code}
+                </span>
+                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  {branch.city} • {branch.address}
+                </span>
+              </div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#F8F5F1', letterSpacing: '-0.02em' }}>
+                {branch.name}
+              </h2>
+            </div>
           </div>
 
           <button
             className="btn-icon"
             onClick={onClose}
-            style={{ color: 'var(--text-muted)', background: 'rgba(255, 255, 255, 0.05)' }}
+            title="Close modal"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              color: 'var(--text-secondary)',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* CONTROLS BAR: TABS & SEARCH */}
         <div
           style={{
-            padding: '16px 24px',
-            background: 'var(--bg-surface-elevated)',
-            borderBottom: '1px solid var(--border-color)',
+            padding: '14px 24px',
+            background: '#191410',
+            borderBottom: '1px solid rgba(212, 154, 91, 0.12)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -130,11 +185,11 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                 alignItems: 'center',
                 gap: '8px',
                 padding: '8px 16px',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 fontSize: '0.84rem',
                 fontWeight: 600,
-                border: activeTab === 'students' ? '1px solid #D49A5B' : '1px solid transparent',
-                background: activeTab === 'students' ? 'rgba(212, 154, 91, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                border: activeTab === 'students' ? '1.5px solid #D49A5B' : '1px solid rgba(255, 255, 255, 0.08)',
+                background: activeTab === 'students' ? 'rgba(212, 154, 91, 0.18)' : 'rgba(255, 255, 255, 0.03)',
                 color: activeTab === 'students' ? '#D49A5B' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
@@ -148,7 +203,7 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                   color: activeTab === 'students' ? '#181310' : 'var(--text-primary)',
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  padding: '2px 6px',
+                  padding: '2px 7px',
                   borderRadius: '10px',
                   marginLeft: '2px',
                 }}
@@ -164,11 +219,11 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                 alignItems: 'center',
                 gap: '8px',
                 padding: '8px 16px',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 fontSize: '0.84rem',
                 fontWeight: 600,
-                border: activeTab === 'staff' ? '1px solid #6EE7B7' : '1px solid transparent',
-                background: activeTab === 'staff' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                border: activeTab === 'staff' ? '1.5px solid #6EE7B7' : '1px solid rgba(255, 255, 255, 0.08)',
+                background: activeTab === 'staff' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(255, 255, 255, 0.03)',
                 color: activeTab === 'staff' ? '#6EE7B7' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
@@ -182,7 +237,7 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                   color: activeTab === 'staff' ? '#064E3B' : 'var(--text-primary)',
                   fontSize: '0.7rem',
                   fontWeight: 700,
-                  padding: '2px 6px',
+                  padding: '2px 7px',
                   borderRadius: '10px',
                   marginLeft: '2px',
                 }}
@@ -196,28 +251,62 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
           <div style={{ position: 'relative', minWidth: '240px', flex: '1', maxWidth: '320px' }}>
             <Search
               size={15}
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
+              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--crema-gold)' }}
             />
             <input
               type="text"
-              className="input"
+              className="form-input"
               placeholder={activeTab === 'students' ? 'Search trainees by name or reg no...' : 'Search staff by name or role...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '34px', fontSize: '0.82rem', width: '100%' }}
+              style={{
+                paddingLeft: '34px',
+                fontSize: '0.82rem',
+                width: '100%',
+                background: '#140F0D',
+                border: '1.5px solid rgba(212, 154, 91, 0.25)',
+                color: '#F8F5F1',
+                borderRadius: '8px',
+              }}
             />
           </div>
         </div>
 
         {/* TAB 1: TRAINEES ROSTER */}
-        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: '24px', overflowY: 'auto', flex: 1, background: '#16120E' }}>
           {activeTab === 'students' && (
             <div>
               {filteredStudents.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-                  <GraduationCap size={44} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                  <p style={{ margin: 0, fontWeight: 600 }}>No trainees found matching this query for {branch.name}.</p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>Trainees enrolled under this campus will appear here.</p>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '50px 24px',
+                    background: '#1A1411',
+                    border: '1px dashed rgba(212, 154, 91, 0.2)',
+                    borderRadius: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      background: 'rgba(212, 154, 91, 0.1)',
+                      color: 'var(--crema-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}
+                  >
+                    <GraduationCap size={28} />
+                  </div>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.96rem', fontWeight: 700, color: '#F8F5F1' }}>
+                    No Enrolled Trainees in {branch.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '420px', marginInline: 'auto' }}>
+                    New registrations and admitted trainees assigned to this regional campus will be organized here.
+                  </p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -230,10 +319,10 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                       <div
                         key={st.id}
                         style={{
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '10px',
-                          padding: '14px 18px',
+                          background: '#1E1714',
+                          border: '1px solid rgba(212, 154, 91, 0.18)',
+                          borderRadius: '12px',
+                          padding: '16px 20px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -337,10 +426,36 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
           {activeTab === 'staff' && (
             <div>
               {filteredStaff.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
-                  <Users size={44} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                  <p style={{ margin: 0, fontWeight: 600 }}>No faculty or staff members assigned to {branch.name}.</p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>Branch directors, roasters, and trainers will appear here.</p>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '50px 24px',
+                    background: '#1A1411',
+                    border: '1px dashed rgba(16, 185, 129, 0.2)',
+                    borderRadius: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      color: '#6EE7B7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}
+                  >
+                    <Users size={28} />
+                  </div>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.96rem', fontWeight: 700, color: '#F8F5F1' }}>
+                    No Faculty or Staff Assigned to {branch.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '420px', marginInline: 'auto' }}>
+                    Branch directors, instructors, and master roasters stationed at this campus will be rostered here.
+                  </p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -356,10 +471,10 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
                       <div
                         key={member.id}
                         style={{
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '10px',
-                          padding: '14px 18px',
+                          background: '#1E1714',
+                          border: '1px solid rgba(212, 154, 91, 0.18)',
+                          borderRadius: '12px',
+                          padding: '16px 20px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -463,25 +578,25 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
         {/* MODAL FOOTER */}
         <div
           style={{
-            padding: '14px 24px',
-            borderTop: '1px solid var(--border-color)',
+            padding: '16px 24px',
+            borderTop: '1px solid rgba(212, 154, 91, 0.15)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'var(--bg-surface-elevated)',
+            background: '#191410',
             flexWrap: 'wrap',
-            gap: '10px',
+            gap: '12px',
           }}
         >
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Showing records specifically allocated to <strong>{branch.name}</strong> ({branch.code})
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            Showing records specifically allocated to <strong style={{ color: 'var(--crema-gold)' }}>{branch.name}</strong> ({branch.code})
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {onNavigateToTab && activeTab === 'students' && (
               <button
                 className="btn btn-secondary"
-                style={{ padding: '7px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
                 onClick={() => {
                   onClose();
                   onNavigateToTab('students', branch.id);
@@ -495,7 +610,7 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
             {onNavigateToTab && activeTab === 'staff' && (
               <button
                 className="btn btn-secondary"
-                style={{ padding: '7px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
                 onClick={() => {
                   onClose();
                   onNavigateToTab('staff', branch.id);
@@ -506,7 +621,11 @@ export const BranchRosterModal: React.FC<BranchRosterModalProps> = ({
               </button>
             )}
 
-            <button className="btn btn-primary" onClick={onClose} style={{ padding: '7px 18px', fontSize: '0.8rem' }}>
+            <button
+              className="btn btn-primary"
+              onClick={onClose}
+              style={{ padding: '8px 22px', fontSize: '0.82rem', fontWeight: 700 }}
+            >
               Close
             </button>
           </div>

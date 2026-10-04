@@ -52,9 +52,9 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1200 }}>
       <div
-        className="glass-card"
+        className="modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '560px', width: '95%', margin: 'auto', padding: 0, overflow: 'hidden' }}
       >

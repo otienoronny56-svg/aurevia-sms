@@ -1870,9 +1870,9 @@ export const InstructorDashboard: React.FC<InstructorDashboardProps> = ({
 
       {/* Trainee Roster Modal */}
       {selectedCohortForRoster && (
-        <div className="modal-backdrop" onClick={() => setSelectedCohortForRoster(null)}>
+        <div className="modal-overlay" onClick={() => setSelectedCohortForRoster(null)} style={{ zIndex: 1200 }}>
           <div
-            className="modal-content glass-card"
+            className="modal-content"
             style={{ maxWidth: '640px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}
           >
