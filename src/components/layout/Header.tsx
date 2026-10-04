@@ -233,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentProfile.full_name.split(' ')[0]}
               </span>
               <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', lineHeight: 1 }}>
-                {currentProfile.role.replace('_', ' ')}
+                {currentRole.replace('_', ' ')}
               </span>
             </div>
 
@@ -271,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentProfile.email || currentProfile.staff_id || currentProfile.reg_number || 'Signed In'}
                 </div>
                 <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {myBranch ? myBranch.name : 'All Campuses'} • {currentProfile.role.replace('_', ' ').toUpperCase()}
+                  {myBranch ? myBranch.name : 'All Campuses'} • Viewing as: <strong style={{ color: 'var(--text-primary)' }}>{currentRole.replace('_', ' ').toUpperCase()}</strong>
                 </div>
               </div>
 

@@ -12,7 +12,7 @@ import { SqlMigrationModal } from './components/modals/SqlMigrationModal';
 import { Coffee, ShieldCheck, ExternalLink } from 'lucide-react';
 
 const DashboardRouter: React.FC = () => {
-  const { currentProfile } = useApp();
+  const { currentProfile, currentRole } = useApp();
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -51,12 +51,12 @@ const DashboardRouter: React.FC = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<string>(() => getDefaultTabForRole(currentProfile.role));
+  const [activeTab, setActiveTab] = useState<string>(() => getDefaultTabForRole(currentRole));
 
   // Update default tab when role switches
   useEffect(() => {
-    setActiveTab(getDefaultTabForRole(currentProfile.role));
-  }, [currentProfile.role]);
+    setActiveTab(getDefaultTabForRole(currentRole));
+  }, [currentRole]);
 
   if (receiptRef) {
     return <PublicReceiptView receiptRef={receiptRef} onBack={() => setReceiptRef(null)} />;
@@ -86,16 +86,16 @@ const DashboardRouter: React.FC = () => {
 
         {/* Dynamic Canvas - Tight Edge-to-Edge Margins */}
         <main className="app-main-content" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0, width: '100%' }}>
-          {currentProfile.role === 'super_admin' && (
+          {currentRole === 'super_admin' && (
             <SuperAdminDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
           )}
-          {currentProfile.role === 'branch_manager' && (
+          {currentRole === 'branch_manager' && (
             <BranchManagerDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
           )}
-          {currentProfile.role === 'instructor' && (
+          {currentRole === 'instructor' && (
             <InstructorDashboard activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
           )}
-          {currentProfile.role === 'student' && (
+          {currentRole === 'student' && (
             <StudentPortal activeTab={activeTab as any} setActiveTab={setActiveTab as any} />
           )}
         </main>

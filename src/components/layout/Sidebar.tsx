@@ -22,13 +22,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   onOpenSqlModal,
 }) => {
-  const { currentProfile, profiles, branches, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions, logout } = useApp();
+  const { currentRole, currentProfile, profiles, branches, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions, logout } = useApp();
 
   const myBranch = branches.find((b) => b.id === currentProfile.branch_id);
 
   // Define Grouped Navigation Items per Role
   const getNavGroups = () => {
-    switch (currentProfile.role) {
+    switch (currentRole) {
       case 'super_admin':
         return [
           {
@@ -342,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {currentProfile.full_name.split(' ')[0]}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                {currentProfile.role.replace('_', ' ')}
+                {currentRole.replace('_', ' ')}
               </div>
             </div>
           </div>
