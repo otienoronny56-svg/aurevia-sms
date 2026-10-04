@@ -101,6 +101,7 @@ export interface WelcomeAdmissionEmailParams {
   startDate?: string;
   googleMeetLink?: string;
   portalUrl?: string;
+  temporaryPassword?: string;
 }
 
 export function generateWelcomeAdmissionEmailHtml(params: WelcomeAdmissionEmailParams): string {
@@ -156,9 +157,13 @@ export function generateWelcomeAdmissionEmailHtml(params: WelcomeAdmissionEmailP
             </tr>
           </table>
 
-          <div style="background-color: rgba(212, 154, 91, 0.08); border-left: 3px solid #D49A5B; padding: 12px 16px; margin: 20px 0; font-size: 13px; color: #D6C7BB;">
-            <strong>Mandatory SCA Academic Requirement:</strong> Trainees are required to maintain a minimum of <strong>80% attendance</strong> across physical espresso lab calibrations and theory webinars to qualify for practical examinations.
-          </div>
+          ${params.temporaryPassword ? `
+          <div style="background-color: #271E19; border: 1px dashed #D49A5B; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+            <p style="color: #A89B8F; font-size: 11px; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;">Initial Trainee Portal Access</p>
+            <p style="color: #F5EBE1; font-size: 14px; margin: 0 0 6px 0;">Login ID: <strong style="color: #D49A5B; font-family: monospace;">${params.regNumber}</strong> or your email</p>
+            <p style="color: #F5EBE1; font-size: 14px; margin: 0;">Unique Default Password: <strong style="color: #38BDF8; font-family: monospace; letter-spacing: 1px;">${params.temporaryPassword}</strong></p>
+            <p style="color: #8C7E74; font-size: 11px; margin: 8px 0 0 0;">Note: For your protection, once you change this password, the default password is permanently invalidated and cannot be used again.</p>
+          </div>` : ''}
 
           <div style="text-align: center; margin: 26px 0;">
             <a href="${portalUrl}" class="email-btn" style="${BUTTON_STYLES}">Access Student Portal & Dossier</a>

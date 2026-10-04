@@ -24,21 +24,32 @@ export async function hashPassword(plainPassword: string): Promise<string> {
 }
 
 /**
+ * Generates a unique, secure default password for a user based on their name and random secure digits.
+ * Example format: Aur#7492!Ronn or Aur#3815!Fait
+ */
+export function generateUniqueDefaultPassword(fullName: string): string {
+  const cleanName = fullName.trim().replace(/[^a-zA-Z]/g, '') || 'User';
+  const prefix = cleanName.slice(0, 4);
+  const capitalized = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  const random4 = 1000 + (array[0] % 9000); // 4 random digits
+
+  return `Aur#${random4}!${capitalized}`;
+}
+
+/**
  * Verifies an entered password against either:
  * - A stored SHA-256 hash (64 hex characters)
- * - An initial seed password (plain text for legacy/dev seeded mock profiles)
- * - Institutional master fallback ('Aurevia@2026!')
+ * - An initial unique seed password (exact match)
+ * NOTE: There are NO master or shared passwords. Each user is strictly verified against their own credential.
  */
 export async function verifyPassword(
   enteredPassword: string,
   storedCredential?: string | null
 ): Promise<boolean> {
-  if (!enteredPassword) return false;
-
-  // Master institutional administrative bypass
-  if (enteredPassword === 'Aurevia@2026!') return true;
-
-  if (!storedCredential) return false;
+  if (!enteredPassword || !storedCredential) return false;
 
   // If storedCredential looks like a 64-char hex SHA-256 hash:
   if (/^[a-f0-9]{64}$/i.test(storedCredential)) {
@@ -46,7 +57,7 @@ export async function verifyPassword(
     return computedHash.toLowerCase() === storedCredential.toLowerCase();
   }
 
-  // Plain-text comparison for initial mock seeds
+  // Exact plain-text comparison for initial unique seed
   return enteredPassword === storedCredential;
 }
 

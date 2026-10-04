@@ -47,7 +47,7 @@ import {
   generateBroadcastEmailHtml,
   generateLoginAlertEmailHtml,
 } from './emailTemplates';
-import { hashPassword, verifyPassword, generateSecureOTP } from './security';
+import { hashPassword, verifyPassword, generateSecureOTP, generateUniqueDefaultPassword } from './security';
 
 interface AppContextType {
   // Authentication & Session
@@ -963,20 +963,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'This account has been deactivated. Please contact your administrator.' };
     }
 
-    // Password verification: checks cryptographic hash, profile initial_password, or institutional master password
-    const isCryptoValid = await verifyPassword(enteredPass, matchedProfile.password || matchedProfile.initial_password);
-    const acceptedPasswords = [
-      matchedProfile.initial_password,
-      'Aurevia@2026!',
-      'Admin@2026!',
-      'Manager@2026!',
-      'Teacher@2026!',
-      'Faith@2026!',
-    ].filter(Boolean);
+    // Password verification:
+    // 1. If password was changed, ONLY the new hashed password is valid.
+    // The default / initial password CANNOT unlock it under any circumstance!
+    if (matchedProfile.password_changed) {
+      if (matchedProfile.password) {
+        const isMatch = await verifyPassword(enteredPass, matchedProfile.password);
+        if (isMatch) {
+          loginWithProfile(matchedProfile);
+          return { success: true };
+        }
+      }
+      return { success: false, error: INVALID };
+    }
 
-    if (isCryptoValid || acceptedPasswords.includes(enteredPass)) {
-      loginWithProfile(matchedProfile);
-      return { success: true };
+    // 2. If password was NOT yet changed, only this user's unique initial default password can unlock it.
+    // No other user's password and no shared password can unlock it.
+    if (matchedProfile.initial_password) {
+      const isMatch = await verifyPassword(enteredPass, matchedProfile.initial_password);
+      if (isMatch) {
+        loginWithProfile(matchedProfile);
+        return { success: true };
+      }
+      return { success: false, error: INVALID };
     }
 
     // Otherwise verify against Supabase Auth using the profile's email
@@ -1133,6 +1142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const regNumber = generateRegNumber(params.branchId);
     const course = courses.find((c) => c.id === params.courseId) || courses[0];
     const feeAmount = course?.fee_amount || 35000;
+    const studentDefaultPwd = generateUniqueDefaultPassword(params.fullName);
 
     let createdProfile: Profile;
     let createdStudent: StudentKYC;
@@ -1151,6 +1161,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           phone: params.phone,
           national_id: params.nationalId,
           reg_number: regNumber,
+          initial_password: studentDefaultPwd,
+          password_changed: false,
           is_active: true,
         })
         .select()
@@ -1222,7 +1234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdInvoice = { ...invData, branch_id: params.branchId };
 
       // 5. Insert SMS log
-      const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
+      const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Temp password: ${studentDefaultPwd}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
       try {
         await supabase.from('aur_sms_logs').insert({
           recipient_phone: params.phone,
@@ -1252,6 +1264,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: params.phone,
         national_id: params.nationalId,
         reg_number: regNumber,
+        initial_password: studentDefaultPwd,
+        password_changed: false,
         is_active: true,
         created_at: new Date().toISOString(),
       };
@@ -1326,6 +1340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cohortName: cohortObj?.name || 'Upcoming Cohort',
         branchName: branchObj?.name || 'Aurevia Coffee Institute',
         scheduleTiming: cohortObj?.schedule_timing,
+        temporaryPassword: studentDefaultPwd,
       });
 
       sendResendEmail({
@@ -1465,7 +1480,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (params.avatarUrl !== undefined) profileUpdates.avatar_url = params.avatarUrl;
         if (params.newPassword) {
           profileUpdates.password = hashedPassword;
-          profileUpdates.initial_password = params.newPassword;
+          profileUpdates.initial_password = null;
           profileUpdates.password_changed = true;
         }
 
@@ -1511,7 +1526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               national_id: params.nationalId,
               avatar_url: params.avatarUrl !== undefined ? params.avatarUrl : p.avatar_url,
               password: hashedPassword || p.password,
-              initial_password: params.newPassword || p.initial_password,
+              initial_password: params.newPassword ? undefined : p.initial_password,
               password_changed: params.newPassword ? true : p.password_changed,
             }
           : p
@@ -1528,7 +1543,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           national_id: params.nationalId,
           avatar_url: params.avatarUrl !== undefined ? params.avatarUrl : prev.avatar_url,
           password: hashedPassword || prev.password,
-          initial_password: params.newPassword || prev.initial_password,
+          initial_password: params.newPassword ? undefined : prev.initial_password,
           password_changed: params.newPassword ? true : prev.password_changed,
         };
         localStorage.setItem('aur_current_profile', JSON.stringify(up));
@@ -2511,7 +2526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created = {
         ...data,
         staff_id: params.staff_id,
-        initial_password: params.initial_password || 'Aurevia@2026!',
+        initial_password: params.initial_password || generateUniqueDefaultPassword(params.full_name || 'Staff'),
         password_changed: false,
         assigned_courses: params.assigned_courses,
         assigned_cohorts: params.assigned_cohorts,
@@ -2527,7 +2542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         national_id: params.national_id || 'ID-000',
         specialty: params.specialty || 'Lead Trainer',
         staff_id: params.staff_id || `AUR/STF-${Date.now().toString().slice(-3)}`,
-        initial_password: params.initial_password || 'Aurevia@2026!',
+        initial_password: params.initial_password || generateUniqueDefaultPassword(params.full_name || 'Staff'),
         password_changed: false,
         assigned_courses: params.assigned_courses || [],
         assigned_cohorts: params.assigned_cohorts || [],
@@ -2571,14 +2586,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProfiles((prev) =>
       prev.map((p) =>
         p.id === profileId
-          ? { ...p, password: hashedPassword, initial_password: newPassword, password_changed: true }
+          ? { ...p, password: hashedPassword, initial_password: undefined, password_changed: true }
           : p
       )
     );
 
     if (currentProfile?.id === profileId) {
       setCurrentProfile((prev) => {
-        const up = { ...prev, password: hashedPassword, initial_password: newPassword, password_changed: true };
+        const up = { ...prev, password: hashedPassword, initial_password: undefined, password_changed: true };
         localStorage.setItem('aur_current_profile', JSON.stringify(up));
         return up;
       });
@@ -2589,7 +2604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .from('aur_profiles')
         .update({
           password: hashedPassword,
-          initial_password: newPassword,
+          initial_password: null,
           password_changed: true,
         })
         .eq('id', profileId);
@@ -2614,13 +2629,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'User account not found.' };
     }
 
-    // Verify current password if provided
+    // Verify current password if provided (no bypass allowed)
     if (currentPasswordInput) {
       const isCurrentValid = await verifyPassword(
         currentPasswordInput,
         targetProfile.password || targetProfile.initial_password
       );
-      if (!isCurrentValid && currentPasswordInput !== 'Aurevia@2026!') {
+      if (!isCurrentValid) {
         return { success: false, error: 'Your current password is incorrect.' };
       }
     }
@@ -2628,19 +2643,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Cryptographically hash the new password using Web Crypto SHA-256 with institutional salt
     const hashedPassword = await hashPassword(newPassword);
 
-    // Update in profiles state
+    // Update in profiles state: initial default password is permanently cleared
     setProfiles((prev) =>
       prev.map((p) =>
         p.id === profileId
-          ? { ...p, password: hashedPassword, initial_password: newPassword, password_changed: true }
+          ? { ...p, password: hashedPassword, initial_password: undefined, password_changed: true }
           : p
       )
     );
 
-    // Update in currentProfile if active session
+    // Update in currentProfile if active session: initial default password is permanently cleared
     if (currentProfile?.id === profileId) {
       setCurrentProfile((prev) => {
-        const up = { ...prev, password: hashedPassword, initial_password: newPassword, password_changed: true };
+        const up = { ...prev, password: hashedPassword, initial_password: undefined, password_changed: true };
         localStorage.setItem('aur_current_profile', JSON.stringify(up));
         return up;
       });
@@ -2650,17 +2665,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const initIdx = INITIAL_PROFILES.findIndex((p) => p.id === profileId);
     if (initIdx !== -1) {
       INITIAL_PROFILES[initIdx].password = hashedPassword;
-      INITIAL_PROFILES[initIdx].initial_password = newPassword;
+      INITIAL_PROFILES[initIdx].initial_password = undefined;
       INITIAL_PROFILES[initIdx].password_changed = true;
     }
 
-    // Update Supabase if cloud connected
+    // Update Supabase if cloud connected: initial_password set to null
     try {
       await supabase
         .from('aur_profiles')
         .update({
           password: hashedPassword,
-          initial_password: newPassword,
+          initial_password: null,
           password_changed: true,
         })
         .eq('id', profileId);

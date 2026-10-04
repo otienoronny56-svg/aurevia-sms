@@ -160,7 +160,7 @@ export const ChangeMyPasswordModal: React.FC<ChangeMyPasswordModalProps> = ({ on
                 <span>Show passwords</span>
               </label>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Default was: <code>Aurevia@2026!</code>
+                {currentProfile.password_changed ? 'Using custom password' : 'Using unique assigned initial password'}
               </span>
             </div>
 

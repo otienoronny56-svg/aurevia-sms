@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../lib/store';
 import { UserRole } from '../../types/database.types';
+import { generateUniqueDefaultPassword } from '../../lib/security';
 import {
   X, UserPlus, Key, Shield, Building, Coffee, Mail, Phone,
   CheckCircle2, Copy, Check, Eye, EyeOff, Sparkles, BookOpen,
@@ -54,12 +55,19 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   const defaultStaffId = `AUR/${branchCode}/${prefix}-${String(nextStaffNum).padStart(3, '0')}`;
   
   const [staffId, setStaffId] = useState(defaultStaffId);
-  const [initialPassword, setInitialPassword] = useState('Aurevia@2026!');
+  const [initialPassword, setInitialPassword] = useState(() => generateUniqueDefaultPassword('Staff'));
   const [showPassword, setShowPassword] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<any | null>(null);
   const [copiedCreds, setCopiedCreds] = useState(false);
+
+  // Generate distinct default password for each new staff member based on their name
+  React.useEffect(() => {
+    if (fullName.trim()) {
+      setInitialPassword(generateUniqueDefaultPassword(fullName));
+    }
+  }, [fullName]);
 
   // Update staff ID prefix when branch or category changes
   React.useEffect(() => {
@@ -529,7 +537,18 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Default Initial Password</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label className="form-label" style={{ margin: 0 }}>Unique Default Password</label>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => setInitialPassword(generateUniqueDefaultPassword(fullName || 'Staff'))}
+                          style={{ fontSize: '0.72rem', color: 'var(--crema-gold)', padding: '2px 6px', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          title="Generate a new randomized unique default password"
+                        >
+                          <Sparkles size={11} /> Regenerate
+                        </button>
+                      </div>
                       <input
                         type="text"
                         className="form-input"
@@ -541,7 +560,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                   </div>
 
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                    * The staff member can change this default password privately once logged into their portal.
+                    * Each user receives their own unique generated default password. Once changed by the user, this default password is permanently invalidated and can never unlock the account again.
                   </div>
                 </div>
               ) : (
