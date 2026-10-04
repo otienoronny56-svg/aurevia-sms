@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
-  Info, ShieldCheck, MapPin, CheckCircle2,
+  Info, ShieldCheck, MapPin, CheckCircle2, GraduationCap,
 } from 'lucide-react';
 import { PasswordResetModal } from '../components/modals/PasswordResetModal';
+import { isPortalMode, switchDomainMode } from '../lib/domainConfig';
 import './LoginPage.css';
 
 const MAX_ATTEMPTS = 5;
@@ -70,9 +71,13 @@ export const LoginPage: React.FC = () => {
   const isLocked = lockRemaining > 0;
   const busy = isLoading || isGoogleLoading;
 
+  const onPortal = isPortalMode();
+
   useEffect(() => {
-    document.title = 'Sign in | Aurevia Coffee Institute';
-  }, []);
+    document.title = onPortal
+      ? 'Sign in | Aurevia Academy Portal'
+      : 'Sign in | Aurevia Management System (SMS)';
+  }, [onPortal]);
 
   // OAuth errors: from the redirect URL, or a rejected (unregistered) Google account
   useEffect(() => {
@@ -204,8 +209,19 @@ export const LoginPage: React.FC = () => {
         <div className="auth-card">
           <Brand />
 
-          <h1 className="auth-card__title">Welcome back</h1>
-          <p className="auth-card__subtitle">Sign in to your Aurevia portal account.</p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '16px', background: onPortal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(212, 154, 91, 0.12)', color: onPortal ? '#10B981' : 'var(--crema-gold)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '8px 0 10px 0' }}>
+            {onPortal ? <GraduationCap size={13} /> : <Coffee size={13} />}
+            <span>{onPortal ? 'Academy Learning Portal' : 'Operations Management (SMS)'}</span>
+          </div>
+
+          <h1 className="auth-card__title">
+            {onPortal ? 'Welcome to Academy Portal' : 'Aurevia SMS Management'}
+          </h1>
+          <p className="auth-card__subtitle">
+            {onPortal
+              ? 'Sign in to access your course timetable, attendance roll-call, and student records.'
+              : 'Sign in to manage campuses, student admissions, fee payments, and faculty HR.'}
+          </p>
 
           <button
             type="button"
@@ -256,7 +272,7 @@ export const LoginPage: React.FC = () => {
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <div className="auth-field">
               <label htmlFor="login-identifier">
-                Email, Staff ID, or Student Reg Number
+                {onPortal ? 'Student Reg Number, Staff ID, or Email' : 'Manager Email or Staff ID'}
               </label>
               <div className="auth-input">
                 <span className="auth-input__icon">
@@ -273,7 +289,7 @@ export const LoginPage: React.FC = () => {
                   spellCheck={false}
                   autoFocus
                   required
-                  placeholder="e.g. name@aureviacoffeeinstitute.co.ke or AUR/NBO/..."
+                  placeholder={onPortal ? 'e.g. AUR/NBO/2026/01 or teacher@aurevia...' : 'e.g. manager@aureviacoffeeinstitute.co.ke'}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   aria-invalid={!!error && !identifier.trim()}
@@ -364,6 +380,46 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Domain Cross-Link Switcher Card */}
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'var(--bg-surface-elevated)',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+              {onPortal ? 'Campus Director or Branch Manager?' : 'Student or Faculty Instructor?'}
+            </div>
+            <button
+              type="button"
+              onClick={() => switchDomainMode(onPortal ? 'sms' : 'portal')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--crema-gold)',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '2px 4px',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <span>{onPortal ? 'Go to SMS Hub' : 'Go to Academy Portal'}</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
 
           <footer className="auth-footer">
             <span className="auth-footer__secure">

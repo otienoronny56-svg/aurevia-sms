@@ -7,6 +7,7 @@ import {
   Building2, Sparkles, Coffee, RefreshCw, LogOut, Lock
 } from 'lucide-react';
 import { ChangeMyPasswordModal } from '../modals/ChangeMyPasswordModal';
+import { DomainModeBanner } from './DomainModeBanner';
 
 interface HeaderProps {
   activeTab: string;
@@ -117,6 +118,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right Controls: Theme Toggle + Database Status + Profile Switcher */}
       {/* Right Controls: Cloud Sync + Theme Toggle + Role Switcher */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.5vw, 10px)', flexShrink: 0 }}>
+        {/* SUBDOMAIN MODE BADGE */}
+        <DomainModeBanner />
+
         {/* SUPABASE LIVE CLOUD SYNC BUTTON */}
         <button
           type="button"

@@ -8,7 +8,9 @@ import { BranchManagerDashboard } from './pages/BranchManagerDashboard';
 import { InstructorDashboard } from './pages/InstructorDashboard';
 import { StudentPortal } from './pages/StudentPortal';
 import { PublicReceiptView } from './pages/PublicReceiptView';
+import { DomainGatekeeperPage } from './pages/DomainGatekeeperPage';
 import { SqlMigrationModal } from './components/modals/SqlMigrationModal';
+import { isPortalMode } from './lib/domainConfig';
 import { Coffee, ShieldCheck, ExternalLink } from 'lucide-react';
 
 const DashboardRouter: React.FC = () => {
@@ -209,7 +211,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 }
 
 const MainApp: React.FC = () => {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, currentRole } = useApp();
+  const [bypassGatekeeper, setBypassGatekeeper] = useState(false);
+  const onPortal = isPortalMode();
 
   const [receiptRef, setReceiptRef] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -225,6 +229,13 @@ const MainApp: React.FC = () => {
 
   if (!isAuthenticated) {
     return <LoginPage />;
+  }
+
+  // Domain Boundary Enforcement:
+  // If user is on the SMS domain (Management), but their account is a student or instructor:
+  // Guide them to the Academy Portal (with a developer preview bypass option).
+  if (!onPortal && (currentRole === 'student' || currentRole === 'instructor') && !bypassGatekeeper) {
+    return <DomainGatekeeperPage onBypassDev={() => setBypassGatekeeper(true)} />;
   }
 
   return <DashboardRouter />;
