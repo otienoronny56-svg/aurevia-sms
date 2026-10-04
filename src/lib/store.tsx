@@ -336,13 +336,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [students, setStudents] = useState<StudentKYC[]>(() => {
     const saved = localStorage.getItem('aur_students');
+    let loaded = INITIAL_STUDENTS;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) loaded = parsed;
       } catch (_) {}
     }
-    return INITIAL_STUDENTS;
+    return loaded.map((s) => {
+      if (s.profile?.full_name) return s;
+      const matchedProf = INITIAL_PROFILES.find((p) => p.id === s.profile_id);
+      return matchedProf ? { ...s, profile: matchedProf } : s;
+    });
   });
 
   const [enrollments, setEnrollments] = useState<Enrollment[]>(() => {

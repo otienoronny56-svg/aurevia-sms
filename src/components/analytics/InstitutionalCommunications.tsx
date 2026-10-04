@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../lib/store';
 import { SMSLog } from '../../types/database.types';
+import { INITIAL_PROFILES } from '../../lib/mockData';
 import {
   Send, Smartphone, Mail, Sparkles, CheckCircle2, AlertTriangle,
   Search, Users, Building2, BookOpen, CreditCard,
@@ -163,17 +164,51 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
       return true;
     });
 
+    const resolveStudentProfile = (profileId?: string, fallbackStudent?: any) => {
+      if (fallbackStudent?.profile?.full_name) return fallbackStudent.profile;
+      const foundInProfiles = profiles.find((p) => p.id === profileId);
+      if (foundInProfiles) return foundInProfiles;
+      const foundInMock = INITIAL_PROFILES.find((p) => p.id === profileId);
+      if (foundInMock) return foundInMock;
+      return undefined;
+    };
+
+    const getStudentFinancials = (studentId?: string) => {
+      if (!studentId) return { balance: 20000 };
+      const studentInvoices = invoices.filter((inv) => inv.student_id === studentId);
+      if (studentInvoices.length > 0) {
+        const totalBilled = studentInvoices.reduce((acc, curr) => acc + (curr.total_fee || 0), 0);
+        const totalPaid = studentInvoices.reduce((acc, curr) => acc + (curr.amount_paid || 0), 0);
+        const balance = studentInvoices.reduce((acc, curr) => acc + (curr.balance_due ?? 0), 0) || (totalBilled - totalPaid);
+        return { balance };
+      }
+      return { balance: 20000 };
+    };
+
+    const getStudentAttendanceRate = (studentId?: string) => {
+      if (!studentId) return 92;
+      const studentLogs = attendance.filter((a) => a.student_id === studentId);
+      if (studentLogs.length > 0) {
+        const presentCount = studentLogs.filter((a) => a.status === 'present' || a.status === 'late').length;
+        return Math.round((presentCount / studentLogs.length) * 100);
+      }
+      return 92;
+    };
+
     if (targetAudience === 'all_students') {
       list = scopedStudents.map((s) => {
-        const prof = profiles.find((p) => p.id === s.profile_id);
+        const prof = resolveStudentProfile(s.profile_id, s);
         const enr = enrollments.find((e) => e.student_id === s.id);
         const studentCohort = cohorts.find((c) => c.id === enr?.cohort_id);
         const studentCourse = courses.find((c) => c.id === studentCohort?.course_id);
+        const fin = getStudentFinancials(s.id);
         return {
-          name: prof?.full_name || 'Trainee',
-          phone: prof?.phone || '+254700000000',
-          email: prof?.email || 'student@aurevia.ac.ke',
+          name: prof?.full_name || 'Faith Cherono',
+          phone: prof?.phone || '0714767240',
+          email: prof?.email || 'faith.cherono@aureviacoffeeinstitute.co.ke',
           branchId: s.branch_id,
+          balanceDue: fin.balance,
+          attendanceRate: getStudentAttendanceRate(s.id),
           courseName: studentCourse?.title,
           cohortName: studentCohort?.name,
         };
@@ -184,12 +219,15 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
       const courseObj = courses.find((c) => c.id === cohortObj?.course_id);
       list = cohortEnrs.map((e) => {
         const s = students.find((st) => st.id === e.student_id);
-        const prof = profiles.find((p) => p.id === s?.profile_id);
+        const prof = resolveStudentProfile(s?.profile_id, s);
+        const fin = getStudentFinancials(s?.id);
         return {
-          name: prof?.full_name || 'Trainee',
-          phone: prof?.phone || '+254700000000',
-          email: prof?.email || 'student@aurevia.ac.ke',
+          name: prof?.full_name || 'Faith Cherono',
+          phone: prof?.phone || '0714767240',
+          email: prof?.email || 'faith.cherono@aureviacoffeeinstitute.co.ke',
           branchId: s?.branch_id,
+          balanceDue: fin.balance,
+          attendanceRate: getStudentAttendanceRate(s?.id),
           courseName: courseObj?.title,
           cohortName: cohortObj?.name,
         };
@@ -200,13 +238,16 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
       const courseObj = courses.find((c) => c.id === selectedCourseId);
       list = courseEnrs.map((e) => {
         const s = students.find((st) => st.id === e.student_id);
-        const prof = profiles.find((p) => p.id === s?.profile_id);
+        const prof = resolveStudentProfile(s?.profile_id, s);
         const cObj = cohorts.find((c) => c.id === e.cohort_id);
+        const fin = getStudentFinancials(s?.id);
         return {
-          name: prof?.full_name || 'Trainee',
-          phone: prof?.phone || '+254700000000',
-          email: prof?.email || 'student@aurevia.ac.ke',
+          name: prof?.full_name || 'Faith Cherono',
+          phone: prof?.phone || '0714767240',
+          email: prof?.email || 'faith.cherono@aureviacoffeeinstitute.co.ke',
           branchId: s?.branch_id,
+          balanceDue: fin.balance,
+          attendanceRate: getStudentAttendanceRate(s?.id),
           courseName: courseObj?.title,
           cohortName: cObj?.name,
         };
@@ -214,20 +255,18 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
     } else if (targetAudience === 'fee_defaulters') {
       list = scopedStudents
         .map((s) => {
-          const prof = profiles.find((p) => p.id === s.profile_id);
-          const studentInvoices = invoices.filter((inv) => inv.student_id === s.id);
-          const totalBilled = studentInvoices.reduce((acc, curr) => acc + curr.total_fee, 0);
-          const totalPaid = studentInvoices.reduce((acc, curr) => acc + curr.amount_paid, 0);
-          const balance = studentInvoices.reduce((acc, curr) => acc + curr.balance_due, 0) || (totalBilled - totalPaid);
+          const prof = resolveStudentProfile(s.profile_id, s);
+          const fin = getStudentFinancials(s.id);
           const enr = enrollments.find((e) => e.student_id === s.id);
           const studentCohort = cohorts.find((c) => c.id === enr?.cohort_id);
           const studentCourse = courses.find((c) => c.id === studentCohort?.course_id);
           return {
-            name: prof?.full_name || 'Trainee',
-            phone: prof?.phone || '+254700000000',
-            email: prof?.email || 'student@aurevia.ac.ke',
+            name: prof?.full_name || 'Faith Cherono',
+            phone: prof?.phone || '0714767240',
+            email: prof?.email || 'faith.cherono@aureviacoffeeinstitute.co.ke',
             branchId: s.branch_id,
-            balanceDue: balance > 0 ? balance : 15000,
+            balanceDue: fin.balance,
+            attendanceRate: getStudentAttendanceRate(s.id),
             courseName: studentCourse?.title,
             cohortName: studentCohort?.name,
           };
@@ -235,18 +274,18 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
         .filter((item) => (item.balanceDue ?? 0) > 0);
     } else if (targetAudience === 'low_attendance') {
       list = scopedStudents.map((s) => {
-        const prof = profiles.find((p) => p.id === s.profile_id);
-        const studentLogs = attendance.filter((a) => a.student_id === s.id);
-        const presentCount = studentLogs.filter((a) => a.status === 'present' || a.status === 'late').length;
-        const rate = studentLogs.length > 0 ? Math.round((presentCount / studentLogs.length) * 100) : 75;
+        const prof = resolveStudentProfile(s.profile_id, s);
+        const fin = getStudentFinancials(s.id);
+        const rate = getStudentAttendanceRate(s.id);
         const enr = enrollments.find((e) => e.student_id === s.id);
         const studentCohort = cohorts.find((c) => c.id === enr?.cohort_id);
         const studentCourse = courses.find((c) => c.id === studentCohort?.course_id);
         return {
-          name: prof?.full_name || 'Trainee',
-          phone: prof?.phone || '+254700000000',
-          email: prof?.email || 'student@aurevia.ac.ke',
+          name: prof?.full_name || 'Faith Cherono',
+          phone: prof?.phone || '0714767240',
+          email: prof?.email || 'faith.cherono@aureviacoffeeinstitute.co.ke',
           branchId: s.branch_id,
+          balanceDue: fin.balance,
           attendanceRate: rate,
           courseName: studentCourse?.title,
           cohortName: studentCohort?.name,
@@ -422,12 +461,12 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
   // Currently active preview recipient from selected audience
   const activePreviewRecipient = resolvedRecipients[previewRecipientIndex] || resolvedRecipients[0] || {
     name: 'Faith Cherono',
-    phone: '+254 712 998 877',
-    email: 'faith.cherono@gmail.com',
-    balanceDue: 15000,
+    phone: '0714767240',
+    email: 'faith.cherono@aureviacoffeeinstitute.co.ke',
+    balanceDue: 20000,
     attendanceRate: 92,
     courseName: 'Barista Skills Foundation',
-    cohortName: 'SEP-2026-NBO-BARISTA',
+    cohortName: 'NBO Barista Intensive - Cohort 12',
     branchId: currentProfile.branch_id || branches[0]?.id,
   };
 

@@ -205,6 +205,7 @@ export const INITIAL_STUDENTS: StudentKYC[] = [
     media_consent: true,
     terms_accepted_at: '2026-08-20T00:00:00Z',
     created_at: '2026-02-10T00:00:00Z',
+    profile: INITIAL_PROFILES[3],
   },
 ];
 
