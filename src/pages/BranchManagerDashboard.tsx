@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, Calendar,
   ClipboardList, Check, UserCheck,
   LogOut, User, Edit3, CalendarCheck, X, GraduationCap, RotateCcw,
-  Beaker, Compass, AlertTriangle, Filter, Trash2, ExternalLink, Sparkles, MapPin, Laptop
+  Beaker, Compass, AlertTriangle, Filter, Trash2, ExternalLink, Sparkles, MapPin, Laptop, Key
 } from 'lucide-react';
 import { StudentKYCModal } from '../components/modals/StudentKYCModal';
 import { MpesaPaymentModal } from '../components/modals/MpesaPaymentModal';
@@ -18,6 +18,7 @@ import { ManageLabsModal } from '../components/modals/ManageLabsModal';
 import { RecordStaffLeaveModal } from '../components/modals/RecordStaffLeaveModal';
 import { BranchRosterModal } from '../components/modals/BranchRosterModal';
 import { StudentDetailModal } from '../components/modals/StudentDetailModal';
+import { ChangeMyPasswordModal } from '../components/modals/ChangeMyPasswordModal';
 import { StudentRollCallAnalytics } from '../components/analytics/StudentRollCallAnalytics';
 import { InstitutionalCommunications } from '../components/analytics/InstitutionalCommunications';
 import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManagement';
@@ -138,6 +139,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const [leaveStatusFilter, setLeaveStatusFilter] = useState<'ALL' | 'pending' | 'approved' | 'rejected'>('ALL');
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [signingStaff, setSigningStaff] = useState<Profile | null>(null);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Date for Staff Duty Register / Logbook
   const [selectedLogDate, setSelectedLogDate] = useState(new Date().toISOString().split('T')[0]);
@@ -514,6 +516,24 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
             >
               <GraduationCap size={14} />
               <span>Campus Roster</span>
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowChangePasswordModal(true)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(212, 154, 91, 0.1)',
+                borderColor: 'rgba(212, 154, 91, 0.3)',
+                color: 'var(--crema-gold)'
+              }}
+              title="Update your branch manager portal password"
+            >
+              <Key size={14} />
+              <span>Change Password</span>
             </button>
             <button className="btn btn-secondary" onClick={() => setShowAddStaffModal(true)} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
               <UserCheck size={14} />
@@ -2441,6 +2461,9 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
             setSelectedStaffForLeave(null);
           }}
         />
+      )}
+      {showChangePasswordModal && (
+        <ChangeMyPasswordModal onClose={() => setShowChangePasswordModal(false)} />
       )}
     </div>
   );

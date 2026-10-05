@@ -8,6 +8,8 @@ import {
   Sparkle, Briefcase, UserCheck, ShieldOff, Send
 } from 'lucide-react';
 import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
+import { sendResendEmail } from '../../lib/resend';
+import { generateStaffWelcomeEmailHtml } from '../../lib/emailTemplates';
 
 interface AddStaffModalProps {
   onClose: () => void;
@@ -64,6 +66,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   const [copiedCreds, setCopiedCreds] = useState(false);
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [smsSentNotice, setSmsSentNotice] = useState<string | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSentNotice, setEmailSentNotice] = useState<string | null>(null);
 
   // Generate distinct default password for each new staff member based on their name
   React.useEffect(() => {
@@ -78,6 +82,17 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
     setStaffId(`AUR/${branchCode}/${pfx}-${String(nextStaffNum).padStart(3, '0')}`);
   }, [branchId, staffCategory, nextStaffNum, branchCode]);
 
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
+    if (newRole === 'branch_manager') {
+      setSpecialty('Campus Branch Manager');
+    } else if (newRole === 'super_admin') {
+      setSpecialty('Super Administrator');
+    } else if (newRole === 'instructor') {
+      setSpecialty('Lead Barista Trainer & Q-Grader');
+    }
+  };
+
   const handleToggleCourse = (cId: string) => {
     setAssignedCourseIds((prev) =>
       prev.includes(cId) ? prev.filter((id) => id !== cId) : [...prev, cId]
@@ -85,10 +100,60 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   };
 
   const handleCopyCredentials = () => {
-    const text = `Aurevia Academy Portal Access\nStaff Member: ${fullName}\nStaff ID / Login: ${staffId}\nBranch: ${branchObj?.name}\nPortal URL: ${PRODUCTION_PORTAL_URL}\n${staffCategory === 'system' ? `Login Identifier: ${staffId} or ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}\nPlease sign in and change your password on first login.`;
+    const roleLabel = (createdProfile?.role || role) === 'branch_manager'
+      ? 'Campus Branch Manager'
+      : (createdProfile?.role || role) === 'super_admin'
+      ? 'Super Administrator'
+      : (createdProfile?.job_title || specialty || 'Faculty Instructor');
+
+    const text = `Aurevia Academy Portal Access\nStaff Member: ${fullName}\nRole: ${roleLabel}\nStaff ID / Login: ${staffId}\nBranch: ${branchObj?.name}\nPortal URL: ${PRODUCTION_PORTAL_URL}\n${staffCategory === 'system' ? `Login Identifier: ${staffId} or ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}\nPlease sign in and change your password on first login.`;
     navigator.clipboard.writeText(text);
     setCopiedCreds(true);
     setTimeout(() => setCopiedCreds(false), 2500);
+  };
+
+  const handleSendPortalEmail = async () => {
+    const targetEmail = createdProfile?.email || email;
+    if (!targetEmail || targetEmail.includes('.local')) {
+      alert('Please provide a valid email address to send credentials.');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const branchName = branchObj?.name || 'Aurevia Coffee Institute';
+      const roleTitle = (createdProfile?.role || role) === 'branch_manager'
+        ? 'Campus Branch Manager'
+        : (createdProfile?.role || role) === 'super_admin'
+        ? 'Super Administrator'
+        : (createdProfile?.job_title || specialty || 'Instructor');
+
+      const html = generateStaffWelcomeEmailHtml({
+        staffName: createdProfile?.full_name || fullName,
+        staffId: createdProfile?.staff_id || staffId,
+        role: roleTitle,
+        department: createdProfile?.department || (role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
+        branchName,
+        temporaryPassword: createdProfile?.initial_password || initialPassword,
+        portalUrl: PRODUCTION_PORTAL_URL,
+      });
+
+      const res = await sendResendEmail({
+        to: targetEmail,
+        subject: `Welcome to Aurevia Specialty Coffee Academy - Your Portal Credentials (${createdProfile?.staff_id || staffId})`,
+        html,
+      });
+
+      if (res.success) {
+        setEmailSentNotice(`Welcome credentials email delivered to ${targetEmail}!`);
+      } else {
+        setEmailSentNotice(`Email queued for ${targetEmail}`);
+      }
+      setTimeout(() => setEmailSentNotice(null), 6000);
+    } catch (e: any) {
+      alert('Error sending welcome email: ' + e.message);
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleSendPortalSms = async () => {
@@ -98,7 +163,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
     }
     setIsSendingSms(true);
     try {
-      const msg = `Hello ${fullName}, your Aurevia Academy Portal account is active. Portal: ${PRODUCTION_PORTAL_URL} | Login ID: ${staffId} | Initial Password: ${initialPassword}. Tripple T Systems.`;
+      const roleLabel = (createdProfile?.role || role) === 'branch_manager' ? 'Branch Manager' : 'Staff';
+      const msg = `Hello ${fullName}, your Aurevia Academy ${roleLabel} account is active. Portal: ${PRODUCTION_PORTAL_URL} | Login ID: ${staffId} | Initial Password: ${initialPassword}. Tripple T Systems.`;
       await sendBulkCommunication({
         channel: 'sms',
         purpose: 'admissions',
@@ -128,7 +194,15 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
 
     try {
       const isSystem = staffCategory === 'system';
-      const finalRole: UserRole = isSystem ? role : 'instructor'; // internal role fallback
+      const finalRole: UserRole = isSystem ? role : 'instructor';
+
+      const finalJobTitle = isSystem
+        ? (specialty.trim() || (finalRole === 'branch_manager' ? 'Campus Branch Manager' : finalRole === 'super_admin' ? 'Super Administrator' : 'Lead Barista Trainer'))
+        : jobTitle;
+
+      const finalDepartment = isSystem
+        ? (finalRole === 'branch_manager' ? 'Campus Operations' : finalRole === 'super_admin' ? 'Campus Operations' : 'Academic & Training')
+        : department;
 
       const newStaff = await createStaffMember({
         full_name: fullName,
@@ -138,9 +212,9 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
         branch_id: branchId,
         role: finalRole,
         system_access: isSystem,
-        department: isSystem ? 'Academic & Training' : department,
-        job_title: isSystem ? specialty : jobTitle,
-        specialty: isSystem ? specialty : jobTitle,
+        department: finalDepartment,
+        job_title: finalJobTitle,
+        specialty: finalJobTitle,
         staff_id: staffId,
         initial_password: isSystem ? initialPassword : '',
         password_changed: false,
@@ -149,6 +223,12 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
       });
 
       setCreatedProfile(newStaff);
+
+      // Automatically dispatch welcome email if system staff with valid email
+      if (isSystem && email && !email.includes('.local')) {
+        handleSendPortalEmail().catch(() => {});
+      }
+
       if (onSuccess) onSuccess();
     } catch (err: any) {
       alert('Error registering staff member: ' + err.message);
@@ -280,7 +360,11 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Role / Title:</span>
                     <span className="badge badge-gold" style={{ fontSize: '0.7rem' }}>
-                      {createdProfile.job_title || createdProfile.specialty}
+                      {createdProfile.role === 'branch_manager'
+                        ? 'Campus Branch Manager'
+                        : createdProfile.role === 'super_admin'
+                        ? 'Super Administrator'
+                        : (createdProfile.job_title || createdProfile.specialty || 'Staff Member')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -310,19 +394,39 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
               </div>
 
               {createdProfile.system_access !== false && (
-                <div style={{ marginBottom: '20px' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleSendPortalSms}
-                    disabled={isSendingSms || !phone}
-                    style={{ fontSize: '0.82rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Send size={14} color="var(--crema-gold)" />
-                    <span>{isSendingSms ? 'Dispatching SMS...' : 'Send Portal Access SMS to Staff'}</span>
-                  </button>
+                <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSendPortalEmail}
+                      disabled={isSendingEmail || !createdProfile?.email || createdProfile.email.includes('.local')}
+                      style={{ fontSize: '0.82rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Mail size={14} color="var(--crema-gold)" />
+                      <span>{isSendingEmail ? 'Dispatching Email...' : 'Send Welcome Email'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSendPortalSms}
+                      disabled={isSendingSms || !phone}
+                      style={{ fontSize: '0.82rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Send size={14} color="var(--crema-gold)" />
+                      <span>{isSendingSms ? 'Dispatching SMS...' : 'Send Portal Access SMS'}</span>
+                    </button>
+                  </div>
+
+                  {emailSentNotice && (
+                    <div style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 600 }}>
+                      ✓ {emailSentNotice}
+                    </div>
+                  )}
+
                   {smsSentNotice && (
-                    <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#10B981', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 600 }}>
                       ✓ {smsSentNotice}
                     </div>
                   )}
@@ -497,7 +601,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                         <select
                           className="form-select"
                           value={role}
-                          onChange={(e) => setRole(e.target.value as UserRole)}
+                          onChange={(e) => handleRoleChange(e.target.value as UserRole)}
                           required
                         >
                           <option value="instructor">Instructor / Q-Grader Trainer</option>

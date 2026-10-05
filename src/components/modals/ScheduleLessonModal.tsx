@@ -23,11 +23,12 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { cohorts, courses, profiles, lessons, labs, createLesson } = useApp();
+  const { cohorts, courses, profiles, lessons, labs, createLesson, branches, currentRole } = useApp();
 
-  const branchCohorts = cohorts.filter((c) => c.branch_id === branchId || !c.branch_id);
+  const [activeBranchId, setActiveBranchId] = useState(branchId || branches[0]?.id || '');
+  const branchCohorts = cohorts.filter((c) => c.branch_id === activeBranchId || !c.branch_id);
   const branchInstructors = profiles.filter(
-    (p) => (p.branch_id === branchId || !p.branch_id) && (p.role === 'instructor' || p.role === 'super_admin')
+    (p) => (p.branch_id === activeBranchId || !p.branch_id) && (p.role === 'instructor' || p.role === 'super_admin' || p.role === 'branch_manager')
   );
 
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
@@ -181,7 +182,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
     setIsSaving(true);
     try {
       await createLesson({
-        branch_id: branchId,
+        branch_id: activeBranchId || branchId,
         cohort_id: cohortId || branchCohorts[0]?.id,
         course_id: courseId,
         instructor_id: instructorId,
@@ -274,6 +275,28 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
           {/* Scrollable Form Body */}
           <form onSubmit={handleSubmit} style={{ padding: '22px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
             
+            {/* Campus Selector for Super Admin */}
+            {currentRole === 'super_admin' && (
+              <div style={{ background: 'var(--bg-surface)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '6px', color: 'var(--crema-gold)' }}>
+                  🏛️ Target Academy Campus *
+                </label>
+                <select
+                  className="form-select"
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(e.target.value)}
+                  required
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* 1. DELIVERY FORMAT CARDS (Physical Lab / Virtual Theory / Field Trip) */}
             <div>
               <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '8px', display: 'block' }}>

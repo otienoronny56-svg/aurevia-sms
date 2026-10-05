@@ -4,7 +4,7 @@ import {
   Building2, Users, DollarSign, BookOpen, Plus, Search, Coffee,
   Award, TrendingUp, CheckCircle2, Clock, Phone, Mail, Shield, MessageSquare,
   Calendar, Video, FileText, UserCheck, ShieldCheck, Filter, ExternalLink, ChevronRight,
-  Trash2, Key, Edit3, CalendarCheck, Check, X, GraduationCap
+  Trash2, Key, Edit3, CalendarCheck, Check, X, GraduationCap, Beaker, Laptop, Compass, MapPin
 } from 'lucide-react';
 import { StudentKYCModal } from '../components/modals/StudentKYCModal';
 import { MpesaPaymentModal } from '../components/modals/MpesaPaymentModal';
@@ -12,6 +12,8 @@ import { StudentDetailModal } from '../components/modals/StudentDetailModal';
 import { CreateCohortModal } from '../components/modals/CreateCohortModal';
 import { EditCohortModal } from '../components/modals/EditCohortModal';
 import { AddStaffModal } from '../components/modals/AddStaffModal';
+import { ScheduleLessonModal } from '../components/modals/ScheduleLessonModal';
+import { ManageLabsModal } from '../components/modals/ManageLabsModal';
 import { RecordStaffLeaveModal } from '../components/modals/RecordStaffLeaveModal';
 import { BranchRosterModal } from '../components/modals/BranchRosterModal';
 import { InstitutionalAnalytics } from '../components/analytics/InstitutionalAnalytics';
@@ -29,7 +31,7 @@ import { EditCourseModal } from '../components/modals/EditCourseModal';
 import { DeleteCourseModal } from '../components/modals/DeleteCourseModal';
 import { AlumniPerformanceModal } from '../components/modals/AlumniPerformanceModal';
 import { EditAlumniModal } from '../components/modals/EditAlumniModal';
-import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch, Course, Alumni } from '../types/database.types';
+import { Invoice, StudentKYC, Profile, Cohort, LeaveRequest, Branch, Course, Alumni, LessonMode, TimetableLesson } from '../types/database.types';
 
 type DashboardTab =
   | 'overview'
@@ -37,6 +39,7 @@ type DashboardTab =
   | 'branches'
   | 'courses'
   | 'cohorts'
+  | 'timetable'
   | 'students'
   | 'trainees'
   | 'alumni'
@@ -81,9 +84,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     setSelectedBranchId,
     createBranch,
     deleteStaffMember,
-    reviewLeaveRequest,
     updateAlumni,
     deleteAlumni,
+    lessons,
+    labs,
+    deleteLesson,
   } = useApp();
 
   const [localActiveTab, setLocalActiveTab] = useState<DashboardTab>('overview');
@@ -118,6 +123,71 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [courseFilter, setCourseFilter] = useState('ALL');
   const [kycFilter, setKycFilter] = useState('ALL');
   const [cohortStatusFilter, setCohortStatusFilter] = useState<'ALL' | 'in_progress' | 'upcoming' | 'completed'>('ALL');
+
+  // Super Admin Master Timetable States & Multi-Campus Filters
+  const [timetableBranchFilter, setTimetableBranchFilter] = useState<string>('ALL');
+  const [timetableModeFilter, setTimetableModeFilter] = useState<'all' | LessonMode>('all');
+  const [timetableLabFilter, setTimetableLabFilter] = useState<string>('all');
+  const [timetableTrainerFilter, setTimetableTrainerFilter] = useState<string>('all');
+  const [showScheduleLessonModal, setShowScheduleLessonModal] = useState(false);
+  const [showManageLabsModal, setShowManageLabsModal] = useState(false);
+  const [presetDayForSchedule, setPresetDayForSchedule] = useState<TimetableLesson['day_of_week'] | undefined>(undefined);
+  const [presetBranchForSchedule, setPresetBranchForSchedule] = useState<string | undefined>(undefined);
+
+  const filteredTimetableLessons = lessons.filter((l) => {
+    if (timetableBranchFilter !== 'ALL' && l.branch_id && l.branch_id !== timetableBranchFilter) {
+      return false;
+    }
+    if (timetableModeFilter !== 'all') {
+      const mode = l.lesson_mode || 'physical_lab';
+      if (mode !== timetableModeFilter) return false;
+    }
+    if (timetableLabFilter !== 'all') {
+      if (l.lab_location !== timetableLabFilter) return false;
+    }
+    if (timetableTrainerFilter !== 'all') {
+      if (l.instructor_id !== timetableTrainerFilter) return false;
+    }
+    return true;
+  });
+
+  const handleExportSuperAdminTimetable = (format: 'csv' | 'pdf') => {
+    const headers = ['Campus', 'Day', 'Time', 'Delivery Mode', 'Course / Topic', 'Cohort', 'Trainer', 'Venue / Lab / URL'];
+    const rows = filteredTimetableLessons.map((les) => {
+      const bObj = branches.find((b) => b.id === les.branch_id);
+      const course = courses.find((c) => c.id === les.course_id);
+      const cohort = cohorts.find((c) => c.id === les.cohort_id);
+      const trainer = profiles.find((p) => p.id === les.instructor_id);
+      const modeLabel = les.lesson_mode === 'virtual_theory' ? 'Online / Virtual' : les.lesson_mode === 'field_trip' ? 'Field / Farm Trip' : 'In-Person Lab';
+      const loc = les.lesson_mode === 'virtual_theory' ? (les.google_meet_url || 'Virtual Class') : les.lab_location;
+      return [
+        bObj?.name || 'All Campuses',
+        les.day_of_week,
+        `${les.start_time} - ${les.end_time}`,
+        modeLabel,
+        course?.title || les.topic_title,
+        cohort?.name || 'Assigned Cohort',
+        trainer?.full_name || 'Assigned Trainer',
+        loc,
+      ];
+    });
+
+    const branchLabel = timetableBranchFilter === 'ALL'
+      ? 'National_All_Campuses'
+      : (branches.find((b) => b.id === timetableBranchFilter)?.code || 'Campus');
+
+    if (format === 'csv') {
+      exportToCSV(`Master_Timetable_${branchLabel}`, headers, rows);
+    } else {
+      exportToPDFReport(
+        `Master_Timetable_${branchLabel}`,
+        `AUREVIA MASTER TIMETABLE & FACILITY SCHEDULE - ${timetableBranchFilter === 'ALL' ? 'ALL CAMPUSES' : (branches.find((b) => b.id === timetableBranchFilter)?.name.toUpperCase() || 'CAMPUS')}`,
+        `Weekly Laboratory, Classroom, Virtual & Field Timetable • Filter: ${timetableBranchFilter === 'ALL' ? 'Multi-Campus National' : branchLabel}`,
+        headers,
+        rows
+      );
+    }
+  };
 
   // New branch form state
   const [newBranchCode, setNewBranchCode] = useState('');
@@ -1563,6 +1633,702 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: MULTI-CAMPUS MASTER TIMETABLE & FACILITY ALLOCATOR */}
+      {/* ========================================================================= */}
+      {activeTab === 'timetable' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header & KPI Summary Cards */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                  <Calendar size={22} color="var(--crema-gold)" />
+                  <span>National Master Timetable & Multi-Campus Facility Allocator</span>
+                </h2>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Cross-campus scheduling engine with conflict protection for labs, trainers, and student cohorts across physical, online, and field classes.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Campus Filter Dropdown */}
+                <select
+                  value={timetableBranchFilter}
+                  onChange={(e) => setTimetableBranchFilter(e.target.value)}
+                  style={{
+                    padding: '7px 12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1.5px solid var(--crema-gold)',
+                    color: 'var(--crema-gold)',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                  title="Filter timetable by campus"
+                >
+                  <option value="ALL">🌐 All Campuses (National Master)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      🏛️ {b.name} ({b.city})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '7px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => setShowManageLabsModal(true)}
+                >
+                  <Beaker size={14} color="var(--crema-gold)" />
+                  <span>Configure Labs ({labs.length})</span>
+                </button>
+
+                <ExportActionsMenu
+                  onExportCSV={() => handleExportSuperAdminTimetable('csv')}
+                  onExportPDF={() => handleExportSuperAdminTimetable('pdf')}
+                  label="Export Timetable"
+                />
+
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '7px 14px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    setPresetDayForSchedule(undefined);
+                    setPresetBranchForSchedule(timetableBranchFilter !== 'ALL' ? timetableBranchFilter : branches[0]?.id);
+                    setShowScheduleLessonModal(true);
+                  }}
+                >
+                  <Calendar size={14} />
+                  <span>+ Schedule New Lesson</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick KPI Stat Tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              {/* Total Lessons */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(212, 154, 91, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crema-gold)' }}>
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>{filteredTimetableLessons.length}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {timetableBranchFilter === 'ALL' ? 'Total Scheduled Sessions' : 'Campus Scheduled Sessions'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Physical Labs */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <Beaker size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10B981' }}>
+                    {filteredTimetableLessons.filter((l) => (l.lesson_mode || 'physical_lab') === 'physical_lab').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>In-Person Lab Practicals</div>
+                </div>
+              </div>
+
+              {/* Virtual Lectures */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
+                  <Laptop size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38BDF8' }}>
+                    {filteredTimetableLessons.filter((l) => l.lesson_mode === 'virtual_theory').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Virtual Google Meet Classes</div>
+                </div>
+              </div>
+
+              {/* Field Trips */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EAB308' }}>
+                  <Compass size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#EAB308' }}>
+                    {filteredTimetableLessons.filter((l) => l.lesson_mode === 'field_trip').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Field & Farm Tours</div>
+                </div>
+              </div>
+
+              {/* Campus Lab Facilities */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--crema-gold)' }}>{labs.length}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Configured Labs</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 8px', fontSize: '0.70rem' }}
+                  onClick={() => setShowManageLabsModal(true)}
+                >
+                  Manage
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              {/* Format Pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Filter size={12} /> Format:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('all')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'all' ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'all' ? 'rgba(212, 154, 91, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'all' ? 'var(--crema-gold)' : 'var(--text-secondary)',
+                  }}
+                >
+                  All Formats ({lessons.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('physical_lab')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'physical_lab' ? '1px solid #10B981' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'physical_lab' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'physical_lab' ? '#10B981' : 'var(--text-secondary)',
+                  }}
+                >
+                  🔬 In-Person Labs ({lessons.filter((l) => (l.lesson_mode || 'physical_lab') === 'physical_lab').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('virtual_theory')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'virtual_theory' ? '1px solid #38BDF8' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'virtual_theory' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'virtual_theory' ? '#38BDF8' : 'var(--text-secondary)',
+                  }}
+                >
+                  💻 Online / Meet ({lessons.filter((l) => l.lesson_mode === 'virtual_theory').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('field_trip')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'field_trip' ? '1px solid #EAB308' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'field_trip' ? 'rgba(234, 179, 8, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'field_trip' ? '#EAB308' : 'var(--text-secondary)',
+                  }}
+                >
+                  🌿 Field Trips ({lessons.filter((l) => l.lesson_mode === 'field_trip').length})
+                </button>
+              </div>
+
+              {/* Lab & Trainer Dropdowns */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <select
+                  value={timetableLabFilter}
+                  onChange={(e) => setTimetableLabFilter(e.target.value)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.74rem',
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="all">🏢 All Labs & Venues</option>
+                  {Array.from(new Set([...labs.map((lb) => lb.name), ...lessons.map((l) => l.lab_location).filter(Boolean)])).map((labName) => (
+                    <option key={labName} value={labName}>
+                      {labName}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={timetableTrainerFilter}
+                  onChange={(e) => setTimetableTrainerFilter(e.target.value)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.74rem',
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="all">👨‍🏫 All Faculty Trainers</option>
+                  {profiles
+                    .filter((p) => p.role === 'instructor' || p.role === 'super_admin' || p.role === 'branch_manager')
+                    .map((trainer) => (
+                      <option key={trainer.id} value={trainer.id}>
+                        {trainer.full_name}
+                      </option>
+                    ))}
+                </select>
+
+                {(timetableModeFilter !== 'all' || timetableLabFilter !== 'all' || timetableTrainerFilter !== 'all' || timetableBranchFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimetableBranchFilter('ALL');
+                      setTimetableModeFilter('all');
+                      setTimetableLabFilter('all');
+                      setTimetableTrainerFilter('all');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--crema-gold)',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: '4px 6px',
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Weekly Days Grid (Monday - Saturday) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '32px' }}>
+            {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const).map((day) => {
+              const dayLessons = filteredTimetableLessons
+                .filter((l) => l.day_of_week === day)
+                .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+              return (
+                <div
+                  key={day}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  {/* Column Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderBottom: '1px solid var(--border-subtle)',
+                      paddingBottom: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--crema-gold)' }}>
+                        {day}
+                      </div>
+                      <span className="badge badge-secondary" style={{ fontSize: '0.68rem', fontWeight: 600 }}>
+                        {dayLessons.length} {dayLessons.length === 1 ? 'Class' : 'Classes'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.70rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => {
+                        setPresetDayForSchedule(day);
+                        setPresetBranchForSchedule(timetableBranchFilter !== 'ALL' ? timetableBranchFilter : branches[0]?.id);
+                        setShowScheduleLessonModal(true);
+                      }}
+                      title={`Schedule a lesson on ${day}`}
+                    >
+                      <Plus size={11} />
+                      <span>Add</span>
+                    </button>
+                  </div>
+
+                  {/* Lessons List */}
+                  {dayLessons.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '36px 16px',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        border: '1px dashed var(--border-medium)',
+                        borderRadius: 'var(--radius-sm)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <Clock size={20} style={{ opacity: 0.4 }} />
+                      <div style={{ fontSize: '0.78rem' }}>No lessons scheduled for {day}</div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '3px 10px', fontSize: '0.70rem', marginTop: '4px' }}
+                        onClick={() => {
+                          setPresetDayForSchedule(day);
+                          setPresetBranchForSchedule(timetableBranchFilter !== 'ALL' ? timetableBranchFilter : branches[0]?.id);
+                          setShowScheduleLessonModal(true);
+                        }}
+                      >
+                        + Schedule on {day}
+                      </button>
+                    </div>
+                  ) : (
+                    dayLessons.map((les) => {
+                      const bObj = branches.find((b) => b.id === les.branch_id);
+                      const trainer = profiles.find((p) => p.id === les.instructor_id);
+                      const cohort = cohorts.find((c) => c.id === les.cohort_id);
+                      const course = courses.find((c) => c.id === les.course_id);
+                      const mode = les.lesson_mode || 'physical_lab';
+
+                      // Compute duration string (e.g., 2h, 1.5h)
+                      let durationLabel = '';
+                      if (les.start_time && les.end_time) {
+                        const [sh, sm] = les.start_time.split(':').map(Number);
+                        const [eh, em] = les.end_time.split(':').map(Number);
+                        const diffMin = (eh * 60 + em) - (sh * 60 + sm);
+                        if (diffMin > 0) {
+                          const hrs = diffMin / 60;
+                          durationLabel = hrs % 1 === 0 ? `${hrs}h` : `${hrs.toFixed(1)}h`;
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={les.id}
+                          style={{
+                            background: 'var(--bg-surface-elevated)',
+                            border: mode === 'virtual_theory'
+                              ? '1px solid rgba(56, 189, 248, 0.35)'
+                              : mode === 'field_trip'
+                              ? '1px solid rgba(234, 179, 8, 0.35)'
+                              : '1px solid var(--border-medium)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            position: 'relative',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {/* Timing, Delivery Mode & Campus Badge */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span
+                                style={{
+                                  fontFamily: 'var(--font-mono)',
+                                  fontWeight: 700,
+                                  fontSize: '0.78rem',
+                                  color: '#6EE7B7',
+                                  background: 'rgba(110, 231, 183, 0.12)',
+                                  padding: '2px 7px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <Clock size={11} />
+                                {les.start_time} - {les.end_time}
+                                {durationLabel && (
+                                  <span style={{ opacity: 0.75, fontSize: '0.68rem', marginLeft: '2px' }}>
+                                    ({durationLabel})
+                                  </span>
+                                )}
+                              </span>
+
+                              {/* Campus Tag */}
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: 'var(--crema-gold)',
+                                  background: 'rgba(212, 154, 91, 0.12)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(212, 154, 91, 0.25)',
+                                }}
+                              >
+                                🏛️ {bObj?.name || 'All Campuses / HQ'}
+                              </span>
+                            </div>
+
+                            {mode === 'physical_lab' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#10B981',
+                                  background: 'rgba(16, 185, 129, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Beaker size={10} /> In-Person Lab
+                              </span>
+                            )}
+                            {mode === 'virtual_theory' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#38BDF8',
+                                  background: 'rgba(56, 189, 248, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Laptop size={10} /> Online Virtual
+                              </span>
+                            )}
+                            {mode === 'field_trip' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#EAB308',
+                                  background: 'rgba(234, 179, 8, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Compass size={10} /> Field Trip
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Course / Topic Title */}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                              {course?.title || les.topic_title}
+                            </div>
+                            {les.topic_title && les.topic_title !== course?.title && (
+                              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {les.topic_title}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Cohort Name & Intake Details */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.74rem', color: 'var(--crema-gold-light)', fontWeight: 600 }}>
+                              {cohort?.name || 'Assigned Cohort'}
+                            </span>
+                            {course?.category && (
+                              <span className="badge badge-gold" style={{ fontSize: '0.64rem', padding: '1px 5px' }}>
+                                {course.category}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Venue / Lab / Google Meet Block */}
+                          <div
+                            style={{
+                              background: 'rgba(0,0,0,0.22)',
+                              padding: '8px 10px',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '0.74rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '5px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Users size={12} color="var(--crema-gold)" style={{ flexShrink: 0 }} />
+                              <span>Trainer: <strong>{trainer?.full_name || 'Assigned Lead'}</strong></span>
+                            </div>
+
+                            {mode === 'physical_lab' && (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10B981', fontWeight: 600 }}>
+                                  <Beaker size={12} style={{ flexShrink: 0 }} />
+                                  <span>{les.lab_location || 'Espresso Lab 1'}</span>
+                                </div>
+                                {les.equipment_needed && (
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', paddingLeft: '18px' }}>
+                                    Tools: {les.equipment_needed}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {mode === 'virtual_theory' && (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginTop: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38BDF8' }}>
+                                  <Video size={12} style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.72rem' }}>Google Meet Live Classroom</span>
+                                </div>
+                                {les.google_meet_url && (
+                                  <a
+                                    href={les.google_meet_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      fontSize: '0.70rem',
+                                      color: '#38BDF8',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      textDecoration: 'none',
+                                      fontWeight: 600,
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                    }}
+                                  >
+                                    <span>Join</span>
+                                    <ExternalLink size={10} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            {mode === 'field_trip' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#EAB308', fontWeight: 600 }}>
+                                <MapPin size={12} style={{ flexShrink: 0 }} />
+                                <span>{les.lab_location || 'Coffee Farm / Estate Tour'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer Actions */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '4px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              📱 Auto Reminders Active
+                            </span>
+
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => {
+                                if (window.confirm(`Super Admin: Remove "${course?.title || les.topic_title}" at ${bObj?.name || 'Campus'} from ${les.day_of_week}'s schedule?`)) {
+                                  deleteLesson(les.id);
+                                }
+                              }}
+                              title="Delete session from master timetable"
+                            >
+                              <Trash2 size={10} />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB: EXAM & MARKS LEDGER */}
       {/* ========================================================================= */}
       {activeTab === 'grades' && (
@@ -2480,6 +3246,26 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           onClose={() => setSelectedAlumniForEdit(null)}
           onUpdate={updateAlumni}
           onDelete={deleteAlumni}
+        />
+      )}
+
+      {/* Schedule Lesson Modal for Super Admin */}
+      {showScheduleLessonModal && (
+        <ScheduleLessonModal
+          branchId={presetBranchForSchedule || (timetableBranchFilter !== 'ALL' ? timetableBranchFilter : branches[0]?.id || '')}
+          initialDay={presetDayForSchedule}
+          onClose={() => {
+            setShowScheduleLessonModal(false);
+            setPresetDayForSchedule(undefined);
+            setPresetBranchForSchedule(undefined);
+          }}
+        />
+      )}
+
+      {/* Manage Labs & Venues Modal */}
+      {showManageLabsModal && (
+        <ManageLabsModal
+          onClose={() => setShowManageLabsModal(false)}
         />
       )}
     </div>

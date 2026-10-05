@@ -3187,11 +3187,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (created.email && !created.email.includes('.local')) {
       const branchObj = branches.find((b) => b.id === created.branch_id);
       const branchName = branchObj?.name || 'Aurevia Coffee Institute';
+      const roleTitle = created.role === 'branch_manager'
+        ? 'Campus Branch Manager'
+        : created.role === 'super_admin'
+        ? 'Super Administrator'
+        : (created.job_title || created.specialty || 'Faculty Instructor');
+
       const html = generateStaffWelcomeEmailHtml({
         staffName: created.full_name,
         staffId: created.staff_id || created.reg_number || 'Staff',
-        role: created.role === 'branch_manager' ? 'Branch Manager' : (created.specialty || 'Instructor'),
-        department: created.department,
+        role: roleTitle,
+        department: created.department || (created.role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
         branchName,
         temporaryPassword: staffDefaultPwd,
         portalUrl: PRODUCTION_PORTAL_URL,
@@ -3199,17 +3205,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       sendResendEmail({
         to: created.email,
-        subject: `Welcome to Aurevia Specialty Coffee Academy - Your Faculty Credentials (${created.staff_id || created.reg_number})`,
+        subject: `Welcome to Aurevia Specialty Coffee Academy - Your Portal Credentials (${created.staff_id || created.reg_number})`,
         html,
       }).catch((err) => console.warn('Staff welcome email dispatch note:', err));
     }
 
     // Dispatch SMS notification with credentials to staff member's phone
     if (created.phone) {
+      const roleLabel = created.role === 'branch_manager'
+        ? 'Branch Manager'
+        : created.role === 'super_admin'
+        ? 'Super Admin'
+        : 'Faculty';
+
       sendInstitutionalSMS({
         recipientPhone: created.phone,
         recipientName: created.full_name,
-        message: `Welcome to Aurevia! Your faculty account is active. Staff ID: ${created.staff_id || created.reg_number}, Password: ${staffDefaultPwd}. Portal: sms.aureviacoffeeinstitute.co.ke`,
+        message: `Welcome to Aurevia! Your ${roleLabel} account is active. Staff ID: ${created.staff_id || created.reg_number}, Password: ${staffDefaultPwd}. Portal: sms.aureviacoffeeinstitute.co.ke`,
         purpose: 'general',
       }).catch(() => {});
     }

@@ -11,6 +11,8 @@ import { Profile } from '../../types/database.types';
 import { AddStaffModal } from '../modals/AddStaffModal';
 import { StudentKYCModal } from '../modals/StudentKYCModal';
 import { StaffPasswordModal } from '../modals/StaffPasswordModal';
+import { sendResendEmail } from '../../lib/resend';
+import { generateStaffWelcomeEmailHtml } from '../../lib/emailTemplates';
 
 interface PortalCredentialsManagerProps {
   isBranchManagerMode?: boolean;
@@ -33,6 +35,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'instructors' | 'students'>('instructors');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'branch_manager' | 'instructor' | 'super_admin'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCohortFilter, setSelectedCohortFilter] = useState('ALL');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState(
@@ -46,6 +49,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sendingSmsId, setSendingSmsId] = useState<string | null>(null);
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [isBulkSending, setIsBulkSending] = useState(false);
 
@@ -58,18 +62,22 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
         ? selectedBranchId
         : 'ALL';
 
-  // Instructors list
-  const instructorsList = profiles
-    .filter((p) => p.role === 'instructor')
+  // Staff & Faculty list (including branch managers, instructors, super admins)
+  const staffList = profiles
+    .filter((p) => p.role !== 'student')
+    .filter((p) => roleFilter === 'ALL' || p.role === roleFilter)
     .filter((p) => effectiveBranchId === 'ALL' || p.branch_id === effectiveBranchId)
     .filter((p) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
-        p.full_name.toLowerCase().includes(q) ||
+        p.full_name?.toLowerCase().includes(q) ||
         p.email?.toLowerCase().includes(q) ||
         p.staff_id?.toLowerCase().includes(q) ||
-        p.phone?.toLowerCase().includes(q)
+        p.phone?.toLowerCase().includes(q) ||
+        p.specialty?.toLowerCase().includes(q) ||
+        p.job_title?.toLowerCase().includes(q) ||
+        p.role?.toLowerCase().includes(q)
       );
     });
 
@@ -189,6 +197,51 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
       alert('Error sending SMS: ' + e.message);
     } finally {
       setSendingSmsId(null);
+    }
+  };
+
+  const handleSendSingleEmail = async (staff: Profile) => {
+    if (!staff.email || staff.email.includes('.local')) {
+      alert(`No valid email address found for ${staff.full_name}.`);
+      return;
+    }
+    const loginId = staff.staff_id || staff.email;
+    setSendingEmailId(loginId);
+    try {
+      const branchObj = branches.find((b) => b.id === staff.branch_id);
+      const branchName = branchObj?.name || 'Aurevia Coffee Institute';
+      const roleTitle = staff.role === 'branch_manager'
+        ? 'Campus Branch Manager'
+        : staff.role === 'super_admin'
+        ? 'Super Administrator'
+        : (staff.job_title || staff.specialty || 'Faculty Instructor');
+      const pass = getStaffPassword(staff);
+
+      const html = generateStaffWelcomeEmailHtml({
+        staffName: staff.full_name,
+        staffId: staff.staff_id || staff.reg_number || 'Staff',
+        role: roleTitle,
+        department: staff.department || (staff.role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
+        branchName,
+        temporaryPassword: pass,
+        portalUrl: PRODUCTION_PORTAL_URL,
+      });
+
+      const res = await sendResendEmail({
+        to: staff.email,
+        subject: `Aurevia Academy Portal Credentials - ${roleTitle} (${staff.staff_id || 'Staff'})`,
+        html,
+      });
+
+      if (res.success) {
+        showNotification(`Welcome credentials email sent to ${staff.full_name} (${staff.email})!`);
+      } else {
+        showNotification(`Email queued for ${staff.full_name} (${staff.email})`);
+      }
+    } catch (e: any) {
+      alert('Error sending email: ' + e.message);
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -317,7 +370,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
             }}
           >
             <Users size={14} />
-            <span>Teachers & Instructors ({instructorsList.length})</span>
+            <span>Staff & Management ({staffList.length})</span>
           </button>
           <button
             type="button"
@@ -347,7 +400,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder={`Search ${activeSubTab === 'instructors' ? 'teachers' : 'trainees'} by name, ID, email...`}
+              placeholder={`Search ${activeSubTab === 'instructors' ? 'staff & managers' : 'trainees'} by name, ID, email...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -377,26 +430,61 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
         </div>
       </div>
 
-      {/* TAB 1: TEACHERS & INSTRUCTORS */}
+      {/* TAB 1: TEACHERS & MANAGEMENT */}
       {activeSubTab === 'instructors' && (
         <div className="glass-card" style={{ padding: '20px' }}>
+          {/* Role Filter Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Role Filter:</span>
+            {[
+              { id: 'ALL', label: `All Staff (${profiles.filter((p) => p.role !== 'student').length})` },
+              { id: 'branch_manager', label: `👔 Campus Managers (${profiles.filter((p) => p.role === 'branch_manager').length})` },
+              { id: 'instructor', label: `👨‍🏫 Instructors (${profiles.filter((p) => p.role === 'instructor').length})` },
+              { id: 'super_admin', label: `🛡️ Super Admins (${profiles.filter((p) => p.role === 'super_admin').length})` },
+            ].map((pill) => (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setRoleFilter(pill.id as any)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: roleFilter === pill.id ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                  background: roleFilter === pill.id ? 'rgba(212, 154, 91, 0.18)' : 'transparent',
+                  color: roleFilter === pill.id ? 'var(--crema-gold)' : 'var(--text-secondary)',
+                }}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
+
           <div className="table-container" style={{ width: '100%', overflowX: 'auto' }}>
             <table className="data-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Teacher / Faculty Member</th>
+                  <th>Staff Member</th>
+                  <th>Role & Designation</th>
                   <th>Staff ID</th>
                   <th>Campus</th>
-                  <th>Designation / Specialty</th>
                   <th>Portal Password Status</th>
                   <th style={{ textAlign: 'right' }}>Portal Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {instructorsList.map((inst) => {
+                {staffList.map((inst) => {
                   const sBranch = branches.find((b) => b.id === inst.branch_id);
                   const loginId = inst.staff_id || inst.email;
                   const displayPass = getStaffPassword(inst);
+
+                  const roleBadge = inst.role === 'branch_manager'
+                    ? { label: 'Branch Manager', bg: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', border: 'rgba(59, 130, 246, 0.3)' }
+                    : inst.role === 'super_admin'
+                    ? { label: 'Super Admin', bg: 'rgba(168, 85, 247, 0.15)', color: '#C084FC', border: 'rgba(168, 85, 247, 0.3)' }
+                    : { label: 'Instructor', bg: 'rgba(16, 185, 129, 0.15)', color: '#34D399', border: 'rgba(16, 185, 129, 0.3)' };
 
                   return (
                     <tr key={inst.id}>
@@ -405,12 +493,33 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{inst.email} • {inst.phone}</div>
                       </td>
                       <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              background: roleBadge.bg,
+                              color: roleBadge.color,
+                              border: `1px solid ${roleBadge.border}`,
+                              width: 'fit-content',
+                            }}
+                          >
+                            {roleBadge.label}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            {inst.specialty || inst.job_title || 'Campus Staff'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--crema-gold)', fontWeight: 700 }}>
                           {inst.staff_id || 'STF-PENDING'}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.8rem' }}>{sBranch?.name || 'Aurevia Hub'}</td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{inst.specialty || 'Faculty Instructor'}</td>
+                      <td style={{ fontSize: '0.8rem' }}>{sBranch?.name || 'All Campuses / HQ'}</td>
                       <td>
                         {inst.password_changed ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#10B981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
@@ -426,7 +535,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                         )}
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             className="btn btn-secondary"
@@ -441,7 +550,19 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            onClick={() => handleSendSingleSms(inst.full_name, inst.phone || '', loginId, displayPass, 'instructor', inst.branch_id || '')}
+                            onClick={() => handleSendSingleEmail(inst)}
+                            disabled={sendingEmailId === loginId || !inst.email || inst.email.includes('.local')}
+                            style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Send Welcome Email with Credentials"
+                          >
+                            <Mail size={12} color="var(--crema-gold)" />
+                            <span>{sendingEmailId === loginId ? 'Sending...' : 'Email'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => handleSendSingleSms(inst.full_name, inst.phone || '', loginId, displayPass, inst.role, inst.branch_id || '')}
                             disabled={sendingSmsId === loginId || !inst.phone}
                             style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                             title="Send Portal Access SMS"
@@ -479,10 +600,10 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                   );
                 })}
 
-                {instructorsList.length === 0 && (
+                {staffList.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      No faculty instructors found matching this query.
+                      No staff or management members found matching this query.
                     </td>
                   </tr>
                 )}

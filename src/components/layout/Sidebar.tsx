@@ -40,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               { id: 'branches', label: 'Multi-Campus Hub', icon: Building2, count: branches.length },
               { id: 'courses', label: 'Academic Courses', icon: BookOpen },
               { id: 'cohorts', label: 'Active Cohorts', icon: Layers, count: cohorts.length },
+              { id: 'timetable', label: 'Master Timetable', icon: Calendar, count: lessons.length },
               { id: 'students', label: 'Students & Trainees', icon: GraduationCap, count: students.length },
               { id: 'alumni', label: 'Certified Alumni & Careers', icon: Award, count: alumni.length },
               { id: 'grades', label: 'Exam & Marks Ledger', icon: BookOpen, count: assessments.length },
