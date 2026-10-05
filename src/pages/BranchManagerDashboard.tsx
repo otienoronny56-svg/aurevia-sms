@@ -2363,11 +2363,11 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
               </div>
 
               <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Paybill Account Name</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Paybill Account Number</div>
                 <div style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', marginTop: '2px' }}>
                   {myBranch.paybill_account_name || (myBranch.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Students see this exact name</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Students see this exact account number</div>
               </div>
 
               <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
@@ -2379,6 +2379,12 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                   A/C: {myBranch.bank_account_number || '1289456780'}
                 </div>
               </div>
+            </div>
+
+            {/* Trainee View Preview */}
+            <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(0, 166, 81, 0.06)', borderRadius: '6px', border: '1px solid rgba(0, 166, 81, 0.15)', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+              <span style={{ fontWeight: 700, color: '#4ADE80' }}>Live Trainee Instruction: </span>
+              {myBranch.payment_instructions || `Pay via Paybill ${myBranch.paybill_number || '174379'} and Account Number ${myBranch.paybill_account_name || (myBranch.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}, then paste your M-Pesa message in your trainee portal.`}
             </div>
           </div>
 

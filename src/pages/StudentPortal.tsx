@@ -79,6 +79,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     country: 'Kenya',
     phone: '+254 711 234 567',
     email: 'info@aureviacoffeeinstitute.co.ke',
+    paybill_number: '174379',
+    paybill_account_name: 'AUREVIA-NBO',
+    payment_instructions: 'Pay via Paybill 174379 and Account Number AUREVIA-NBO, then paste your M-Pesa message in your trainee portal.',
     is_active: true,
   };
 
@@ -149,7 +152,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   );
 
   const profile = currentProfile?.role === 'student' ? currentProfile : (student?.profile || currentProfile);
-  const myBranch = branches.find((b) => b.id === student?.branch_id) || branches.find((b) => b.id === currentProfile?.branch_id) || fallbackBranch;
+  const myBranch =
+    branches.find((b) => b.id === student?.branch_id) ||
+    branches.find((b) => b.id === currentProfile?.branch_id) ||
+    branches[0] ||
+    fallbackBranch;
 
   // Enrollments strictly scoped to this student
   const myEnrollment = enrollments.find((e) => e.student_id === student?.id) || (isSuperAdminPreview ? (enrollments[0] || fallbackEnrollment) : undefined);
@@ -1798,7 +1805,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                       Campus Fee Payment & M-Pesa Confirmation
                     </h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '3px 0 0 0' }}>
-                      Paybill: <strong>{myBranch?.paybill_number || '174379'}</strong> • Account: <strong style={{ color: 'var(--crema-gold)' }}>{myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}</strong> • {myBranch?.name}
+                      Paybill: <strong>{myBranch?.paybill_number || '174379'}</strong> • Account No: <strong style={{ color: 'var(--crema-gold)' }}>{myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}</strong> • {myBranch?.name}
                     </p>
                   </div>
                 </div>
@@ -1880,9 +1887,25 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               </h3>
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-              Pay via your Safaricom M-Pesa SIM menu using the campus credentials below. Then paste your confirmation SMS to have your tuition balance credited.
-            </p>
+            {/* Dynamic Real-Time Trainee Instructions */}
+            <div
+              style={{
+                padding: '12px 14px',
+                background: 'rgba(0, 166, 81, 0.08)',
+                border: '1px solid rgba(0, 166, 81, 0.25)',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+              }}
+            >
+              <Smartphone size={18} color="#4ADE80" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {myBranch?.payment_instructions ||
+                  `Pay via Paybill ${myBranch?.paybill_number || '174379'} and Account Number ${myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}, then paste your M-Pesa message in your trainee portal.`}
+              </div>
+            </div>
 
             <div
               style={{
@@ -1928,7 +1951,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   padding: '14px',
                 }}
               >
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Campus Account Name</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Campus Account Number</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                   <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
                     {myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}
@@ -1938,13 +1961,13 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     className="btn btn-secondary"
                     onClick={() => handleCopy(myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ'), 'account')}
                     style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
-                    title="Copy Account Reference"
+                    title="Copy Account Number"
                   >
                     {copiedKey === 'account' ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
                     <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use this exact campus account name</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use this exact campus account number</div>
               </div>
             </div>
           </div>

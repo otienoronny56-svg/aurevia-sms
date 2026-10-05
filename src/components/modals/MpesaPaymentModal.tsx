@@ -79,7 +79,11 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
   const student = students.find((s) => s.id === activeInvoice?.student_id);
   const profile = profiles.find((p) => p.id === student?.profile_id);
-  const branch = branches.find((b) => b.id === activeInvoice?.branch_id);
+  const branch =
+    branches.find((b) => b.id === activeInvoice?.branch_id) ||
+    branches.find((b) => b.id === currentProfile?.branch_id) ||
+    branches.find((b) => b.id === student?.branch_id) ||
+    branches[0];
   const enrollment = enrollments.find((e) => e.student_id === student?.id);
   const cohort = cohorts.find((c) => c.id === enrollment?.cohort_id);
   const course = courses.find((c) => c.id === cohort?.course_id);
@@ -507,7 +511,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                   </div>
 
                   <div style={{ background: 'var(--bg-surface-elevated)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Account Name</div>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Account Number</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
                       <span style={{ fontSize: '0.92rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
                         {campusAccount}
@@ -523,6 +527,12 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Dynamic Real-Time Trainee Instructions */}
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.45, borderTop: '1px solid rgba(0, 166, 81, 0.2)', paddingTop: '8px' }}>
+                  {branch?.payment_instructions ||
+                    `Pay via Paybill ${campusPaybill} and Account Number ${campusAccount}, then paste your M-Pesa message in your trainee portal.`}
                 </div>
               </div>
 

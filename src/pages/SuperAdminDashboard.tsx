@@ -2885,7 +2885,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         </div>
                       </div>
                       <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '6px 10px', borderRadius: '6px' }}>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Paybill Account Name</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Paybill Account Number</div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
                           {b.paybill_account_name || (b.code ? `AUREVIA-${b.code}` : 'AUREVIA-HQ')}
                         </div>

@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../lib/store';
 import {
-  Building2,
-  CreditCard,
   Smartphone,
+  CreditCard,
   Save,
   X,
   CheckCircle2,
   AlertCircle,
   HelpCircle,
-  ShieldCheck,
-  Landmark,
+  RotateCcw,
 } from 'lucide-react';
 
 interface ConfigureBranchPaybillModalProps {
@@ -27,18 +25,44 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
   const { branches, updateBranchPaymentConfig } = useApp();
   const branch = branches.find((b) => b.id === branchId) || branches[0];
 
-  const [paybillNumber, setPaybillNumber] = useState(branch?.paybill_number || '174379');
-  const [paybillAccountName, setPaybillAccountName] = useState(branch?.paybill_account_name || (branch?.code ? `AUREVIA-${branch.code}` : 'AUREVIA-HQ'));
-  const [bankName, setBankName] = useState(branch?.bank_name || 'KCB Bank Kenya');
-  const [bankAccountNumber, setBankAccountNumber] = useState(branch?.bank_account_number || '1289456780');
+  const initialPaybill = branch?.paybill_number || '174379';
+  const initialAccount = branch?.paybill_account_name || (branch?.code ? `AUREVIA-${branch.code}` : 'AUREVIA-HQ');
+
+  const getDefaultInstructions = (pb: string, acc: string) =>
+    `Pay via Paybill ${pb} and Account Number ${acc}, then paste your M-Pesa message in your trainee portal.`;
+
+  const [paybillNumber, setPaybillNumber] = useState(initialPaybill);
+  const [paybillAccountNumber, setPaybillAccountNumber] = useState(initialAccount);
+  const [isCustomDirty, setIsCustomDirty] = useState(false);
   const [paymentInstructions, setPaymentInstructions] = useState(
-    branch?.payment_instructions ||
-      `Pay via Safaricom M-Pesa Paybill ${branch?.paybill_number || '174379'} using Account Name ${branch?.paybill_account_name || 'AUREVIA'}. Paste your confirmation SMS in your trainee portal for automatic bursar reconciliation.`
+    branch?.payment_instructions || getDefaultInstructions(initialPaybill, initialAccount)
   );
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // When paybill number changes, auto-sync instructions if user hasn't customized
+  const handlePaybillChange = (val: string) => {
+    setPaybillNumber(val);
+    if (!isCustomDirty) {
+      setPaymentInstructions(getDefaultInstructions(val, paybillAccountNumber));
+    }
+  };
+
+  // When account number changes, auto-sync instructions if user hasn't customized
+  const handleAccountChange = (val: string) => {
+    const upper = val.toUpperCase();
+    setPaybillAccountNumber(upper);
+    if (!isCustomDirty) {
+      setPaymentInstructions(getDefaultInstructions(paybillNumber, upper));
+    }
+  };
+
+  const handleResetInstructions = () => {
+    setIsCustomDirty(false);
+    setPaymentInstructions(getDefaultInstructions(paybillNumber, paybillAccountNumber));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,8 +72,8 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
       setErrorMessage('Please provide a valid Safaricom M-Pesa Paybill Number.');
       return;
     }
-    if (!paybillAccountName.trim()) {
-      setErrorMessage('Please provide the Paybill Account Name that students must use.');
+    if (!paybillAccountNumber.trim()) {
+      setErrorMessage('Please provide the M-Pesa Account Number that trainees must use.');
       return;
     }
 
@@ -58,17 +82,15 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
     try {
       await updateBranchPaymentConfig(branch.id, {
         paybill_number: paybillNumber.trim(),
-        paybill_account_name: paybillAccountName.trim(),
-        bank_name: bankName.trim(),
-        bank_account_number: bankAccountNumber.trim(),
+        paybill_account_name: paybillAccountNumber.trim(),
         payment_instructions: paymentInstructions.trim(),
       });
 
-      setSuccessMessage('Campus Paybill & Banking configuration saved securely.');
+      setSuccessMessage('Paybill and Account Number published in real time.');
       setTimeout(() => {
         if (onSuccess) onSuccess();
         onClose();
-      }, 1000);
+      }, 700);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to save campus paybill configuration.');
     } finally {
@@ -94,7 +116,7 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: '560px',
+          maxWidth: '520px',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
@@ -121,7 +143,7 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
+                background: '#00A651',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -132,10 +154,10 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
             </div>
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
-                Configure Campus Paybill & Bank Accounts
+                Configure Campus M-Pesa Paybill
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                {branch?.name || 'Selected Campus'} • Live Student Dashboard Sync
+                {branch?.name || 'Selected Campus'} • Live Trainee Portal Sync
               </p>
             </div>
           </div>
@@ -156,30 +178,6 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
-          {/* Security Notice */}
-          <div
-            style={{
-              padding: '12px 14px',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              fontSize: '0.78rem',
-              lineHeight: 1.5,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '10px',
-            }}
-          >
-            <ShieldCheck size={18} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <strong style={{ color: '#10B981' }}>Secure Backend Verification</strong>
-              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
-                These banking credentials are saved in PostgreSQL with Row-Level Security. All trainees enrolled at <strong>{branch?.name}</strong> will see this exact Paybill and Account Name in their trainee portal.
-              </div>
-            </div>
-          </div>
-
           {errorMessage && (
             <div
               style={{
@@ -220,99 +218,103 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
             </div>
           )}
 
-          {/* Paybill Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+          {/* Paybill Number and Account Number */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Smartphone size={14} color="#00A651" />
-                Safaricom Paybill Number
+                Paybill Number
               </label>
               <input
                 type="text"
                 className="form-input"
                 value={paybillNumber}
-                onChange={(e) => setPaybillNumber(e.target.value)}
-                placeholder="e.g. 174379 or 522522"
+                onChange={(e) => handlePaybillChange(e.target.value)}
+                placeholder="e.g. 174379"
                 required
-                style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem' }}
               />
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Business Shortcode for M-Pesa payments.
+                Safaricom Business Number
               </span>
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <CreditCard size={14} color="var(--crema-gold)" />
-                Campus Paybill Account Name
+                Account Number
               </label>
               <input
                 type="text"
                 className="form-input"
-                value={paybillAccountName}
-                onChange={(e) => setPaybillAccountName(e.target.value.toUpperCase())}
+                value={paybillAccountNumber}
+                onChange={(e) => handleAccountChange(e.target.value)}
                 placeholder="e.g. AUREVIA-NBO"
                 required
-                style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.95rem' }}
               />
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Account string shown on student screens.
+                Account reference for trainees
               </span>
             </div>
           </div>
 
-          {/* Bank Wire Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Landmark size={14} color="#3B82F6" />
-                Bank Name
-              </label>
-              <input
-                type="text"
-                className="form-input"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="e.g. KCB Bank Kenya"
-              />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Bank institution for EFT / Wire / Cheques.
-              </span>
-            </div>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CreditCard size={14} color="#3B82F6" />
-                Bank Account Number
-              </label>
-              <input
-                type="text"
-                className="form-input"
-                value={bankAccountNumber}
-                onChange={(e) => setBankAccountNumber(e.target.value)}
-                placeholder="e.g. 1289456780"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Official branch bank account number.
-              </span>
-            </div>
-          </div>
-
-          {/* Student Guidance / Instructions */}
+          {/* Custom Trainee Instructions */}
           <div className="form-group" style={{ marginBottom: '16px' }}>
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <HelpCircle size={14} color="var(--crema-gold)" />
-              Custom Instructions Shown to Trainees
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                <HelpCircle size={14} color="var(--crema-gold)" />
+                Custom Instructions Shown to Trainees
+              </label>
+              <button
+                type="button"
+                onClick={handleResetInstructions}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--crema-gold)',
+                  fontSize: '0.72rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                }}
+                title="Reset to real-time Paybill & Account Number format"
+              >
+                <RotateCcw size={12} />
+                <span>Auto-sync text</span>
+              </button>
+            </div>
             <textarea
               className="form-input"
               rows={3}
               value={paymentInstructions}
-              onChange={(e) => setPaymentInstructions(e.target.value)}
-              placeholder="Instructions displayed to students before and after paying fees..."
-              style={{ fontSize: '0.78rem', lineHeight: 1.4 }}
+              onChange={(e) => {
+                setIsCustomDirty(true);
+                setPaymentInstructions(e.target.value);
+              }}
+              placeholder="e.g. Pay via Paybill 174379 and Account Number AUREVIA-NBO, then paste your M-Pesa message in your trainee portal."
+              style={{ fontSize: '0.82rem', lineHeight: 1.45 }}
             />
+          </div>
+
+          {/* Real-time Trainee View Preview */}
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              background: 'rgba(0, 166, 81, 0.06)',
+              border: '1px solid rgba(0, 166, 81, 0.2)',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4ADE80', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+              Live Trainee Screen Preview
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, fontStyle: 'italic' }}>
+              "{paymentInstructions}"
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -344,10 +346,13 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
+                background: '#00A651',
+                borderColor: '#00A651',
+                color: '#fff',
               }}
             >
               <Save size={16} />
-              <span>{isSaving ? 'Saving...' : 'Save & Publish to Students'}</span>
+              <span>{isSaving ? 'Saving...' : 'Save & Publish in Real Time'}</span>
             </button>
           </div>
         </form>

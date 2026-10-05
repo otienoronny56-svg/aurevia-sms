@@ -691,11 +691,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         const liveBranches = (bRes.data && bRes.data.length > 0)
-          ? bRes.data.map((b: any, idx: number) =>
-              idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
-                ? { ...b, name: 'Aurevia Coffee Institute' }
-                : b
-            )
+          ? bRes.data.map((b: any, idx: number) => {
+              const localMatch = (localBranches || []).find((lb) => lb.id === b.id);
+              const base =
+                idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
+                  ? { ...b, name: 'Aurevia Coffee Institute' }
+                  : b;
+              return {
+                ...base,
+                paybill_number: b.paybill_number || localMatch?.paybill_number,
+                paybill_account_name: b.paybill_account_name || localMatch?.paybill_account_name,
+                bank_name: b.bank_name || localMatch?.bank_name,
+                bank_account_number: b.bank_account_number || localMatch?.bank_account_number,
+                payment_instructions: b.payment_instructions || localMatch?.payment_instructions,
+              };
+            })
           : (localBranches || INITIAL_BRANCHES);
         setBranches(liveBranches);
 
