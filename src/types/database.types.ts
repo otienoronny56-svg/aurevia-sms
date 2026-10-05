@@ -56,6 +56,17 @@ export interface Course {
 
 export type LessonMode = 'physical_lab' | 'virtual_theory' | 'field_trip';
 
+export interface LabVenue {
+  id: string;
+  name: string;
+  code: string;
+  branch_id?: string;
+  capacity?: number;
+  equipment_summary?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface TimetableLesson {
   id: string;
   branch_id: string;

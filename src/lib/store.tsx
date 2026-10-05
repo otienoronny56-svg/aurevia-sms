@@ -17,6 +17,7 @@ import {
   Alumni,
   UserRole,
   LiveClassSession,
+  LabVenue,
 } from '../types/database.types';
 import {
   INITIAL_BRANCHES,
@@ -34,6 +35,7 @@ import {
   INITIAL_SMS_LOGS,
   INITIAL_LESSONS,
   INITIAL_LIVE_SESSIONS,
+  INITIAL_LABS,
 } from './mockData';
 import { INITIAL_ALUMNI } from './alumniData';
 import { createClient } from '@supabase/supabase-js';
@@ -129,12 +131,16 @@ interface AppContextType {
   leaveRequests: LeaveRequest[];
   smsLogs: SMSLog[];
   lessons: TimetableLesson[];
+  labs: LabVenue[];
   alumni: Alumni[];
   liveSessions: LiveClassSession[];
 
   // Mutations
   createLesson: (lesson: Partial<TimetableLesson>) => Promise<TimetableLesson>;
+  updateLesson: (lessonId: string, updates: Partial<TimetableLesson>) => Promise<void>;
   deleteLesson: (lessonId: string) => Promise<void>;
+  createLab: (lab: Partial<LabVenue>) => Promise<LabVenue>;
+  deleteLab: (labId: string) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
   graduateStudent: (enrollmentId: string) => Promise<void>;
   updateAlumni: (alumniId: string, updates: Partial<Alumni>) => Promise<void>;
@@ -510,6 +516,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_LESSONS;
   });
 
+  const [labs, setLabs] = useState<LabVenue[]>(() => {
+    const saved = localStorage.getItem('aur_labs');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+    return INITIAL_LABS;
+  });
+
   const [alumni, setAlumni] = useState<Alumni[]>(() => {
     const saved = localStorage.getItem('aur_alumni');
     if (saved) {
@@ -547,6 +564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('aur_leave_requests', JSON.stringify(leaveRequests)); }, [leaveRequests]);
   useEffect(() => { localStorage.setItem('aur_sms_logs', JSON.stringify(smsLogs)); }, [smsLogs]);
   useEffect(() => { localStorage.setItem('aur_lessons', JSON.stringify(lessons)); }, [lessons]);
+  useEffect(() => { localStorage.setItem('aur_labs', JSON.stringify(labs)); }, [labs]);
   useEffect(() => { localStorage.setItem('aur_alumni', JSON.stringify(alumni)); }, [alumni]);
   useEffect(() => { localStorage.setItem('aur_live_sessions', JSON.stringify(liveSessions)); }, [liveSessions]);
 
@@ -3496,8 +3514,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       topic_title: params.topic_title || 'Practical Lab Session',
       day_of_week: params.day_of_week || 'Monday',
       start_time: params.start_time || '08:30',
-      end_time: params.end_time || '12:30',
+      end_time: params.end_time || '10:30',
+      lesson_mode: params.lesson_mode || 'physical_lab',
       lab_location: params.lab_location || 'Espresso Lab 1',
+      equipment_needed: params.equipment_needed,
       google_meet_url: params.google_meet_url || 'https://meet.google.com/aur-class-live',
       sms_reminder_enabled: params.sms_reminder_enabled ?? true,
       is_recurring: params.is_recurring ?? true,
@@ -3528,8 +3548,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newLesson;
   };
 
+  const updateLesson = async (lessonId: string, updates: Partial<TimetableLesson>): Promise<void> => {
+    setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, ...updates } : l));
+  };
+
   const deleteLesson = async (lessonId: string): Promise<void> => {
     setLessons((prev) => prev.filter((l) => l.id !== lessonId));
+  };
+
+  // Campus Labs & Venues Mutations
+  const createLab = async (params: Partial<LabVenue>): Promise<LabVenue> => {
+    const newLab: LabVenue = {
+      id: 'lab-' + Date.now(),
+      name: params.name || 'New Facility',
+      code: params.code || `LAB-${Date.now().toString().slice(-4)}`,
+      branch_id: params.branch_id,
+      capacity: params.capacity || 12,
+      equipment_summary: params.equipment_summary || 'Standard Training Machinery',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    setLabs((prev) => [...prev, newLab]);
+    return newLab;
+  };
+
+  const deleteLab = async (labId: string): Promise<void> => {
+    setLabs((prev) => prev.filter((l) => l.id !== labId));
   };
 
   const sendBulkCommunication = async (params: {
@@ -3755,10 +3799,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         leaveRequests,
         smsLogs,
         lessons,
+        labs,
         alumni,
         liveSessions,
         createLesson,
+        updateLesson,
         deleteLesson,
+        createLab,
+        deleteLab,
         createBranch,
         updateBranch,
         deleteBranch,

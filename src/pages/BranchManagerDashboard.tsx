@@ -4,7 +4,8 @@ import {
   Users, DollarSign, BookOpen, Plus, Video,
   CheckCircle2, Clock, Calendar,
   ClipboardList, Check, UserCheck,
-  LogOut, User, Edit3, CalendarCheck, X, GraduationCap, RotateCcw
+  LogOut, User, Edit3, CalendarCheck, X, GraduationCap, RotateCcw,
+  Beaker, Compass, AlertTriangle, Filter, Trash2, ExternalLink, Sparkles, MapPin, Laptop
 } from 'lucide-react';
 import { StudentKYCModal } from '../components/modals/StudentKYCModal';
 import { MpesaPaymentModal } from '../components/modals/MpesaPaymentModal';
@@ -13,6 +14,7 @@ import { EditCohortModal } from '../components/modals/EditCohortModal';
 import { SignStaffAttendanceModal } from '../components/modals/SignStaffAttendanceModal';
 import { AddStaffModal } from '../components/modals/AddStaffModal';
 import { ScheduleLessonModal } from '../components/modals/ScheduleLessonModal';
+import { ManageLabsModal } from '../components/modals/ManageLabsModal';
 import { RecordStaffLeaveModal } from '../components/modals/RecordStaffLeaveModal';
 import { BranchRosterModal } from '../components/modals/BranchRosterModal';
 import { StudentDetailModal } from '../components/modals/StudentDetailModal';
@@ -22,7 +24,7 @@ import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManageme
 import { PortalCredentialsManager } from '../components/analytics/PortalCredentialsManager';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
-import { Invoice, Profile, Cohort, StudentKYC } from '../types/database.types';
+import { Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
 
 type ManagerTab =
   | 'overview'
@@ -66,6 +68,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     staffClockins,
     leaveRequests,
     lessons,
+    labs,
     deleteLesson,
     verifyStudentKYC,
     reviewLeaveRequest,
@@ -97,6 +100,27 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const branchStaff = profiles.filter((p) => (p.branch_id === myBranch?.id || !p.branch_id) && p.role !== 'student');
   const branchLeaves = leaveRequests.filter((l) => l.branch_id === myBranch?.id);
   const branchLessons = lessons.filter((l) => l.branch_id === myBranch?.id || !l.branch_id);
+
+  // Timetable State & Filters
+  const [timetableModeFilter, setTimetableModeFilter] = useState<'all' | LessonMode>('all');
+  const [timetableLabFilter, setTimetableLabFilter] = useState<string>('all');
+  const [timetableTrainerFilter, setTimetableTrainerFilter] = useState<string>('all');
+  const [presetDayForSchedule, setPresetDayForSchedule] = useState<TimetableLesson['day_of_week'] | undefined>(undefined);
+  const [showManageLabsModal, setShowManageLabsModal] = useState(false);
+
+  const filteredBranchLessons = branchLessons.filter((l) => {
+    if (timetableModeFilter !== 'all') {
+      const mode = l.lesson_mode || 'physical_lab';
+      if (mode !== timetableModeFilter) return false;
+    }
+    if (timetableLabFilter !== 'all') {
+      if (l.lab_location !== timetableLabFilter) return false;
+    }
+    if (timetableTrainerFilter !== 'all') {
+      if (l.instructor_id !== timetableTrainerFilter) return false;
+    }
+    return true;
+  });
 
   // Modals state
   const [showKYCModal, setShowKYCModal] = useState(false);
@@ -415,6 +439,38 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     }
   };
 
+  const handleExportTimetable = (format: 'csv' | 'pdf') => {
+    const headers = ['Day', 'Time', 'Delivery Mode', 'Course / Topic', 'Cohort', 'Trainer', 'Venue / Lab / URL'];
+    const rows = filteredBranchLessons.map((les) => {
+      const course = courses.find((c) => c.id === les.course_id);
+      const cohort = cohorts.find((c) => c.id === les.cohort_id);
+      const trainer = profiles.find((p) => p.id === les.instructor_id);
+      const modeLabel = les.lesson_mode === 'virtual_theory' ? 'Online / Virtual' : les.lesson_mode === 'field_trip' ? 'Field / Farm Trip' : 'In-Person Lab';
+      const loc = les.lesson_mode === 'virtual_theory' ? (les.google_meet_url || 'Virtual Class') : les.lab_location;
+      return [
+        les.day_of_week,
+        `${les.start_time} - ${les.end_time}`,
+        modeLabel,
+        course?.title || les.topic_title,
+        cohort?.name || 'Assigned Cohort',
+        trainer?.full_name || 'Assigned Trainer',
+        loc,
+      ];
+    });
+
+    if (format === 'csv') {
+      exportToCSV(`Campus_Timetable_${myBranch.code}`, headers, rows);
+    } else {
+      exportToPDFReport(
+        `Campus_Timetable_${myBranch.code}`,
+        `CAMPUS MASTER TIMETABLE & LAB SCHEDULE - ${myBranch.name.toUpperCase()}`,
+        `Weekly Laboratory, Classroom & Field Timetable • ${myBranch.name}`,
+        headers,
+        rows
+      );
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '28px 24px' }}>
       {/* Top Banner - Compact on Sub-Tabs */}
@@ -562,14 +618,30 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
             )}
             {activeTab === 'timetable' && (
               <>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => setShowManageLabsModal(true)}
+                  title="Configure physical lab rooms, workstations, and equipment"
+                >
+                  <Beaker size={13} color="var(--crema-gold)" />
+                  <span>Manage Campus Labs ({labs.length})</span>
+                </button>
                 <ExportActionsMenu
-                  onExportCSV={() => handleExportCohorts('csv')}
-                  onExportPDF={() => handleExportCohorts('pdf')}
+                  onExportCSV={() => handleExportTimetable('csv')}
+                  onExportPDF={() => handleExportTimetable('pdf')}
                   label="Export Timetable"
                 />
-                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.76rem' }} onClick={() => setShowScheduleLessonModal(true)}>
-                  <Calendar size={12} />
-                  <span>Schedule Class</span>
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '6px 12px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    setPresetDayForSchedule(undefined);
+                    setShowScheduleLessonModal(true);
+                  }}
+                >
+                  <Calendar size={13} />
+                  <span>+ Schedule Timetable Lesson</span>
                 </button>
               </>
             )}
@@ -1210,22 +1282,323 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       {/* TAB: TIMETABLE & LESSON SCHEDULER */}
       {/* ========================================================================= */}
       {activeTab === 'timetable' && (
-        <div>
-          {/* Header */}
-          <div style={{ marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={20} color="var(--crema-gold)" />
-              <span>Campus Weekly Timetable & Master Schedule</span>
-            </h2>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              Assign faculty trainers to lessons, allocate laboratory machine stations, and automate class reminders.
-            </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header & KPI Summary Cards */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                  <Calendar size={22} color="var(--crema-gold)" />
+                  <span>Campus Master Timetable & Facility Allocator</span>
+                </h2>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Smart scheduling engine with real-time clash protection for machine labs, trainers, and trainee cohorts across physical, online, and field lessons.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '7px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => setShowManageLabsModal(true)}
+                >
+                  <Beaker size={14} color="var(--crema-gold)" />
+                  <span>Configure Campus Labs ({labs.length})</span>
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '7px 14px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    setPresetDayForSchedule(undefined);
+                    setShowScheduleLessonModal(true);
+                  }}
+                >
+                  <Calendar size={14} />
+                  <span>+ Schedule New Lesson</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick KPI Stat Tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              {/* Total Lessons */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(212, 154, 91, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crema-gold)' }}>
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>{branchLessons.length}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Weekly Scheduled Classes</div>
+                </div>
+              </div>
+
+              {/* Physical Labs */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <Beaker size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10B981' }}>
+                    {branchLessons.filter((l) => (l.lesson_mode || 'physical_lab') === 'physical_lab').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>In-Person Lab Practicals</div>
+                </div>
+              </div>
+
+              {/* Virtual Lectures */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
+                  <Laptop size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38BDF8' }}>
+                    {branchLessons.filter((l) => l.lesson_mode === 'virtual_theory').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Virtual Google Meet Classes</div>
+                </div>
+              </div>
+
+              {/* Field Trips */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EAB308' }}>
+                  <Compass size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#EAB308' }}>
+                    {branchLessons.filter((l) => l.lesson_mode === 'field_trip').length}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Field & Farm Tours</div>
+                </div>
+              </div>
+
+              {/* Campus Lab Facilities */}
+              <div
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--crema-gold)' }}>{labs.length}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Configured Labs</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 8px', fontSize: '0.70rem' }}
+                  onClick={() => setShowManageLabsModal(true)}
+                >
+                  Manage
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              {/* Format Pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Filter size={12} /> Format:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('all')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'all' ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'all' ? 'rgba(212, 154, 91, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'all' ? 'var(--crema-gold)' : 'var(--text-secondary)',
+                  }}
+                >
+                  All Formats ({branchLessons.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('physical_lab')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'physical_lab' ? '1px solid #10B981' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'physical_lab' ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'physical_lab' ? '#10B981' : 'var(--text-secondary)',
+                  }}
+                >
+                  🔬 In-Person Labs ({branchLessons.filter((l) => (l.lesson_mode || 'physical_lab') === 'physical_lab').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('virtual_theory')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'virtual_theory' ? '1px solid #38BDF8' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'virtual_theory' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'virtual_theory' ? '#38BDF8' : 'var(--text-secondary)',
+                  }}
+                >
+                  💻 Online / Meet ({branchLessons.filter((l) => l.lesson_mode === 'virtual_theory').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimetableModeFilter('field_trip')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: timetableModeFilter === 'field_trip' ? '1px solid #EAB308' : '1px solid var(--border-subtle)',
+                    background: timetableModeFilter === 'field_trip' ? 'rgba(234, 179, 8, 0.15)' : 'transparent',
+                    color: timetableModeFilter === 'field_trip' ? '#EAB308' : 'var(--text-secondary)',
+                  }}
+                >
+                  🌿 Field Trips ({branchLessons.filter((l) => l.lesson_mode === 'field_trip').length})
+                </button>
+              </div>
+
+              {/* Lab & Trainer Dropdowns */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <select
+                  value={timetableLabFilter}
+                  onChange={(e) => setTimetableLabFilter(e.target.value)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.74rem',
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="all">🏢 All Labs & Venues</option>
+                  {Array.from(new Set([...labs.map((lb) => lb.name), ...branchLessons.map((l) => l.lab_location).filter(Boolean)])).map((labName) => (
+                    <option key={labName} value={labName}>
+                      {labName}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={timetableTrainerFilter}
+                  onChange={(e) => setTimetableTrainerFilter(e.target.value)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.74rem',
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="all">👨‍🏫 All Faculty Trainers</option>
+                  {profiles
+                    .filter((p) => p.role === 'instructor' || p.role === 'super_admin' || p.role === 'branch_manager')
+                    .map((trainer) => (
+                      <option key={trainer.id} value={trainer.id}>
+                        {trainer.full_name}
+                      </option>
+                    ))}
+                </select>
+
+                {(timetableModeFilter !== 'all' || timetableLabFilter !== 'all' || timetableTrainerFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimetableModeFilter('all');
+                      setTimetableLabFilter('all');
+                      setTimetableTrainerFilter('all');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--crema-gold)',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: '4px 6px',
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Weekly Days Grid */}
+          {/* Weekly Days Grid (Monday - Saturday) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '32px' }}>
             {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const).map((day) => {
-              const dayLessons = branchLessons.filter((l) => l.day_of_week === day);
+              const dayLessons = filteredBranchLessons
+                .filter((l) => l.day_of_week === day)
+                .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
               return (
                 <div
@@ -1240,49 +1613,109 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                     gap: '12px',
                   }}
                 >
+                  {/* Column Header */}
                   <div
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       borderBottom: '1px solid var(--border-subtle)',
-                      paddingBottom: '8px',
+                      paddingBottom: '10px',
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--crema-gold)' }}>
-                      {day}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--crema-gold)' }}>
+                        {day}
+                      </div>
+                      <span className="badge badge-secondary" style={{ fontSize: '0.68rem', fontWeight: 600 }}>
+                        {dayLessons.length} {dayLessons.length === 1 ? 'Class' : 'Classes'}
+                      </span>
                     </div>
-                    <span className="badge badge-secondary" style={{ fontSize: '0.68rem' }}>
-                      {dayLessons.length} {dayLessons.length === 1 ? 'Lesson' : 'Lessons'}
-                    </span>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.70rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => {
+                        setPresetDayForSchedule(day);
+                        setShowScheduleLessonModal(true);
+                      }}
+                      title={`Add a lesson on ${day}`}
+                    >
+                      <Plus size={11} />
+                      <span>Add</span>
+                    </button>
                   </div>
 
+                  {/* Lessons List */}
                   {dayLessons.length === 0 ? (
-                    <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                      No lessons scheduled.
+                    <div
+                      style={{
+                        padding: '36px 16px',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        border: '1px dashed var(--border-medium)',
+                        borderRadius: 'var(--radius-sm)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <Clock size={20} style={{ opacity: 0.4 }} />
+                      <div style={{ fontSize: '0.78rem' }}>No lessons scheduled for {day}</div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '3px 10px', fontSize: '0.70rem', marginTop: '4px' }}
+                        onClick={() => {
+                          setPresetDayForSchedule(day);
+                          setShowScheduleLessonModal(true);
+                        }}
+                      >
+                        + Schedule on {day}
+                      </button>
                     </div>
                   ) : (
                     dayLessons.map((les) => {
                       const trainer = profiles.find((p) => p.id === les.instructor_id);
                       const cohort = cohorts.find((c) => c.id === les.cohort_id);
                       const course = courses.find((c) => c.id === les.course_id);
+                      const mode = les.lesson_mode || 'physical_lab';
+
+                      // Compute duration string (e.g., 2h, 1.5h)
+                      let durationLabel = '';
+                      if (les.start_time && les.end_time) {
+                        const [sh, sm] = les.start_time.split(':').map(Number);
+                        const [eh, em] = les.end_time.split(':').map(Number);
+                        const diffMin = (eh * 60 + em) - (sh * 60 + sm);
+                        if (diffMin > 0) {
+                          const hrs = diffMin / 60;
+                          durationLabel = hrs % 1 === 0 ? `${hrs}h` : `${hrs.toFixed(1)}h`;
+                        }
+                      }
 
                       return (
                         <div
                           key={les.id}
                           style={{
                             background: 'var(--bg-surface-elevated)',
-                            border: '1px solid var(--border-medium)',
+                            border: mode === 'virtual_theory'
+                              ? '1px solid rgba(56, 189, 248, 0.35)'
+                              : mode === 'field_trip'
+                              ? '1px solid rgba(234, 179, 8, 0.35)'
+                              : '1px solid var(--border-medium)',
                             borderRadius: 'var(--radius-sm)',
                             padding: '12px',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '8px',
                             position: 'relative',
+                            transition: 'all 0.15s ease',
                           }}
                         >
-                          {/* Timing & Cohort Tag */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {/* Timing & Delivery Badge */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                             <span
                               style={{
                                 fontFamily: 'var(--font-mono)',
@@ -1290,89 +1723,188 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                                 fontSize: '0.78rem',
                                 color: '#6EE7B7',
                                 background: 'rgba(110, 231, 183, 0.12)',
-                                padding: '2px 6px',
+                                padding: '2px 7px',
                                 borderRadius: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
                               }}
                             >
-                              <Clock size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                              <Clock size={11} />
                               {les.start_time} - {les.end_time}
+                              {durationLabel && (
+                                <span style={{ opacity: 0.75, fontSize: '0.68rem', marginLeft: '2px' }}>
+                                  ({durationLabel})
+                                </span>
+                              )}
                             </span>
-                            <span className="badge badge-gold" style={{ fontSize: '0.65rem' }}>
-                              {course?.category || 'Barista'}
-                            </span>
+
+                            {mode === 'physical_lab' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#10B981',
+                                  background: 'rgba(16, 185, 129, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Beaker size={10} /> In-Person Lab
+                              </span>
+                            )}
+                            {mode === 'virtual_theory' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#38BDF8',
+                                  background: 'rgba(56, 189, 248, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Laptop size={10} /> Online Virtual
+                              </span>
+                            )}
+                            {mode === 'field_trip' && (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  color: '#EAB308',
+                                  background: 'rgba(234, 179, 8, 0.14)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Compass size={10} /> Field Trip
+                              </span>
+                            )}
                           </div>
 
-                          {/* Course Title */}
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                            {course?.title || les.topic_title}
+                          {/* Course / Topic Title */}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                              {course?.title || les.topic_title}
+                            </div>
+                            {les.topic_title && les.topic_title !== course?.title && (
+                              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {les.topic_title}
+                              </div>
+                            )}
                           </div>
 
-                          {/* Cohort Name & Fee */}
+                          {/* Cohort Name & Intake Details */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.74rem', color: 'var(--crema-gold-light)', fontWeight: 600 }}>
                               {cohort?.name || 'Assigned Cohort'}
                             </span>
-                            {course && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                • Fee: KES {(Number(course.fee_amount) || 0).toLocaleString()}
+                            {course?.category && (
+                              <span className="badge badge-gold" style={{ fontSize: '0.64rem', padding: '1px 5px' }}>
+                                {course.category}
                               </span>
                             )}
                           </div>
 
-                          {/* Trainer & Lab Room Info */}
+                          {/* Venue / Lab / Google Meet Block */}
                           <div
                             style={{
-                              background: 'rgba(0,0,0,0.25)',
+                              background: 'rgba(0,0,0,0.22)',
                               padding: '8px 10px',
                               borderRadius: 'var(--radius-sm)',
-                              fontSize: '0.75rem',
+                              fontSize: '0.74rem',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '4px',
+                              gap: '5px',
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <User size={12} color="var(--crema-gold)" />
+                              <User size={12} color="var(--crema-gold)" style={{ flexShrink: 0 }} />
                               <span>Trainer: <strong>{trainer?.full_name || 'Assigned Lead'}</strong></span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <BookOpen size={12} color="var(--crema-gold)" />
-                              <span style={{ color: 'var(--text-secondary)' }}>{les.lab_location}</span>
-                            </div>
+
+                            {mode === 'physical_lab' && (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10B981', fontWeight: 600 }}>
+                                  <Beaker size={12} style={{ flexShrink: 0 }} />
+                                  <span>{les.lab_location || 'Espresso Lab 1'}</span>
+                                </div>
+                                {les.equipment_needed && (
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', paddingLeft: '18px' }}>
+                                    Tools: {les.equipment_needed}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {mode === 'virtual_theory' && (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginTop: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38BDF8' }}>
+                                  <Video size={12} style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.72rem' }}>Google Meet Live Classroom</span>
+                                </div>
+                                {les.google_meet_url && (
+                                  <a
+                                    href={les.google_meet_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      fontSize: '0.70rem',
+                                      color: '#38BDF8',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      textDecoration: 'none',
+                                      fontWeight: 600,
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                    }}
+                                  >
+                                    <span>Join</span>
+                                    <ExternalLink size={10} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            {mode === 'field_trip' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#EAB308', fontWeight: 600 }}>
+                                <MapPin size={12} style={{ flexShrink: 0 }} />
+                                <span>{les.lab_location || 'Coffee Farm / Estate Tour'}</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Footer Actions */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                            {les.lesson_mode === 'virtual_theory' && les.google_meet_url ? (
-                              <a
-                                href={les.google_meet_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: 'var(--crema-gold)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  textDecoration: 'none',
-                                }}
-                              >
-                                <Video size={12} />
-                                <span>Meet Classroom</span>
-                              </a>
-                            ) : (
-                              <span style={{ fontSize: '0.72rem', color: '#6EE7B7', fontWeight: 600 }}>
-                                🔬 On-Campus Physical Lab
-                              </span>
-                            )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '4px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              📱 Auto Reminders Active
+                            </span>
 
                             <button
+                              type="button"
                               className="btn btn-danger"
-                              style={{ padding: '2px 6px', fontSize: '0.68rem' }}
-                              onClick={() => deleteLesson(les.id)}
-                              title="Delete from timetable"
+                              style={{ padding: '2px 8px', fontSize: '0.68rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => {
+                                if (window.confirm(`Remove "${course?.title || les.topic_title}" from ${les.day_of_week}'s schedule?`)) {
+                                  deleteLesson(les.id);
+                                }
+                              }}
+                              title="Delete session from timetable"
                             >
-                              Remove
+                              <Trash2 size={10} />
+                              <span>Remove</span>
                             </button>
                           </div>
                         </div>
@@ -1887,7 +2419,16 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       {showScheduleLessonModal && (
         <ScheduleLessonModal
           branchId={myBranch.id}
-          onClose={() => setShowScheduleLessonModal(false)}
+          initialDay={presetDayForSchedule}
+          onClose={() => {
+            setShowScheduleLessonModal(false);
+            setPresetDayForSchedule(undefined);
+          }}
+        />
+      )}
+      {showManageLabsModal && (
+        <ManageLabsModal
+          onClose={() => setShowManageLabsModal(false)}
         />
       )}
       {showRecordLeaveModal && (
