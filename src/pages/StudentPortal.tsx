@@ -1871,23 +1871,23 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             </div>
           )}
 
-          {/* Manual Paybill & Bank Wire Information Card */}
+          {/* Manual Paybill Information Card (M-Pesa Only) */}
           <div className="glass-card" style={{ padding: 'clamp(16px, 3vw, 24px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <Building2 size={18} color="var(--crema-gold)" />
+              <Smartphone size={18} color="#4ADE80" />
               <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
-                Campus M-Pesa Paybill & Bank Wire Credentials
+                Campus M-Pesa Paybill Credentials
               </h3>
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-              Pay via your M-Pesa SIM menu or Bank transfer using the campus credentials below. Then paste your confirmation SMS to have your tuition balance credited.
+              Pay via your Safaricom M-Pesa SIM menu using the campus credentials below. Then paste your confirmation SMS to have your tuition balance credited.
             </p>
 
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
                 gap: '12px',
               }}
             >
@@ -1945,34 +1945,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   </button>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use this exact campus account name</div>
-              </div>
-
-              {/* Bank Account Card */}
-              <div
-                style={{
-                  background: 'var(--bg-surface-elevated)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  padding: '14px',
-                }}
-              >
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Bank Deposit ({myBranch?.bank_name || 'KCB Bank'})</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                    {myBranch?.bank_account_number || '1289456780'}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => handleCopy(myBranch?.bank_account_number || '1289456780', 'bank')}
-                    style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
-                    title="Copy Bank Account"
-                  >
-                    {copiedKey === 'bank' ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
-                    <span>{copiedKey === 'bank' ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>{myBranch?.name}</div>
               </div>
             </div>
           </div>

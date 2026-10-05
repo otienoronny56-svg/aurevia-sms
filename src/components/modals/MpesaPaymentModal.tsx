@@ -139,6 +139,13 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
     }
   }, [selectedInvoiceId, presetAmount]);
 
+  // Ensure students never have bank_transfer or cash selected
+  React.useEffect(() => {
+    if (isStudent && (paymentMethod === 'bank_transfer' || paymentMethod === 'cash')) {
+      setPaymentMethod('paste_sms');
+    }
+  }, [isStudent, paymentMethod]);
+
   const [step, setStep] = useState<'form' | 'pushing' | 'prompted' | 'success'>('form');
   const [errorMessage, setErrorMessage] = useState('');
   const [createdPayment, setCreatedPayment] = useState<Payment | null>(null);
@@ -408,7 +415,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
             <div>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>
                 {isStudent
-                  ? (paymentMethod === 'mpesa' ? 'Pay Tuition with M-Pesa' : 'Bank Deposit & Paybill Details')
+                  ? (paymentMethod === 'mpesa' ? 'Pay Tuition with M-Pesa' : 'Campus M-Pesa Fee Payment')
                   : (paymentMethod === 'mpesa' ? 'M-Pesa STK Collection' : paymentMethod === 'cash' ? 'Record Cash Receipt' : 'Record Bank Wire / EFT')}
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
@@ -522,7 +529,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
               {/* PAYMENT METHOD SELECTOR TABS */}
               <div style={{ marginBottom: '18px' }}>
                 <label className="form-label">Payment Channel</label>
-                <div style={{ display: 'grid', gridTemplateColumns: isStudent ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isStudent ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '8px' }}>
                   {/* Tab 1: Paste SMS (Default) */}
                   <button
                     type="button"
@@ -571,29 +578,31 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     <span>STK Push (Soon)</span>
                   </button>
 
-                  {/* Tab 3: Bank Transfer */}
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('bank_transfer')}
-                    style={{
-                      padding: '10px 6px',
-                      borderRadius: '8px',
-                      border: paymentMethod === 'bank_transfer' ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
-                      background: paymentMethod === 'bank_transfer' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-surface-elevated)',
-                      color: paymentMethod === 'bank_transfer' ? '#60A5FA' : 'var(--text-secondary)',
-                      fontWeight: 600,
-                      fontSize: '0.74rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Building2 size={18} />
-                    <span>Bank Wire / EFT</span>
-                  </button>
+                  {/* Tab 3: Bank Transfer (Staff & Admin Only) */}
+                  {!isStudent && (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('bank_transfer')}
+                      style={{
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                        border: paymentMethod === 'bank_transfer' ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
+                        background: paymentMethod === 'bank_transfer' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-surface-elevated)',
+                        color: paymentMethod === 'bank_transfer' ? '#60A5FA' : 'var(--text-secondary)',
+                        fontWeight: 600,
+                        fontSize: '0.74rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <Building2 size={18} />
+                      <span>Bank Wire / EFT</span>
+                    </button>
+                  )}
 
                   {!isStudent && (
                     <button
@@ -808,7 +817,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                       <div><strong>Account No:</strong> {campusBankAccount}</div>
                     </div>
                     <p style={{ margin: '8px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      After transferring funds, enter your bank deposit reference below so the bursar can reconcile your receipt.
+                      Confirm funds on campus bank statement, then enter the student's deposit slip number or wire reference to credit tuition balance.
                     </p>
                   </div>
                   <div className="form-group">
