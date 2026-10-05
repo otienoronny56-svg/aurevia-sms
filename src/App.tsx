@@ -10,7 +10,7 @@ import { StudentPortal } from './pages/StudentPortal';
 import { PublicReceiptView } from './pages/PublicReceiptView';
 import { DomainGatekeeperPage } from './pages/DomainGatekeeperPage';
 import { SqlMigrationModal } from './components/modals/SqlMigrationModal';
-import { isPortalMode } from './lib/domainConfig';
+import { isPortalMode, isRoleAllowedOnCurrentDomain } from './lib/domainConfig';
 import { Coffee, ShieldCheck, ExternalLink } from 'lucide-react';
 
 const DashboardRouter: React.FC = () => {
@@ -230,10 +230,10 @@ const MainApp: React.FC = () => {
     return <LoginPage />;
   }
 
-  // Domain Boundary Enforcement:
-  // Only route through gatekeeper if explicitly on a dedicated "sms." management subdomain
-  const isDedicatedSmsSubdomain = typeof window !== 'undefined' && window.location.hostname.toLowerCase().startsWith('sms.');
-  if (isDedicatedSmsSubdomain && !onPortal && (currentRole === 'student' || currentRole === 'instructor')) {
+  // Strict Bidirectional Domain Boundary Enforcement:
+  // - SMS (sms.aureviacoffeeinstitute.co.ke): Super Admin & Branch Managers ONLY
+  // - Academy Portal (portal.aureviacoffeeinstitute.co.ke): Students & Trainers (Instructors) ONLY
+  if (!isRoleAllowedOnCurrentDomain(currentRole)) {
     return <DomainGatekeeperPage />;
   }
 

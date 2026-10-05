@@ -84,10 +84,49 @@ export function switchDomainMode(targetMode: AppDomainMode) {
     localStorage.setItem(MODE_STORAGE_KEY, targetMode);
   } catch (_) {}
 
+  const currentHost = window.location.hostname.toLowerCase();
+  const isProductionDomain = currentHost.includes('aureviacoffeeinstitute');
+
+  if (isProductionDomain) {
+    window.location.href = targetMode === 'portal' ? PRODUCTION_PORTAL_URL : PRODUCTION_SMS_URL;
+    return;
+  }
+
   const url = new URL(window.location.href);
   url.searchParams.set('mode', targetMode);
   url.hash = ''; // Clear OAuth hashes to prevent token re-evaluation
   window.location.href = url.toString();
+}
+
+/**
+ * Strict Domain Access Rules:
+ * - SMS (sms.aureviacoffeeinstitute.co.ke): Super Admin & Branch Managers ONLY
+ * - Academy Portal (portal.aureviacoffeeinstitute.co.ke): Students & Trainers (Instructors) ONLY
+ */
+export function isRoleAllowedOnCurrentDomain(role: string): boolean {
+  const onPortal = isPortalMode();
+  if (onPortal) {
+    return role === 'student' || role === 'instructor';
+  } else {
+    return role === 'super_admin' || role === 'branch_manager';
+  }
+}
+
+export function getDomainAccessRestrictionMessage(role: string): string {
+  const onPortal = isPortalMode();
+  const roleName = role === 'branch_manager'
+    ? 'Campus Branch Manager'
+    : role === 'super_admin'
+    ? 'Super Administrator'
+    : role === 'instructor'
+    ? 'Instructor / Trainer'
+    : 'Student';
+
+  if (onPortal) {
+    return `Access Restricted: ${roleName} accounts belong to Management and must sign in at sms.aureviacoffeeinstitute.co.ke.`;
+  } else {
+    return `Access Restricted: ${roleName} accounts belong to the Academy and must sign in at portal.aureviacoffeeinstitute.co.ke.`;
+  }
 }
 
 /**

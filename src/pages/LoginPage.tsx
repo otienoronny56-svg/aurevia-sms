@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Coffee, Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle,
-  Info, ShieldCheck, CheckCircle2, GraduationCap,
+  Info, ShieldCheck, CheckCircle2, GraduationCap, ExternalLink,
 } from 'lucide-react';
 import { PasswordResetModal } from '../components/modals/PasswordResetModal';
 import { isPortalMode, switchDomainMode } from '../lib/domainConfig';
@@ -205,14 +205,16 @@ export const LoginPage: React.FC = () => {
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '16px', background: onPortal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(212, 154, 91, 0.12)', color: onPortal ? '#10B981' : 'var(--crema-gold)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '8px 0 10px 0' }}>
             {onPortal ? <GraduationCap size={13} /> : <Coffee size={13} />}
-            <span>{onPortal ? 'Academy Portal' : 'Tripple T SMS'}</span>
+            <span>{onPortal ? 'Academy Portal (Students & Trainers)' : 'Tripple T SMS (Admins & Branch Managers)'}</span>
           </div>
 
           <h1 className="auth-card__title">
             {onPortal ? 'Sign In to Academy Portal' : 'Sign In to Management'}
           </h1>
           <p className="auth-card__subtitle">
-            Enter your credentials below to access your account.
+            {onPortal
+              ? 'Students & Trainers: Enter your credentials to access coursework and records.'
+              : 'Super Admins & Branch Managers: Enter credentials to access operations.'}
           </p>
 
           <button
@@ -231,11 +233,36 @@ export const LoginPage: React.FC = () => {
           <div aria-live="assertive">
             {error && (
               <div className="auth-alert auth-alert--error" role="alert" id="login-error" key={error}>
-                <AlertCircle size={17} aria-hidden="true" />
-                <p>
-                  {error}
-                  {isLocked && <> Try again in <strong>{lockRemaining}s</strong>.</>}
-                </p>
+                <AlertCircle size={17} aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, lineHeight: 1.45 }}>
+                    {error}
+                    {isLocked && <> Try again in <strong>{lockRemaining}s</strong>.</>}
+                  </p>
+                  {error.includes('Access Restricted') && (
+                    <button
+                      type="button"
+                      onClick={() => switchDomainMode(onPortal ? 'sms' : 'portal')}
+                      style={{
+                        marginTop: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        background: 'var(--crema-gold)',
+                        color: '#181310',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>Switch to {onPortal ? 'Tripple T SMS (sms.)' : 'Academy Portal (portal.)'}</span>
+                      <ExternalLink size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

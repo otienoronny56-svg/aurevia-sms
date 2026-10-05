@@ -43,6 +43,7 @@ import { supabase, checkSupabaseConnection, supabaseUrl, supabaseAnonKey } from 
 import { generateMpesaReceiptNumber } from './mpesa';
 import { sendInstitutionalSMS, buildLoginAlertSMS } from './sms';
 import { sendResendEmail } from './resend';
+import { isRoleAllowedOnCurrentDomain, getDomainAccessRestrictionMessage } from './domainConfig';
 import {
   generateWelcomeAdmissionEmailHtml,
   generateStaffWelcomeEmailHtml,
@@ -1213,6 +1214,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Enter both your login ID and your password.' };
     }
 
+    const completeLogin = (p: Profile): { success: boolean; error?: string } => {
+      // Domain boundary validation:
+      // Super Admin and Branch Managers ONLY use SMS (sms.aureviacoffeeinstitute.co.ke)
+      // Students and Trainers (Instructors) ONLY use Academy Portal (portal.aureviacoffeeinstitute.co.ke)
+      if (!isRoleAllowedOnCurrentDomain(p.role)) {
+        return {
+          success: false,
+          error: getDomainAccessRestrictionMessage(p.role),
+        };
+      }
+      loginWithProfile(p);
+      return { success: true };
+    };
+
     const rawClean = rawId.replace(/[^a-z0-9]/g, '');
     const cleanRawPhone = rawId.replace(/[^0-9]/g, '');
 
@@ -1382,13 +1397,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
             if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
           } catch (_) {}
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
         const isMatch = await verifyPassword(cleanEntered, expectedPassword);
         if (isMatch) {
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
       }
 
@@ -1396,8 +1409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (storedHashedPwd) {
         const isHashMatch = await verifyPassword(cleanEntered, storedHashedPwd);
         if (isHashMatch) {
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
       }
 
@@ -1412,8 +1424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
             if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
           } catch (_) {}
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
       }
 
@@ -1423,8 +1434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cleanEntered === 'Aur@Staff#2026' ||
           cleanEntered === 'Aur#2026!Staff';
         if (isKnownStaffPin) {
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
       }
     }
@@ -1441,8 +1451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (regKey) localStorage.setItem('aur_student_pwd_' + regKey, cleanEntered);
             if (emailKey) localStorage.setItem('aur_student_pwd_' + emailKey, cleanEntered);
           } catch (_) {}
-          loginWithProfile(matchedProfile);
-          return { success: true };
+          return completeLogin(matchedProfile);
         }
       } catch (_) {}
     }
