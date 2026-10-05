@@ -728,51 +728,35 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 2: M-PESA STK PUSH (COMING SOON TELCO CERTIFICATION) */}
+              {/* TAB 2: M-PESA STK PUSH (COMING SOON) */}
+              {/* NOTE: Backend Safaricom Daraja STK Push architecture is 100% preserved and wired in src/lib/mpesa.ts and store.tsx */}
               {paymentMethod === 'mpesa' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div
-                    style={{
-                      padding: '12px 14px',
-                      background: 'rgba(245, 158, 11, 0.1)',
-                      border: '1px solid rgba(245, 158, 11, 0.3)',
-                      borderRadius: '8px',
-                      marginBottom: '14px',
-                      fontSize: '0.78rem',
-                      lineHeight: 1.5,
-                    }}
+                <div
+                  style={{
+                    marginBottom: '16px',
+                    textAlign: 'center',
+                    padding: '24px 18px',
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                  }}
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#FBBF24', fontWeight: 700, fontSize: '1rem', marginBottom: '6px' }}>
+                    <Clock size={18} />
+                    <span>Coming Soon</span>
+                  </div>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    M-Pesa STK Push is coming soon. Please use <strong>Paste M-Pesa SMS</strong> to submit your fee payment.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-mpesa"
+                    onClick={() => setPaymentMethod('paste_sms')}
+                    style={{ padding: '7px 14px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <div style={{ fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <Clock size={14} />
-                      ⚡ STK Push (Coming Soon - Telco Certification)
-                    </div>
-                    <div style={{ color: 'var(--text-secondary)' }}>
-                      Our Safaricom Daraja STK Push architecture is 100% complete and undergoing final telco certification. For immediate fee processing right now, please send funds to Paybill <strong>{campusPaybill}</strong> and use the <strong>Paste M-Pesa SMS</strong> tab above.
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Safaricom Phone Number (for Sandbox Prompt)</label>
-                    <div style={{ position: 'relative' }}>
-                      <Smartphone
-                        size={16}
-                        color="var(--text-muted)"
-                        style={{ position: 'absolute', left: '12px', top: '12px' }}
-                      />
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="0712345678 or 254712345678"
-                        required
-                        style={{ paddingLeft: '36px' }}
-                      />
-                    </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      A secure Safaricom M-Pesa PIN prompt can be tested in sandbox mode.
-                    </span>
-                  </div>
+                    <FileCheck size={15} />
+                    <span>Use Paste M-Pesa SMS</span>
+                  </button>
                 </div>
               )}
 
@@ -831,106 +815,103 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     />
                   </div>
                 </div>
-              )}
+              )}              {/* Amount Input & Submit (For active channels) */}
+              {paymentMethod !== 'mpesa' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Amount (KES)</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={amount}
+                      step="any"
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setAmount(val === '' ? '' : Number(val));
+                      }}
+                      min={1}
+                      required
+                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      {activeInvoice && activeInvoice.balance_due > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                          onClick={() => setAmount(activeInvoice.balance_due)}
+                        >
+                          Pay Full Due (KES {activeInvoice.balance_due.toLocaleString()})
+                        </button>
+                      )}
+                      {activeInvoice && activeInvoice.balance_due > 10000 && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                          onClick={() => setAmount(Math.round(activeInvoice.balance_due / 2))}
+                        >
+                          50% Deposit
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-              {/* Amount Input */}
-              <div className="form-group">
-                <label className="form-label">Amount (KES)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={amount}
-                  step="any"
-                  placeholder="0"
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setAmount(val === '' ? '' : Number(val));
-                  }}
-                  min={1}
-                  required
-                />
-                <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                  {activeInvoice && activeInvoice.balance_due > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                      onClick={() => setAmount(activeInvoice.balance_due)}
+                  {errorMessage && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid var(--aur-crimson)',
+                        color: '#FCA5A5',
+                        fontSize: '0.8rem',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
                     >
-                      Pay Full Due (KES {activeInvoice.balance_due.toLocaleString()})
-                    </button>
+                      <AlertCircle size={16} />
+                      <span>{errorMessage}</span>
+                    </div>
                   )}
-                  {activeInvoice && activeInvoice.balance_due > 10000 && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                      onClick={() => setAmount(Math.round(activeInvoice.balance_due / 2))}
-                    >
-                      50% Deposit
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {errorMessage && (
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid var(--aur-crimson)',
-                    color: '#FCA5A5',
-                    fontSize: '0.8rem',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <AlertCircle size={16} />
-                  <span>{errorMessage}</span>
-                </div>
+                  <button
+                    type="submit"
+                    className={paymentMethod === 'paste_sms' ? 'btn btn-mpesa' : 'btn btn-primary'}
+                    disabled={isSubmittingSMS}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginTop: '8px',
+                    }}
+                  >
+                    {paymentMethod === 'paste_sms' ? (
+                      <>
+                        <FileCheck size={18} />
+                        <span>{isSubmittingSMS ? 'Submitting SMS...' : `Submit M-Pesa Confirmation SMS (KES ${(Number(amount) || 0).toLocaleString()})`}</span>
+                      </>
+                    ) : paymentMethod === 'cash' ? (
+                      <>
+                        <Banknote size={18} />
+                        <span>Record Cash Payment (KES ${(Number(amount) || 0).toLocaleString()})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 size={18} />
+                        <span>Record Bank Transfer (KES ${(Number(amount) || 0).toLocaleString()})</span>
+                      </>
+                    )}
+                  </button>
+                </>
               )}
-
-              <button
-                type="submit"
-                className={paymentMethod === 'paste_sms' ? 'btn btn-mpesa' : paymentMethod === 'mpesa' ? 'btn btn-gold' : 'btn btn-primary'}
-                disabled={isSubmittingSMS}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginTop: '8px',
-                }}
-              >
-                {paymentMethod === 'paste_sms' ? (
-                  <>
-                    <FileCheck size={18} />
-                    <span>{isSubmittingSMS ? 'Submitting SMS...' : `Submit M-Pesa Confirmation SMS (KES ${(Number(amount) || 0).toLocaleString()})`}</span>
-                  </>
-                ) : paymentMethod === 'mpesa' ? (
-                  <>
-                    <Smartphone size={18} />
-                    <span>Send M-Pesa STK Push (Sandbox - KES {(Number(amount) || 0).toLocaleString()})</span>
-                  </>
-                ) : paymentMethod === 'cash' ? (
-                  <>
-                    <Banknote size={18} />
-                    <span>Record Cash Payment (KES {(Number(amount) || 0).toLocaleString()})</span>
-                  </>
-                ) : (
-                  <>
-                    <Building2 size={18} />
-                    <span>Record Bank Transfer (KES {(Number(amount) || 0).toLocaleString()})</span>
-                  </>
-                )}
-              </button>
             </form>
           )}
 
