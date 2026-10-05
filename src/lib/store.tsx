@@ -883,6 +883,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         });
         setStudents(mergedStudents);
+        try {
+          localStorage.setItem('aur_students', JSON.stringify(mergedStudents));
+        } catch (_) {}
 
         const liveEnrollments = (eRes.data && eRes.data.length > 0) ? eRes.data : (enrollments.length > 0 ? enrollments : []);
         setEnrollments(liveEnrollments);
@@ -1039,12 +1042,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const row = payload.new as any;
             setStudents((prev) => {
+              const matchedProf = profiles.find((p) => p.id === row.profile_id);
+              const hydrated = { ...row, profile: matchedProf || row.profile };
               const exists = prev.find((s) => s.id === row.id);
               if (exists) {
-                return prev.map((s) => (s.id === row.id ? { ...s, ...row } : s));
+                return prev.map((s) => (s.id === row.id ? { ...s, ...hydrated } : s));
               }
-              return [row, ...prev];
+              return [hydrated, ...prev];
             });
+          } else if (payload.eventType === 'DELETE') {
+            setStudents((prev) => prev.filter((s) => s.id !== (payload.old as any).id));
           }
         }
       )
@@ -1061,6 +1068,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               return [...prev, row];
             });
+            setStudents((prev) =>
+              prev.map((s) => (s.profile_id === row.id ? { ...s, profile: row } : s))
+            );
           } else if (payload.eventType === 'DELETE') {
             setProfiles((prev) => prev.filter((p) => p.id !== (payload.old as any).id));
           }
@@ -1592,11 +1602,170 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Helper to generate Registration Number: AUR/{BRANCH}/{YEAR}/{SEQ}
   const generateRegNumber = (branchId: string): string => {
     const branch = branches.find((b) => b.id === branchId) || branches[0];
-    const branchCode = branch?.code || 'NBO';
+    const branchCode = (branch?.code || 'NBO').toUpperCase();
     const year = new Date().getFullYear();
-    const existingForBranch = profiles.filter((p) => p.reg_number && p.reg_number.includes(`/${branchCode}/${year}/`));
-    const nextSeq = existingForBranch.length + 1;
-    return `AUR/${branchCode}/${year}/${String(nextSeq).padStart(3, '0')}`;
+    const prefix = `AUR/${branchCode}/${year}/`;
+
+    let maxSeq = 0;
+    profiles.forEach((p) => {
+      if (p.reg_number && p.reg_number.startsWith(prefix)) {
+        const parts = p.reg_number.split('/');
+        const s = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(s) && s > maxSeq) maxSeq = s;
+      }
+    });
+
+    students.forEach((st) => {
+      const r = st.profile?.reg_number;
+      if (r && r.startsWith(prefix)) {
+        const parts = r.split('/');
+        const s = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(s) && s > maxSeq) maxSeq = s;
+      }
+    });
+
+    try {
+      const savedHighest = localStorage.getItem(`aur_highest_student_seq_${branchCode}_${year}`);
+      if (savedHighest) {
+        const parsed = parseInt(savedHighest, 10);
+        if (!isNaN(parsed) && parsed > maxSeq) maxSeq = parsed;
+      }
+      const retiredRaw = localStorage.getItem('aur_retired_student_ids');
+      if (retiredRaw) {
+        const retiredList = JSON.parse(retiredRaw);
+        if (Array.isArray(retiredList)) {
+          retiredList.forEach((rid: string) => {
+            if (rid.startsWith(prefix)) {
+              const parts = rid.split('/');
+              const s = parseInt(parts[parts.length - 1], 10);
+              if (!isNaN(s) && s > maxSeq) maxSeq = s;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+  };
+
+  // Asynchronous allocator that checks Supabase to guarantee uniqueness across all devices
+  const allocateUniqueStudentRegNumber = async (branchId: string): Promise<string> => {
+    const branch = branches.find((b) => b.id === branchId) || branches[0];
+    const branchCode = (branch?.code || 'NBO').toUpperCase();
+    const year = new Date().getFullYear();
+    const prefix = `AUR/${branchCode}/${year}/`;
+
+    let maxSeq = 0;
+
+    // 1. Check local profiles & students
+    profiles.forEach((p) => {
+      if (p.reg_number && p.reg_number.startsWith(prefix)) {
+        const parts = p.reg_number.split('/');
+        const s = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(s) && s > maxSeq) maxSeq = s;
+      }
+    });
+
+    students.forEach((st) => {
+      const r = st.profile?.reg_number;
+      if (r && r.startsWith(prefix)) {
+        const parts = r.split('/');
+        const s = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(s) && s > maxSeq) maxSeq = s;
+      }
+    });
+
+    // 2. Check localStorage highest sequence & retired student IDs
+    try {
+      const savedHighest = localStorage.getItem(`aur_highest_student_seq_${branchCode}_${year}`);
+      if (savedHighest) {
+        const parsed = parseInt(savedHighest, 10);
+        if (!isNaN(parsed) && parsed > maxSeq) maxSeq = parsed;
+      }
+      const retiredRaw = localStorage.getItem('aur_retired_student_ids');
+      if (retiredRaw) {
+        const retiredList = JSON.parse(retiredRaw);
+        if (Array.isArray(retiredList)) {
+          retiredList.forEach((rid: string) => {
+            if (rid.startsWith(prefix)) {
+              const parts = rid.split('/');
+              const s = parseInt(parts[parts.length - 1], 10);
+              if (!isNaN(s) && s > maxSeq) maxSeq = s;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    // 3. Query Supabase aur_profiles and aur_reg_sequences for ground-truth max
+    try {
+      const { data: dbProfs } = await supabase
+        .from('aur_profiles')
+        .select('reg_number')
+        .like('reg_number', `${prefix}%`);
+
+      if (dbProfs && Array.isArray(dbProfs)) {
+        dbProfs.forEach((p) => {
+          if (p.reg_number) {
+            const parts = p.reg_number.split('/');
+            const s = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(s) && s > maxSeq) maxSeq = s;
+          }
+        });
+      }
+
+      const { data: seqRow } = await supabase
+        .from('aur_reg_sequences')
+        .select('current_val')
+        .eq('branch_code', branchCode)
+        .eq('reg_year', year)
+        .maybeSingle();
+
+      if (seqRow && typeof seqRow.current_val === 'number' && seqRow.current_val > maxSeq) {
+        maxSeq = seqRow.current_val;
+      }
+    } catch (e) {
+      console.warn('Supabase sequence lookup note:', e);
+    }
+
+    // 4. Candidate sequence
+    let candidateSeq = maxSeq + 1;
+    let candidateReg = `${prefix}${String(candidateSeq).padStart(3, '0')}`;
+
+    // 5. Verification loop: ensure this registration number is not already taken in Supabase
+    let isTaken = true;
+    let safetyCounter = 0;
+    while (isTaken && safetyCounter < 50) {
+      safetyCounter++;
+      try {
+        const { data: existing } = await supabase
+          .from('aur_profiles')
+          .select('id')
+          .eq('reg_number', candidateReg)
+          .maybeSingle();
+
+        if (existing) {
+          candidateSeq++;
+          candidateReg = `${prefix}${String(candidateSeq).padStart(3, '0')}`;
+        } else {
+          isTaken = false;
+        }
+      } catch (_) {
+        isTaken = false;
+      }
+    }
+
+    // 6. Update local tracker and Supabase aur_reg_sequences
+    try {
+      localStorage.setItem(`aur_highest_student_seq_${branchCode}_${year}`, String(candidateSeq));
+      await supabase.from('aur_reg_sequences').upsert({
+        branch_code: branchCode,
+        reg_year: year,
+        current_val: candidateSeq,
+      });
+    } catch (_) {}
+
+    return candidateReg;
   };
 
   // Student KYC Registration with Supabase Insert
@@ -1612,10 +1781,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     emergencyPhone: string;
     emergencyRelationship: string;
     coffeeExperience: string;
+    dob?: string;
+    nationality?: string;
+    gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+    medicalConditions?: string;
   }) => {
+    // 0. Email uniqueness check
+    const cleanEmail = (params.email || '').trim().toLowerCase();
+    if (cleanEmail) {
+      const localDup = profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail);
+      if (localDup) {
+        throw new Error(`The email address "${params.email}" is already registered to ${localDup.full_name} (${localDup.role}). Please use a unique email address.`);
+      }
+      try {
+        const { data: dbDup } = await supabase.from('aur_profiles').select('id, full_name, role').eq('email', cleanEmail).maybeSingle();
+        if (dbDup) {
+          throw new Error(`The email address "${params.email}" is already registered to ${dbDup.full_name} (${dbDup.role}) in the database. Please use a unique email address.`);
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('already registered')) throw err;
+      }
+    }
+
     const branch = branches.find((b) => b.id === params.branchId) || branches[0];
-    const branchCode = branch?.code || 'NBO';
-    const regNumber = generateRegNumber(params.branchId);
+    const regNumber = await allocateUniqueStudentRegNumber(params.branchId);
     const course = courses.find((c) => c.id === params.courseId) || courses[0];
     const feeAmount = course?.fee_amount || 35000;
     const studentDefaultPwd = generateUniqueDefaultPassword(params.fullName);
@@ -1626,7 +1815,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let createdInvoice: Invoice;
 
     try {
-      // 1. Create User in Supabase Auth (Authentication Tab) via isolated client (never hijacks admin session)
+      // 1. Create User in Supabase Auth (Authentication Tab) via isolated client
       let authUserId: string | undefined;
       if (params.email) {
         authUserId = await registerAuthUserIsolated(params.email, studentDefaultPwd, {
@@ -1642,7 +1831,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         role: 'student',
         branch_id: params.branchId,
         full_name: params.fullName.trim(),
-        email: params.email.trim(),
+        email: cleanEmail,
         phone: params.phone.trim(),
         reg_number: regNumber,
         specialty: 'Barista & Specialty Coffee',
@@ -1661,7 +1850,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       profData = res.data;
       profErr = res.error;
 
-      // Graceful fallback if database schema is missing the new password columns:
+      // Fallback if password columns are missing in schema
       if (profErr && (profErr.message?.includes('column') || profErr.code === 'PGRST204')) {
         delete profilePayload.initial_password;
         delete profilePayload.password_hash;
@@ -1673,12 +1862,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (profErr || !profData) {
         console.error('Failed to create profile in aur_profiles:', profErr);
-        throw new Error(profErr?.message || 'Failed to create profile');
+        throw new Error(profErr?.message || 'Failed to create student profile in Supabase');
       }
 
       try {
         if (regNumber) localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
-        if (params.email) localStorage.setItem('aur_student_pwd_' + params.email.toLowerCase(), studentDefaultPwd);
+        if (cleanEmail) localStorage.setItem('aur_student_pwd_' + cleanEmail, studentDefaultPwd);
         localStorage.setItem('aur_user_pwd_seed_' + profData.id, studentDefaultPwd);
         localStorage.setItem('aur_user_pwd_hash_' + profData.id, hashedStudentPwd);
       } catch (_) {}
@@ -1691,24 +1880,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // 3. Insert Student KYC into Supabase aur_students
-      const { data: stData, error: stErr } = await supabase
+      const studentPayload: any = {
+        profile_id: createdProfile.id,
+        branch_id: params.branchId,
+        national_id_or_passport: params.nationalId.trim(),
+        dob: params.dob || null,
+        nationality: params.nationality || 'Kenyan',
+        gender: params.gender || 'Female',
+        medical_conditions: params.medicalConditions || 'None',
+        emergency_contact_name: params.emergencyName.trim(),
+        emergency_contact_phone: params.emergencyPhone.trim(),
+        emergency_contact_relationship: params.emergencyRelationship.trim(),
+        kyc_verified: true,
+        coffee_experience_level: params.coffeeExperience,
+      };
+
+      let { data: stData, error: stErr } = await supabase
         .from('aur_students')
-        .insert({
-          profile_id: createdProfile.id,
-          branch_id: params.branchId,
-          national_id_or_passport: params.nationalId.trim(),
-          emergency_contact_name: params.emergencyName.trim(),
-          emergency_contact_phone: params.emergencyPhone.trim(),
-          emergency_contact_relationship: params.emergencyRelationship.trim(),
-          kyc_verified: true,
-          coffee_experience_level: params.coffeeExperience,
-        })
+        .insert(studentPayload)
         .select()
         .single();
 
+      if (stErr && stErr.code === 'PGRST204') {
+        delete studentPayload.dob;
+        delete studentPayload.nationality;
+        delete studentPayload.gender;
+        delete studentPayload.medical_conditions;
+        const retrySt = await supabase.from('aur_students').insert(studentPayload).select().single();
+        stData = retrySt.data;
+        stErr = retrySt.error;
+      }
+
       if (stErr || !stData) {
         console.error('Failed to create student in aur_students:', stErr);
-        throw new Error(stErr?.message || 'Failed to create student record');
+        throw new Error(stErr?.message || 'Failed to create student record in Supabase');
       }
       createdStudent = { ...stData, profile: createdProfile };
 
@@ -1761,15 +1966,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // 5. Insert Enrollment into Supabase (aur_enrollments has no branch_id)
-      const { data: enrData, error: enrErr } = await supabase
-        .from('aur_enrollments')
-        .insert({
-          student_id: createdStudent.id,
-          cohort_id: params.cohortId,
-          status: 'enrolled',
-        })
-        .select()
-        .single();
+      let enrData: any;
+      let enrErr: any;
+      if (params.cohortId) {
+        const resEnr = await supabase
+          .from('aur_enrollments')
+          .insert({
+            student_id: createdStudent.id,
+            cohort_id: params.cohortId,
+            status: 'enrolled',
+          })
+          .select()
+          .single();
+        enrData = resEnr.data;
+        enrErr = resEnr.error;
+      }
 
       if (enrErr || !enrData) {
         console.warn('Supabase enrollment insert fallback:', enrErr?.message);
@@ -1833,15 +2044,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
-      // Secure local password cache for instantaneous offline/online verification
+      // Secure local password cache for instantaneous verification
       try {
         localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
-        localStorage.setItem('aur_student_pwd_' + params.email.trim().toLowerCase(), studentDefaultPwd);
+        localStorage.setItem('aur_student_pwd_' + cleanEmail, studentDefaultPwd);
         localStorage.setItem('aur_student_pwd_' + createdProfile.id.toLowerCase(), studentDefaultPwd);
         localStorage.setItem('aur_user_pwd_seed_' + createdProfile.id, studentDefaultPwd);
       } catch (_) {}
 
-      // 5. Insert SMS log
+      // 7. Insert SMS log
       const smsMsg = `Welcome to ${branch.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Temp password: ${studentDefaultPwd}. Invoice: ${invNumber} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
       try {
         await supabase.from('aur_sms_logs').insert({
@@ -1855,78 +2066,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (smsErr) {
         console.warn('Supabase SMS notice:', smsErr);
       }
-    } catch (err) {
-      console.warn('Falling back to local reactive store:', err);
-      // Fallback for offline or client-only mode
-      const pId = 'prof-' + Date.now();
-      const sId = 's-' + Date.now();
-      const eId = 'e-' + Date.now();
-      const iId = 'inv-' + Date.now();
+    } catch (err: any) {
+      console.error('registerStudentKYC failure:', err);
+      // If truly offline, provide graceful client fallback with non-colliding sequence
+      if (!navigator.onLine || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        const pId = 'prof-' + Date.now();
+        const sId = 's-' + Date.now();
+        const eId = 'enr-' + Date.now();
+        const iId = 'inv-' + Date.now();
 
-      createdProfile = {
-        id: pId,
-        role: 'student',
-        branch_id: params.branchId,
-        full_name: params.fullName,
-        email: params.email,
-        phone: params.phone,
-        national_id: params.nationalId,
-        reg_number: regNumber,
-        initial_password: studentDefaultPwd,
-        specialty: studentDefaultPwd,
-        password_changed: false,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
+        createdProfile = {
+          id: pId,
+          role: 'student',
+          branch_id: params.branchId,
+          full_name: params.fullName,
+          email: cleanEmail,
+          phone: params.phone,
+          national_id: params.nationalId,
+          reg_number: regNumber,
+          initial_password: studentDefaultPwd,
+          specialty: 'Barista & Specialty Coffee',
+          password_changed: false,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
 
-      try {
-        localStorage.setItem('aur_student_pwd_' + regNumber.toLowerCase(), studentDefaultPwd);
-        localStorage.setItem('aur_student_pwd_' + params.email.trim().toLowerCase(), studentDefaultPwd);
-      } catch (_) {}
+        createdStudent = {
+          id: sId,
+          profile_id: pId,
+          branch_id: params.branchId,
+          national_id_or_passport: params.nationalId,
+          emergency_contact_name: params.emergencyName,
+          emergency_contact_phone: params.emergencyPhone,
+          emergency_contact_relationship: params.emergencyRelationship,
+          kyc_verified: true,
+          coffee_experience_level: params.coffeeExperience,
+          created_at: new Date().toISOString(),
+          profile: createdProfile,
+        };
 
-      createdStudent = {
-        id: sId,
-        profile_id: pId,
-        branch_id: params.branchId,
-        national_id_or_passport: params.nationalId,
-        emergency_contact_name: params.emergencyName,
-        emergency_contact_phone: params.emergencyPhone,
-        emergency_contact_relationship: params.emergencyRelationship,
-        kyc_verified: true,
-        coffee_experience_level: params.coffeeExperience,
-        created_at: new Date().toISOString(),
-        profile: createdProfile,
-      };
+        createdEnrollment = {
+          id: eId,
+          student_id: sId,
+          cohort_id: params.cohortId,
+          branch_id: params.branchId,
+          status: 'enrolled',
+          enrolled_at: new Date().toISOString(),
+        };
 
-      createdEnrollment = {
-        id: eId,
-        student_id: sId,
-        cohort_id: params.cohortId,
-        branch_id: params.branchId,
-        status: 'enrolled',
-        enrolled_at: new Date().toISOString(),
-      };
-
-      createdInvoice = {
-        id: iId,
-        invoice_number: `INV-AUR-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        enrollment_id: eId,
-        student_id: sId,
-        branch_id: params.branchId,
-        total_fee: feeAmount,
-        amount_paid: 0,
-        balance_due: feeAmount,
-        status: 'unpaid',
-        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        created_at: new Date().toISOString(),
-      };
+        createdInvoice = {
+          id: iId,
+          invoice_number: `INV-AUR-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`,
+          enrollment_id: eId,
+          student_id: sId,
+          branch_id: params.branchId,
+          total_fee: feeAmount,
+          amount_paid: 0,
+          balance_due: feeAmount,
+          status: 'pending',
+          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+        };
+      } else {
+        // Validation / database error: throw so the modal shows the exact error message
+        throw err;
+      }
     }
 
     // Update React State immediately
-    setProfiles((prev) => [...prev, createdProfile]);
-    setStudents((prev) => [...prev, createdStudent]);
-    setEnrollments((prev) => [...prev, createdEnrollment]);
-    setInvoices((prev) => [...prev, createdInvoice]);
+    setProfiles((prev) => [createdProfile, ...prev.filter((p) => p.id !== createdProfile.id)]);
+    setStudents((prev) => [createdStudent, ...prev.filter((s) => s.id !== createdStudent.id)]);
+    setEnrollments((prev) => [createdEnrollment, ...prev.filter((e) => e.id !== createdEnrollment.id)]);
+    setInvoices((prev) => [createdInvoice, ...prev.filter((i) => i.id !== createdInvoice.id)]);
+
+    // Persist to localStorage
+    try {
+      const savedStuds = JSON.parse(localStorage.getItem('aur_students') || '[]');
+      const filteredStuds = Array.isArray(savedStuds) ? savedStuds.filter((s: any) => s.id !== createdStudent.id) : [];
+      localStorage.setItem('aur_students', JSON.stringify([createdStudent, ...filteredStuds]));
+
+      const savedProfs = JSON.parse(localStorage.getItem('aur_profiles') || '[]');
+      const filteredProfs = Array.isArray(savedProfs) ? savedProfs.filter((p: any) => p.id !== createdProfile.id) : [];
+      localStorage.setItem('aur_profiles', JSON.stringify([createdProfile, ...filteredProfs]));
+    } catch (_) {}
 
     // Send SMS and register in communication ledger
     const admissionMsg = `Welcome to ${branch?.name || 'Aurevia Coffee Institute'}! Reg No: ${regNumber}. Invoice: ${createdInvoice.invoice_number} (KES ${feeAmount.toLocaleString()}). Tripple T Systems.`;
@@ -2002,6 +2224,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteStudent = async (studentId: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
+
+    // Permanently retire student registration number so it is never re-issued
+    const targetProfile = profiles.find((p) => p.id === student.profile_id) || student.profile;
+    const retiredNum = targetProfile?.reg_number;
+    if (retiredNum) {
+      try {
+        const retiredStr = localStorage.getItem('aur_retired_student_ids');
+        const retiredList: string[] = retiredStr ? JSON.parse(retiredStr) : [];
+        if (!retiredList.includes(retiredNum)) {
+          retiredList.push(retiredNum);
+          localStorage.setItem('aur_retired_student_ids', JSON.stringify(retiredList));
+        }
+      } catch (_) {}
+    }
 
     try {
       await supabase.from('aur_assessments').delete().eq('student_id', studentId);
