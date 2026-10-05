@@ -89,7 +89,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
     : (profile?.phone || '0714767240');
 
   const [phone, setPhone] = useState(defaultPhone);
-  const [amount, setAmount] = useState<number>(presetAmount || activeInvoice?.balance_due || 10000);
+  const [amount, setAmount] = useState<number | ''>(presetAmount || activeInvoice?.balance_due || 10000);
   const [cashierNotes, setCashierNotes] = useState('Collected at campus reception desk');
   const [bankReference, setBankReference] = useState('');
 
@@ -117,12 +117,17 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
   const handleConfirmMpesaPayment = async () => {
     if (!activeInvoice) return;
+    const numericAmount = Number(amount) || 0;
+    if (numericAmount <= 0) {
+      setErrorMessage('Please enter a valid payment amount.');
+      return;
+    }
     setIsConfirming(true);
     setErrorMessage('');
     try {
       const payment = await processMpesaPayment({
         invoiceId: activeInvoice.id,
-        amount,
+        amount: numericAmount,
         phone: formatMpesaPhoneNumber(phone),
         paymentMethod: 'mpesa',
       });
@@ -221,13 +226,14 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
       return;
     }
 
-    if (amount <= 0) {
+    const numericAmount = Number(amount) || 0;
+    if (!amount || numericAmount <= 0) {
       setErrorMessage('Please enter an amount greater than 0');
       return;
     }
 
-    if (activeInvoice.balance_due > 0 && amount > activeInvoice.balance_due) {
-      setErrorMessage(`Amount entered (KES ${amount.toLocaleString()}) cannot exceed the balance due of KES ${activeInvoice.balance_due.toLocaleString()}`);
+    if (activeInvoice.balance_due > 0 && numericAmount > activeInvoice.balance_due) {
+      setErrorMessage(`Amount entered (KES ${numericAmount.toLocaleString()}) cannot exceed the balance due of KES ${activeInvoice.balance_due.toLocaleString()}`);
       return;
     }
 
@@ -245,7 +251,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
         // Trigger live Daraja STK Push request
         const res = await initiateDarajaSTKPush({
           phoneNumber: cleanPhone,
-          amount,
+          amount: numericAmount,
           invoiceNumber: activeInvoice.invoice_number,
           studentRegNo: profile?.reg_number || 'N/A',
         });
@@ -263,7 +269,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
       try {
         const payment = await processMpesaPayment({
           invoiceId: activeInvoice.id,
-          amount,
+          amount: numericAmount,
           phone: profile?.phone || '+254 700 000 000',
           paymentMethod: paymentMethod,
         });
@@ -599,7 +605,12 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                   type="number"
                   className="form-input"
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  step="any"
+                  placeholder="0"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAmount(val === '' ? '' : Number(val));
+                  }}
                   min={1}
                   max={activeInvoice?.balance_due && activeInvoice.balance_due > 0 ? activeInvoice.balance_due : undefined}
                   required
@@ -656,17 +667,17 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                 {paymentMethod === 'mpesa' ? (
                   <>
                     <Smartphone size={18} />
-                    <span>Send M-Pesa STK Push (KES {amount.toLocaleString()})</span>
+                    <span>Send M-Pesa STK Push (KES {(Number(amount) || 0).toLocaleString()})</span>
                   </>
                 ) : paymentMethod === 'cash' ? (
                   <>
                     <Banknote size={18} />
-                    <span>Record Cash Payment (KES {amount.toLocaleString()})</span>
+                    <span>Record Cash Payment (KES {(Number(amount) || 0).toLocaleString()})</span>
                   </>
                 ) : (
                   <>
                     <Building2 size={18} />
-                    <span>Record Bank Transfer (KES {amount.toLocaleString()})</span>
+                    <span>Record Bank Transfer (KES {(Number(amount) || 0).toLocaleString()})</span>
                   </>
                 )}
               </button>
@@ -719,7 +730,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                 Check Your Phone Screen
               </h3>
               <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0 0 14px 0' }}>
-                Safaricom M-Pesa prompt dispatched for <strong>KES {amount.toLocaleString()}</strong> to{' '}
+                Safaricom M-Pesa prompt dispatched for <strong>KES {(Number(amount) || 0).toLocaleString()}</strong> to{' '}
                 <strong style={{ color: 'var(--crema-gold)' }}>{formatMpesaPhoneNumber(phone)}</strong>
               </p>
 

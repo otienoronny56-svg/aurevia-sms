@@ -58,7 +58,7 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
 
   const [startDate, setStartDate] = useState(cohort.start_date || '');
   const [endDate, setEndDate] = useState(cohort.end_date || '');
-  const [maxCapacity, setMaxCapacity] = useState(cohort.max_capacity || 16);
+  const [maxCapacity, setMaxCapacity] = useState<number | ''>(cohort.max_capacity ?? 16);
   const [googleMeetUrl, setGoogleMeetUrl] = useState(cohort.google_meet_url || '');
   const [status, setStatus] = useState<Cohort['status']>(cohort.status || 'upcoming');
 
@@ -92,7 +92,7 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
         start_date: startDate,
         end_date: endDate,
         schedule_timing: finalTiming,
-        max_capacity: Number(maxCapacity),
+        max_capacity: Number(maxCapacity) || 16,
         google_meet_url: googleMeetUrl,
         status,
       });
@@ -481,7 +481,11 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
                 min="4"
                 max="40"
                 value={maxCapacity}
-                onChange={(e) => setMaxCapacity(parseInt(e.target.value) || 16)}
+                placeholder="16"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setMaxCapacity(val === '' ? '' : parseInt(val));
+                }}
                 className="form-input"
                 required
               />

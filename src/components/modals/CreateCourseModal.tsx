@@ -12,8 +12,8 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [category, setCategory] = useState<'Barista Skills' | 'Coffee Roasting' | 'Sensory & Cupping' | 'Green Coffee' | 'Brewing & Water'>('Barista Skills');
-  const [durationWeeks, setDurationWeeks] = useState(2);
-  const [feeAmount, setFeeAmount] = useState(35000);
+  const [durationWeeks, setDurationWeeks] = useState<number | ''>(2);
+  const [feeAmount, setFeeAmount] = useState<number | ''>(35000);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,8 +27,8 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
       title,
       code: code.toUpperCase(),
       category,
-      duration_weeks: Number(durationWeeks),
-      fee_amount: Number(feeAmount),
+      duration_weeks: Number(durationWeeks) || 1,
+      fee_amount: Number(feeAmount) || 0,
       description: description || 'Official Specialty Coffee Association certified training module.',
       is_active: true,
       created_at: new Date().toISOString(),
@@ -160,7 +160,11 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
                 required
                 className="form-input"
                 value={durationWeeks}
-                onChange={(e) => setDurationWeeks(Number(e.target.value))}
+                placeholder="2"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDurationWeeks(val === '' ? '' : Number(val));
+                }}
                 style={{ width: '100%', fontSize: '0.82rem' }}
               />
             </div>
@@ -172,11 +176,15 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
               <input
                 type="number"
                 min="0"
-                step="1000"
+                step="any"
                 required
                 className="form-input"
                 value={feeAmount}
-                onChange={(e) => setFeeAmount(Number(e.target.value))}
+                placeholder="35000"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFeeAmount(val === '' ? '' : Number(val));
+                }}
                 style={{ width: '100%', fontSize: '0.82rem', fontWeight: 700 }}
               />
             </div>

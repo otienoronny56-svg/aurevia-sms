@@ -19,8 +19,8 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
   const [title, setTitle] = useState(course.title || '');
   const [code, setCode] = useState(course.code || '');
   const [category, setCategory] = useState<any>(course.category || 'Barista Skills');
-  const [durationWeeks, setDurationWeeks] = useState(course.duration_weeks || 2);
-  const [feeAmount, setFeeAmount] = useState(course.fee_amount || 35000);
+  const [durationWeeks, setDurationWeeks] = useState<number | ''>(course.duration_weeks ?? 2);
+  const [feeAmount, setFeeAmount] = useState<number | ''>(course.fee_amount ?? 35000);
   const [description, setDescription] = useState(course.description || '');
   const [certificationTitle, setCertificationTitle] = useState(course.certification_title || '');
   const [isActive, setIsActive] = useState<boolean>(course.is_active ?? true);
@@ -31,6 +31,16 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
     e.preventDefault();
     if (!title.trim() || !code.trim()) {
       setErrorMsg('Course Title and Course Code are required.');
+      return;
+    }
+
+    if (feeAmount === '' || Number(feeAmount) < 0) {
+      setErrorMsg('Please enter a valid tuition fee.');
+      return;
+    }
+
+    if (durationWeeks === '' || Number(durationWeeks) < 1) {
+      setErrorMsg('Please enter a valid duration (minimum 1 week).');
       return;
     }
 
@@ -215,7 +225,11 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
                   value={durationWeeks}
                   min={1}
                   max={24}
-                  onChange={(e) => setDurationWeeks(Number(e.target.value))}
+                  placeholder="2"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDurationWeeks(val === '' ? '' : Number(val));
+                  }}
                   required
                   style={{ width: '100%' }}
                 />
@@ -233,8 +247,12 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
                   className="input-field"
                   value={feeAmount}
                   min={0}
-                  step={500}
-                  onChange={(e) => setFeeAmount(Number(e.target.value))}
+                  step="any"
+                  placeholder="e.g. 35000"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFeeAmount(val === '' ? '' : Number(val));
+                  }}
                   required
                   style={{ width: '100%' }}
                 />

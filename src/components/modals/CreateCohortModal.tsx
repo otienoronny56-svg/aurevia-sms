@@ -40,7 +40,7 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(defaultEnd);
 
-  const [maxCapacity, setMaxCapacity] = useState(16);
+  const [maxCapacity, setMaxCapacity] = useState<number | ''>(16);
   const [googleMeetUrl, setGoogleMeetUrl] = useState(
     `https://meet.google.com/aur-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`
   );
@@ -75,7 +75,7 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
         start_date: startDate,
         end_date: endDate,
         schedule_timing: finalTiming,
-        max_capacity: maxCapacity,
+        max_capacity: Number(maxCapacity) || 16,
         google_meet_url: googleMeetUrl,
         status,
       });
@@ -282,7 +282,11 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
                     max={50}
                     className="form-input"
                     value={maxCapacity}
-                    onChange={(e) => setMaxCapacity(parseInt(e.target.value) || 16)}
+                    placeholder="16"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMaxCapacity(val === '' ? '' : parseInt(val));
+                    }}
                     required
                   />
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>

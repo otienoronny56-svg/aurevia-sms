@@ -20,15 +20,18 @@ export const EditAssessmentModal: React.FC<EditAssessmentModalProps> = ({
   const profile = profiles.find((p) => p.id === student?.profile_id) || profiles.find((p) => p.id === assessment.student_id);
 
   const [moduleName, setModuleName] = useState(assessment.module_name);
-  const [practicalScore, setPracticalScore] = useState(assessment.practical_score);
-  const [theoryScore, setTheoryScore] = useState(assessment.theory_score);
-  const [sensoryScore, setSensoryScore] = useState(assessment.sensory_score);
+  const [practicalScore, setPracticalScore] = useState<number | ''>(assessment.practical_score ?? 85);
+  const [theoryScore, setTheoryScore] = useState<number | ''>(assessment.theory_score ?? 80);
+  const [sensoryScore, setSensoryScore] = useState<number | ''>(assessment.sensory_score ?? 78);
   const [remarks, setRemarks] = useState(assessment.instructor_remarks || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Live computed score & grade
-  const computedFinal = Number(((practicalScore * 0.5) + (theoryScore * 0.25) + (sensoryScore * 0.25)).toFixed(1));
+  const numPractical = Number(practicalScore) || 0;
+  const numTheory = Number(theoryScore) || 0;
+  const numSensory = Number(sensoryScore) || 0;
+  const computedFinal = Number(((numPractical * 0.5) + (numTheory * 0.25) + (numSensory * 0.25)).toFixed(1));
   let computedGrade = 'C';
   let badgeClass = 'badge-pending';
   if (computedFinal >= 85) {
@@ -51,9 +54,9 @@ export const EditAssessmentModal: React.FC<EditAssessmentModalProps> = ({
     try {
       await updateAssessment(assessment.id, {
         module_name: moduleName,
-        practical_score: Number(practicalScore),
-        theory_score: Number(theoryScore),
-        sensory_score: Number(sensoryScore),
+        practical_score: Number(practicalScore) || 0,
+        theory_score: Number(theoryScore) || 0,
+        sensory_score: Number(sensoryScore) || 0,
         instructor_remarks: remarks,
       });
 
@@ -147,9 +150,14 @@ export const EditAssessmentModal: React.FC<EditAssessmentModalProps> = ({
                   type="number"
                   min="0"
                   max="100"
+                  step="any"
+                  placeholder="0"
                   className="form-input"
                   value={practicalScore}
-                  onChange={(e) => setPracticalScore(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPracticalScore(val === '' ? '' : Number(val));
+                  }}
                   required
                 />
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>
@@ -163,9 +171,14 @@ export const EditAssessmentModal: React.FC<EditAssessmentModalProps> = ({
                   type="number"
                   min="0"
                   max="100"
+                  step="any"
+                  placeholder="0"
                   className="form-input"
                   value={theoryScore}
-                  onChange={(e) => setTheoryScore(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTheoryScore(val === '' ? '' : Number(val));
+                  }}
                   required
                 />
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>
@@ -179,9 +192,14 @@ export const EditAssessmentModal: React.FC<EditAssessmentModalProps> = ({
                   type="number"
                   min="0"
                   max="100"
+                  step="any"
+                  placeholder="0"
                   className="form-input"
                   value={sensoryScore}
-                  onChange={(e) => setSensoryScore(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSensoryScore(val === '' ? '' : Number(val));
+                  }}
                   required
                 />
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>

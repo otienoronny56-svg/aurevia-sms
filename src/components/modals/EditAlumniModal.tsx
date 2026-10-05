@@ -25,7 +25,7 @@ export const EditAlumniModal: React.FC<EditAlumniModalProps> = ({
   const [employmentStatus, setEmploymentStatus] = useState<string>(alumni.employment_status || 'Employed');
   const [certificationName, setCertificationName] = useState(alumni.certification_name || '');
   const [certificateSerialNo, setCertificateSerialNo] = useState(alumni.certificate_serial_no || '');
-  const [graduationYear, setGraduationYear] = useState<number>(alumni.graduation_year || new Date().getFullYear());
+  const [graduationYear, setGraduationYear] = useState<number | ''>(alumni.graduation_year ?? new Date().getFullYear());
   const [graduationMonth, setGraduationMonth] = useState(alumni.graduation_month || 'October');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +46,7 @@ export const EditAlumniModal: React.FC<EditAlumniModalProps> = ({
         employment_status: employmentStatus,
         certification_name: certificationName.trim(),
         certificate_serial_no: certificateSerialNo.trim(),
-        graduation_year: graduationYear,
+        graduation_year: Number(graduationYear) || new Date().getFullYear(),
         graduation_month: graduationMonth,
       });
       onClose();
@@ -299,7 +299,11 @@ export const EditAlumniModal: React.FC<EditAlumniModalProps> = ({
                   type="number"
                   className="form-control"
                   value={graduationYear}
-                  onChange={(e) => setGraduationYear(parseInt(e.target.value) || 2026)}
+                  placeholder="2026"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setGraduationYear(val === '' ? '' : parseInt(val));
+                  }}
                 />
               </div>
             </div>

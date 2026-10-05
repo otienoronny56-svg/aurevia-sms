@@ -19,10 +19,10 @@ interface StudentGradeRow {
   enrollmentId: string;
   fullName: string;
   regNumber: string;
-  score: number;          // Main score for single-type assessments (Test, Practical, Sensory)
-  practicalScore: number; // For comprehensive exams
-  theoryScore: number;
-  sensoryScore: number;
+  score: number | '';          // Main score for single-type assessments (Test, Practical, Sensory)
+  practicalScore: number | ''; // For comprehensive exams
+  theoryScore: number | '';
+  sensoryScore: number | '';
   remarks: string;
 }
 
@@ -421,7 +421,7 @@ export const GradingSheetModal: React.FC<GradingSheetModalProps> = ({ cohort, on
               <tbody>
                 {gradeRows.map((row, idx) => {
                   const scoreVal = category === 'exam'
-                    ? Number(((row.practicalScore * 0.5) + (row.theoryScore * 0.25) + (row.sensoryScore * 0.25)).toFixed(1))
+                    ? Number((((Number(row.practicalScore) || 0) * 0.5) + ((Number(row.theoryScore) || 0) * 0.25) + ((Number(row.sensoryScore) || 0) * 0.25)).toFixed(1))
                     : Number(row.score) || 0;
 
                   const { grade, badgeClass } = calculateGradeBadge(scoreVal);
@@ -447,8 +447,13 @@ export const GradingSheetModal: React.FC<GradingSheetModalProps> = ({ cohort, on
                               type="number"
                               min="0"
                               max="100"
+                              step="any"
+                              placeholder="0"
                               value={row.score}
-                              onChange={(e) => handleUpdateField(idx, 'score', Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateField(idx, 'score', val === '' ? '' : Number(val));
+                              }}
                               className="form-input"
                               style={{
                                 width: '72px',
@@ -469,8 +474,13 @@ export const GradingSheetModal: React.FC<GradingSheetModalProps> = ({ cohort, on
                               type="number"
                               min="0"
                               max="100"
+                              step="any"
+                              placeholder="0"
                               value={row.practicalScore}
-                              onChange={(e) => handleUpdateField(idx, 'practicalScore', Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateField(idx, 'practicalScore', val === '' ? '' : Number(val));
+                              }}
                               className="form-input"
                               style={{ width: '60px', padding: '5px', textAlign: 'center', fontWeight: 600 }}
                             />
@@ -480,8 +490,13 @@ export const GradingSheetModal: React.FC<GradingSheetModalProps> = ({ cohort, on
                               type="number"
                               min="0"
                               max="100"
+                              step="any"
+                              placeholder="0"
                               value={row.theoryScore}
-                              onChange={(e) => handleUpdateField(idx, 'theoryScore', Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateField(idx, 'theoryScore', val === '' ? '' : Number(val));
+                              }}
                               className="form-input"
                               style={{ width: '60px', padding: '5px', textAlign: 'center', fontWeight: 600 }}
                             />
@@ -491,8 +506,13 @@ export const GradingSheetModal: React.FC<GradingSheetModalProps> = ({ cohort, on
                               type="number"
                               min="0"
                               max="100"
+                              step="any"
+                              placeholder="0"
                               value={row.sensoryScore}
-                              onChange={(e) => handleUpdateField(idx, 'sensoryScore', Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateField(idx, 'sensoryScore', val === '' ? '' : Number(val));
+                              }}
                               className="form-input"
                               style={{ width: '60px', padding: '5px', textAlign: 'center', fontWeight: 600 }}
                             />
