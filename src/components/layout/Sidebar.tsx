@@ -135,6 +135,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navGroups = getNavGroups();
 
+  // Multi-Campus Brand Separation per User Role
+  const getBrandInfo = () => {
+    switch (currentRole) {
+      case 'student':
+        return {
+          title: 'Trainee Portal',
+          badge: 'STUDENT',
+          badgeBg: 'rgba(16, 185, 129, 0.15)',
+          badgeColor: '#10B981',
+          subtitle: myBranch?.name || 'Enrolled Campus',
+        };
+      case 'branch_manager':
+        return {
+          title: 'Tripple T SMS',
+          badge: 'CAMPUS',
+          badgeBg: 'rgba(212, 154, 91, 0.18)',
+          badgeColor: 'var(--crema-gold)',
+          subtitle: `${myBranch?.name || 'Campus'} • Campus Operations`,
+        };
+      case 'instructor':
+        return {
+          title: 'Faculty Portal',
+          badge: 'FACULTY',
+          badgeBg: 'rgba(59, 130, 246, 0.15)',
+          badgeColor: '#60A5FA',
+          subtitle: `${myBranch?.name || 'Main Campus'} • Training Faculty`,
+        };
+      case 'super_admin':
+      default:
+        return {
+          title: 'Tripple T SMS',
+          badge: 'HQ MASTER',
+          badgeBg: 'rgba(239, 68, 68, 0.15)',
+          badgeColor: '#F87171',
+          subtitle: 'National Headquarters • Multi-Campus Master Control',
+        };
+    }
+  };
+
+  const brandInfo = getBrandInfo();
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -170,27 +211,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
+                background: currentRole === 'student'
+                  ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                  : 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
-                boxShadow: '0 4px 12px rgba(212, 154, 91, 0.3)',
+                boxShadow: currentRole === 'student'
+                  ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                  : '0 4px 12px rgba(212, 154, 91, 0.3)',
                 fontWeight: 800,
                 fontSize: '1.2rem',
               }}
             >
-              ☕
+              {currentRole === 'student' ? '🎓' : '☕'}
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span>{isPortalMode() ? 'Academy Portal' : 'Tripple T'}</span>
-                <span style={{ fontSize: '0.65rem', background: isPortalMode() ? 'rgba(16, 185, 129, 0.15)' : 'var(--primary-accent-bg)', color: isPortalMode() ? '#10B981' : 'var(--primary-accent)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                  {isPortalMode() ? 'PORTAL' : 'SMS'}
+              <div style={{ fontWeight: 800, fontSize: '1.02rem', letterSpacing: '-0.02em', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span>{brandInfo.title}</span>
+                <span style={{ fontSize: '0.62rem', background: brandInfo.badgeBg, color: brandInfo.badgeColor, padding: '2px 6px', borderRadius: '4px', fontWeight: 800, letterSpacing: '0.04em' }}>
+                  {brandInfo.badge}
                 </span>
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                {myBranch?.name || (currentRole === 'super_admin' ? 'All Campus Branches' : 'Main Campus')}
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, maxWidth: '175px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={brandInfo.subtitle}>
+                {brandInfo.subtitle}
               </div>
             </div>
           </div>

@@ -46,6 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ');
 
+    if (currentRole === 'student') {
+      return `Trainee Portal / ${formattedTab || 'Dashboard'}`;
+    }
     return `Home / ${formattedTab || 'Dashboard'}`;
   };
 
@@ -99,12 +102,12 @@ export const Header: React.FC<HeaderProps> = ({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              maxWidth: 'clamp(80px, 20vw, 150px)',
+              maxWidth: 'clamp(80px, 20vw, 160px)',
             }}
           >
             {getBreadcrumb()}
           </div>
-          {myBranch && (
+          {myBranch ? (
             <div
               style={{
                 display: 'inline-flex',
@@ -112,9 +115,9 @@ export const Header: React.FC<HeaderProps> = ({
                 gap: '4px',
                 padding: '2px 8px',
                 borderRadius: '12px',
-                background: 'rgba(212, 154, 91, 0.1)',
-                border: '1px solid rgba(212, 154, 91, 0.25)',
-                color: 'var(--crema-gold)',
+                background: currentRole === 'student' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(212, 154, 91, 0.1)',
+                border: currentRole === 'student' ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(212, 154, 91, 0.25)',
+                color: currentRole === 'student' ? '#10B981' : 'var(--crema-gold)',
                 fontSize: '0.70rem',
                 fontWeight: 600,
                 whiteSpace: 'nowrap',
@@ -123,7 +126,26 @@ export const Header: React.FC<HeaderProps> = ({
               <Building2 size={11} />
               <span>{myBranch.name}</span>
             </div>
-          )}
+          ) : currentRole === 'super_admin' ? (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#F87171',
+                fontSize: '0.70rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Building2 size={11} />
+              <span>Multi-Campus Master (All Branches)</span>
+            </div>
+          ) : null}
         </div>
       </div>
 

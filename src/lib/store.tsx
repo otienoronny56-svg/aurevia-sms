@@ -204,6 +204,31 @@ interface AppContextType {
     paymentMethod?: 'mpesa' | 'cash' | 'bank_transfer';
   }) => Promise<Payment>;
   revertPayment: (paymentId: string) => Promise<void>;
+  updateBranchPaymentConfig: (branchId: string, config: {
+    paybill_number?: string;
+    paybill_account_name?: string;
+    bank_name?: string;
+    bank_account_number?: string;
+    payment_instructions?: string;
+  }) => Promise<void>;
+  submitMpesaConfirmationSMS: (params: {
+    invoiceId: string;
+    rawMpesaText: string;
+    claimedAmount: number;
+    studentId: string;
+    branchId: string;
+    mpesaReceiptNumber?: string;
+    phoneNumber?: string;
+  }) => Promise<Payment>;
+  verifyAndApprovePayment: (params: {
+    paymentId: string;
+    verifiedAmount: number;
+    remarks?: string;
+  }) => Promise<Payment>;
+  rejectMpesaPayment: (params: {
+    paymentId: string;
+    reason: string;
+  }) => Promise<void>;
   recordAttendance: (record: { cohortId: string; studentId: string; status: 'present' | 'absent' | 'late' | 'excused'; sessionTitle?: string; sessionDate?: string } | Array<{ cohortId: string; studentId: string; status: 'present' | 'absent' | 'late' | 'excused'; sessionTitle?: string; sessionDate?: string }>) => Promise<void>;
   recordAssessment: (assessment: Partial<Assessment>) => Promise<void>;
   submitAssessment: (assessment: Partial<Assessment>) => Promise<void>;
@@ -2257,11 +2282,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    // Send SMS receipt and register in communications hub
+    // Send SMS receipt and register in communications hub strictly signed with campus name
     const student = students.find((s) => s.id === invoice.student_id);
     const studentProfile = profiles.find((p) => p.id === student?.profile_id);
     const branchObj = branches.find((b) => b.id === invoice.branch_id);
-    const receiptMsg = `Confirmed KES ${params.amount.toLocaleString()} received for Invoice ${invoice.invoice_number}. M-Pesa Ref: ${receiptNumber}. ${branchObj?.name || 'Aurevia Coffee Institute'} (Tripple T).`;
+    const campusSignature = branchObj?.name || 'Campus Bursar Desk';
+    const balanceMsg = newBalance <= 0 ? 'Tuition 100% Cleared.' : `Remaining Balance: KES ${newBalance.toLocaleString()}.`;
+    const receiptMsg = `Fee Receipt: Confirmed KES ${params.amount.toLocaleString()} received for Invoice ${invoice.invoice_number}. M-Pesa Ref: ${receiptNumber}. ${balanceMsg} - ${campusSignature}`;
     const smsLog = await sendInstitutionalSMS({
       recipientPhone: params.phone,
       recipientName: studentProfile?.full_name || 'Student',
@@ -2287,14 +2314,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Supabase SMS log error:', smsErr);
     }
 
-    // Dispatch Resend branded HTML tuition receipt email
+    // Dispatch Resend branded HTML tuition receipt email signed with campus name
     if (studentProfile?.email && studentProfile.email.includes('@')) {
       const enrollment = enrollments.find((e) => e.id === invoice.enrollment_id);
       const cohort = cohorts.find((ch) => ch.id === enrollment?.cohort_id);
       const course = courses.find((c) => c.id === cohort?.course_id);
       const emailHtml = generateTuitionReceiptEmailHtml({
         studentName: studentProfile.full_name,
-        regNumber: studentProfile.reg_number || 'AUR/NBO/2026/001',
+        regNumber: studentProfile.reg_number || 'REG-PENDING',
         courseTitle: course?.title || 'Specialty Coffee Course',
         amountPaid: params.amount,
         receiptNumber,
@@ -2304,7 +2331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       sendResendEmail({
         to: studentProfile.email,
-        subject: `Payment Receipt: KES ${params.amount.toLocaleString()} - ${branchObj?.name || 'Aurevia Coffee Institute'}`,
+        subject: `Payment Receipt: KES ${params.amount.toLocaleString()} - ${campusSignature}`,
         html: emailHtml,
       }).then((res) => {
         setSmsLogs((prev) => [
@@ -2379,6 +2406,261 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return next;
       });
     }
+  };
+
+  // Update Campus Paybill & Banking Configuration
+  const updateBranchPaymentConfig = async (
+    branchId: string,
+    config: {
+      paybill_number?: string;
+      paybill_account_name?: string;
+      bank_name?: string;
+      bank_account_number?: string;
+      payment_instructions?: string;
+    }
+  ): Promise<void> => {
+    try {
+      await supabase
+        .from('aur_branches')
+        .update({
+          paybill_number: config.paybill_number,
+          paybill_account_name: config.paybill_account_name,
+          bank_name: config.bank_name,
+          bank_account_number: config.bank_account_number,
+          payment_instructions: config.payment_instructions,
+        })
+        .eq('id', branchId);
+    } catch (e) {
+      console.warn('Supabase branch paybill update notice:', e);
+    }
+
+    setBranches((prev) => {
+      const next = prev.map((b) => (b.id === branchId ? { ...b, ...config } : b));
+      localStorage.setItem('aur_branches', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Trainee M-Pesa SMS Confirmation Submission (Pending Verification Queue)
+  const submitMpesaConfirmationSMS = async (params: {
+    invoiceId: string;
+    rawMpesaText: string;
+    claimedAmount: number;
+    studentId: string;
+    branchId: string;
+    mpesaReceiptNumber?: string;
+    phoneNumber?: string;
+  }): Promise<Payment> => {
+    const invoice = invoices.find((i) => i.id === params.invoiceId);
+    if (!invoice) throw new Error('Invoice not found');
+
+    let extractedCode = params.mpesaReceiptNumber;
+    if (!extractedCode && params.rawMpesaText) {
+      const match = params.rawMpesaText.match(/\b([A-Z0-9]{10})\b/i);
+      if (match) extractedCode = match[1].toUpperCase();
+    }
+    const finalReceiptNo = extractedCode || ('VERIF-' + Date.now().toString().slice(-6));
+
+    let newPayment: Payment;
+    try {
+      const { data, error } = await supabase
+        .from('aur_payments')
+        .insert({
+          invoice_id: params.invoiceId,
+          student_id: params.studentId,
+          branch_id: params.branchId,
+          amount: params.claimedAmount,
+          payment_method: 'mpesa',
+          mpesa_receipt_number: finalReceiptNo,
+          mpesa_phone_number: params.phoneNumber,
+          raw_mpesa_text: params.rawMpesaText,
+          submitted_by_student_id: currentProfile.id,
+          status: 'pending_verification',
+        })
+        .select()
+        .single();
+
+      if (error || !data) throw error;
+      newPayment = {
+        ...data,
+        status: 'pending_verification',
+      };
+    } catch (err) {
+      newPayment = {
+        id: 'pay-' + Date.now(),
+        invoice_id: params.invoiceId,
+        student_id: params.studentId,
+        branch_id: params.branchId,
+        amount: params.claimedAmount,
+        payment_method: 'mpesa',
+        mpesa_receipt_number: finalReceiptNo,
+        mpesa_phone_number: params.phoneNumber,
+        raw_mpesa_text: params.rawMpesaText,
+        submitted_by_student_id: currentProfile.id,
+        status: 'pending_verification',
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    setPayments((prev) => {
+      const next = [newPayment, ...prev];
+      localStorage.setItem('aur_payments', JSON.stringify(next));
+      return next;
+    });
+
+    return newPayment;
+  };
+
+  // Branch Manager & Super Admin: Verify & Approve M-Pesa Payment
+  const verifyAndApprovePayment = async (params: {
+    paymentId: string;
+    verifiedAmount: number;
+    remarks?: string;
+  }): Promise<Payment> => {
+    const payment = payments.find((p) => p.id === params.paymentId);
+    if (!payment) throw new Error('Payment submission not found');
+
+    const invoice = invoices.find((i) => i.id === payment.invoice_id);
+    if (!invoice) throw new Error('Associated invoice not found');
+
+    const finalAmount = params.verifiedAmount > 0 ? params.verifiedAmount : payment.amount;
+    const nowIso = new Date().toISOString();
+
+    try {
+      await supabase
+        .from('aur_payments')
+        .update({
+          amount: finalAmount,
+          status: 'completed',
+          verified_by_profile_id: currentProfile.id,
+          verified_at: nowIso,
+          verification_remarks: params.remarks || 'Approved by Campus Bursar Desk',
+        })
+        .eq('id', params.paymentId);
+    } catch (e) {
+      console.warn('Supabase update payment verification notice:', e);
+    }
+
+    const updatedPayment: Payment = {
+      ...payment,
+      amount: finalAmount,
+      status: 'completed',
+      verified_by_profile_id: currentProfile.id,
+      verified_at: nowIso,
+      verification_remarks: params.remarks || 'Approved by Campus Bursar Desk',
+    };
+
+    setPayments((prev) => {
+      const next = prev.map((p) => (p.id === params.paymentId ? updatedPayment : p));
+      localStorage.setItem('aur_payments', JSON.stringify(next));
+      return next;
+    });
+
+    // Update invoice balances (accurately handles partial payment)
+    const newPaid = (invoice.amount_paid || 0) + finalAmount;
+    const newBalance = Math.max(0, invoice.total_fee - newPaid);
+    const dbStatus = newBalance === 0 ? 'paid' : newPaid > 0 ? 'partially_paid' : 'unpaid';
+    const localStatus = newBalance === 0 ? 'paid' : newPaid > 0 ? 'partial' : 'unpaid';
+
+    try {
+      await supabase
+        .from('aur_invoices')
+        .update({
+          amount_paid: newPaid,
+          balance_due: newBalance,
+          status: dbStatus,
+        })
+        .eq('id', invoice.id);
+    } catch (e) {
+      console.warn('Supabase invoice update notice:', e);
+    }
+
+    setInvoices((prev) => {
+      const next = prev.map((inv) =>
+        inv.id === invoice.id
+          ? { ...inv, amount_paid: newPaid, balance_due: newBalance, status: localStatus as any }
+          : inv
+      );
+      localStorage.setItem('aur_invoices', JSON.stringify(next));
+      return next;
+    });
+
+    // Send SMS receipt strictly signed with campus name
+    const student = students.find((s) => s.id === invoice.student_id);
+    const studentProfile = profiles.find((p) => p.id === student?.profile_id);
+    const branchObj = branches.find((b) => b.id === invoice.branch_id);
+    const campusName = branchObj?.name || 'Campus Bursar Desk';
+    const studentPhone = payment.mpesa_phone_number || studentProfile?.phone || student?.emergency_contact_phone;
+    const balanceMsg = newBalance <= 0 ? 'Tuition 100% Cleared.' : `Remaining Balance: KES ${newBalance.toLocaleString()}.`;
+
+    const receiptMsg = `Fee Receipt: Confirmed KES ${finalAmount.toLocaleString()} received for Invoice ${invoice.invoice_number}. M-Pesa Ref: ${payment.mpesa_receipt_number || 'OK'}. ${balanceMsg} - ${campusName}`;
+
+    if (studentPhone) {
+      const smsLog = await sendInstitutionalSMS({
+        recipientPhone: studentPhone,
+        recipientName: studentProfile?.full_name || 'Trainee',
+        message: receiptMsg,
+        purpose: 'fee_receipt',
+      });
+      setSmsLogs((prev) => [
+        {
+          ...smsLog,
+          branch_id: invoice.branch_id,
+          audience_segment: 'Fee Payers',
+        },
+        ...prev,
+      ]);
+    }
+
+    // Send Email receipt strictly signed with campus name
+    if (studentProfile?.email && studentProfile.email.includes('@')) {
+      const enrollment = enrollments.find((e) => e.id === invoice.enrollment_id);
+      const cohort = cohorts.find((ch) => ch.id === enrollment?.cohort_id);
+      const course = courses.find((c) => c.id === cohort?.course_id);
+      const emailHtml = generateTuitionReceiptEmailHtml({
+        studentName: studentProfile.full_name,
+        regNumber: studentProfile.reg_number || 'REG-PENDING',
+        courseTitle: course?.title || 'Specialty Coffee Course',
+        amountPaid: finalAmount,
+        receiptNumber: payment.mpesa_receipt_number || ('REC-' + Date.now().toString().slice(-6)),
+        mpesaCode: payment.mpesa_receipt_number || 'VERIFIED',
+        balanceDue: newBalance,
+      });
+
+      sendResendEmail({
+        to: studentProfile.email,
+        subject: `Official Tuition Receipt: KES ${finalAmount.toLocaleString()} - ${campusName}`,
+        html: emailHtml,
+      }).catch((e) => console.warn('Resend auto-receipt notice:', e));
+    }
+
+    return updatedPayment;
+  };
+
+  // Branch Manager & Super Admin: Reject M-Pesa Payment Submission
+  const rejectMpesaPayment = async (params: { paymentId: string; reason: string }): Promise<void> => {
+    const payment = payments.find((p) => p.id === params.paymentId);
+    if (!payment) throw new Error('Payment not found');
+
+    try {
+      await supabase
+        .from('aur_payments')
+        .update({
+          status: 'rejected',
+          verification_remarks: params.reason,
+        })
+        .eq('id', params.paymentId);
+    } catch (e) {
+      console.warn('Supabase reject payment notice:', e);
+    }
+
+    setPayments((prev) => {
+      const next = prev.map((p) =>
+        p.id === params.paymentId ? { ...p, status: 'rejected' as const, verification_remarks: params.reason } : p
+      );
+      localStorage.setItem('aur_payments', JSON.stringify(next));
+      return next;
+    });
   };
 
   // Record Attendance (supports single record or array)
@@ -3844,6 +4126,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateStudentKYC,
         processMpesaPayment,
         revertPayment,
+        updateBranchPaymentConfig,
+        submitMpesaConfirmationSMS,
+        verifyAndApprovePayment,
+        rejectMpesaPayment,
         recordAttendance,
         recordAssessment,
         submitAssessment,

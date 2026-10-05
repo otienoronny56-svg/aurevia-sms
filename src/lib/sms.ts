@@ -74,12 +74,14 @@ export function buildFeeReceiptSMS(params: {
   amount: number;
   receiptNumber: string;
   balanceDue: number;
+  campusName?: string;
 }): string {
+  const campus = params.campusName || 'Campus Bursar Desk';
   const balanceMsg = params.balanceDue <= 0 
     ? 'Fee Status: FULLY CLEARED. We look forward to your practical sessions!'
     : `Remaining Balance: KES ${params.balanceDue.toLocaleString()}.`;
 
-  return `Aurevia Institute of Coffee: Payment of KES ${params.amount.toLocaleString()} received for ${params.studentName} (${params.regNumber}). Receipt: ${params.receiptNumber}. ${balanceMsg}`;
+  return `Fee Receipt: Payment of KES ${params.amount.toLocaleString()} received for ${params.studentName} (${params.regNumber}). Ref: ${params.receiptNumber}. ${balanceMsg} - ${campus}`;
 }
 
 export function buildLoginAlertSMS(params: {

@@ -4,10 +4,12 @@ import {
   Building2, Users, DollarSign, BookOpen, Plus, Search, Coffee,
   Award, TrendingUp, CheckCircle2, Clock, Phone, Mail, Shield, MessageSquare,
   Calendar, Video, FileText, UserCheck, ShieldCheck, Filter, ExternalLink, ChevronRight,
-  Trash2, Key, Edit3, CalendarCheck, Check, X, GraduationCap, Beaker, Laptop, Compass, MapPin
+  Trash2, Key, Edit3, CalendarCheck, Check, X, GraduationCap, Beaker, Laptop, Compass, MapPin,
+  Smartphone, FileCheck
 } from 'lucide-react';
 import { StudentKYCModal } from '../components/modals/StudentKYCModal';
 import { MpesaPaymentModal } from '../components/modals/MpesaPaymentModal';
+import { ConfigureBranchPaybillModal } from '../components/modals/ConfigureBranchPaybillModal';
 import { StudentDetailModal } from '../components/modals/StudentDetailModal';
 import { CreateCohortModal } from '../components/modals/CreateCohortModal';
 import { EditCohortModal } from '../components/modals/EditCohortModal';
@@ -89,6 +91,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     lessons,
     labs,
     deleteLesson,
+    verifyAndApprovePayment,
+    rejectMpesaPayment,
   } = useApp();
 
   const [localActiveTab, setLocalActiveTab] = useState<DashboardTab>('overview');
@@ -98,6 +102,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [showKYCModal, setShowKYCModal] = useState(false);
   const [showCreateCohortModal, setShowCreateCohortModal] = useState(false);
   const [editingCohort, setEditingCohort] = useState<Cohort | null>(null);
+  const [configuringPaybillBranchId, setConfiguringPaybillBranchId] = useState<string | null>(null);
+  const [adminVerificationToast, setAdminVerificationToast] = useState<string | null>(null);
+  const [adminVerifiedAmountInput, setAdminVerifiedAmountInput] = useState<Record<string, number>>({});
+  const [adminVerificationRemarksInput, setAdminVerificationRemarksInput] = useState<Record<string, string>>({});
+  const [adminIsVerifyingId, setAdminIsVerifyingId] = useState<string | null>(null);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
   const [showRecordLeaveModal, setShowRecordLeaveModal] = useState(false);
@@ -2777,8 +2786,341 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       {/* TAB: M-PESA & REVENUE LEDGER */}
       {/* ========================================================================= */}
       {(activeTab === 'finance' || activeTab === 'payments') && (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Admin Verification Toast Notification */}
+          {adminVerificationToast && (
+            <div
+              className="glass-card"
+              style={{
+                padding: '12px 18px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid #10B981',
+                color: '#10B981',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <CheckCircle2 size={18} />
+              <span>{adminVerificationToast}</span>
+            </div>
+          )}
 
+          {/* MULTI-CAMPUS PAYBILL & BANKING CREDENTIALS DIRECTORY */}
+          <div
+            className="glass-card"
+            style={{
+              padding: '20px',
+              border: '1px solid rgba(212, 154, 91, 0.3)',
+              background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.1) 0%, rgba(24, 19, 16, 0.6) 100%)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'var(--crema-gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#000',
+                  }}
+                >
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                    Campus M-Pesa Paybill & Banking Master Registry
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Each campus operates with its designated Paybill and Account Name. Changes update all trainee payment screens in real time.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              {filteredBranches.map((b) => (
+                <div
+                  key={b.id}
+                  style={{
+                    background: 'var(--bg-surface-elevated)',
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{b.name}</span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          background: 'rgba(212, 154, 91, 0.15)',
+                          color: 'var(--crema-gold)',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {b.city || 'Campus'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '6px 10px', borderRadius: '6px' }}>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Paybill Business #</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#4ADE80' }}>
+                          {b.paybill_number || '174379'}
+                        </div>
+                      </div>
+                      <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '6px 10px', borderRadius: '6px' }}>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Paybill Account Name</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
+                          {b.paybill_account_name || (b.code ? `AUREVIA-${b.code}` : 'AUREVIA-HQ')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Bank: <strong style={{ color: 'var(--text-primary)' }}>{b.bank_name || 'KCB Bank'}</strong> • A/C: <span style={{ fontFamily: 'var(--font-mono)' }}>{b.bank_account_number || '1289456780'}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setConfiguringPaybillBranchId(b.id)}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: '0.75rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      width: '100%',
+                    }}
+                  >
+                    <span>⚙️ Configure {b.name} Paybill</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* MULTI-CAMPUS PENDING M-PESA SMS VERIFICATIONS QUEUE */}
+          {filteredPayments.filter((p) => p.status === 'pending_verification').length > 0 && (
+            <div
+              className="glass-card"
+              style={{
+                padding: '20px',
+                border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(24, 19, 16, 0.6) 100%)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileCheck size={20} color="#FBBF24" />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#FBBF24' }}>
+                    Multi-Campus Pending M-Pesa Verifications ({filteredPayments.filter((p) => p.status === 'pending_verification').length})
+                  </h3>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#FBBF24',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Requires Verification
+                </span>
+              </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
+                Trainees have submitted Safaricom M-Pesa confirmation SMS messages. Review the raw SMS, confirm the funds on your campus statement, verify/adjust the amount (supporting partial payment), and click Verify & Approve to update the balance and dispatch official SMS/Email receipts signed with the respective campus name.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {filteredPayments
+                  .filter((p) => p.status === 'pending_verification')
+                  .map((p) => {
+                    const student = students.find((s) => s.id === p.student_id);
+                    const profile = profiles.find((pr) => pr.id === student?.profile_id);
+                    const invoice = invoices.find((inv) => inv.id === p.invoice_id);
+                    const branch = branches.find((b) => b.id === p.branch_id);
+                    const currentVerifiedAmt = adminVerifiedAmountInput[p.id] ?? p.amount;
+
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          borderRadius: '10px',
+                          padding: '14px 16px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{profile?.full_name || 'Trainee'}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--crema-gold)', marginLeft: '8px', fontWeight: 600 }}>
+                              {profile?.reg_number}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                background: 'rgba(212, 154, 91, 0.12)',
+                                color: 'var(--crema-gold)',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                marginLeft: '8px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {branch?.name || 'Campus'}
+                            </span>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                              Invoice: <strong>{invoice?.invoice_number}</strong> • Balance Due: <strong style={{ color: 'var(--cherry-red)' }}>KES {(invoice?.balance_due || 0).toLocaleString()}</strong> of Total KES {(invoice?.total_fee || 0).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Claimed Amount</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#4ADE80' }}>
+                              KES {(Number(p.amount) || 0).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                              Ref: {p.mpesa_receipt_number || 'VERIF-PENDING'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Raw Safaricom SMS Bubble */}
+                        <div
+                          style={{
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-subtle)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.76rem',
+                            color: 'var(--text-primary)',
+                            wordBreak: 'break-word',
+                            marginBottom: '12px',
+                          }}
+                        >
+                          <span style={{ color: 'var(--crema-gold)', fontWeight: 700 }}>Pasted Safaricom SMS: </span>
+                          {p.raw_mpesa_text || 'No raw SMS text attached.'}
+                        </div>
+
+                        {/* Verification & Approval Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Verified Amount (KES):
+                              </label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                value={currentVerifiedAmt}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setAdminVerifiedAmountInput((prev) => ({ ...prev, [p.id]: val }));
+                                }}
+                                style={{ width: '110px', padding: '4px 8px', fontSize: '0.8rem', fontWeight: 700 }}
+                              />
+                            </div>
+
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Optional remarks / bank ref..."
+                              value={adminVerificationRemarksInput[p.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdminVerificationRemarksInput((prev) => ({ ...prev, [p.id]: val }));
+                              }}
+                              style={{ width: '220px', padding: '4px 8px', fontSize: '0.75rem' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-mpesa"
+                              disabled={adminIsVerifyingId === p.id}
+                              onClick={async () => {
+                                setAdminIsVerifyingId(p.id);
+                                try {
+                                  await verifyAndApprovePayment({
+                                    paymentId: p.id,
+                                    verifiedAmount: currentVerifiedAmt,
+                                    remarks: adminVerificationRemarksInput[p.id] || 'Verified by HQ Super Admin',
+                                  });
+                                  setAdminVerificationToast(`Payment of KES ${currentVerifiedAmt.toLocaleString()} for ${profile?.full_name} approved! SMS & email receipt dispatched.`);
+                                  setTimeout(() => setAdminVerificationToast(null), 5000);
+                                } catch (err: any) {
+                                  alert(err.message || 'Failed to approve payment.');
+                                } finally {
+                                  setAdminIsVerifyingId(null);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              <CheckCircle2 size={14} />
+                              <span>{adminIsVerifyingId === p.id ? 'Approving...' : '✓ Verify & Approve'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={async () => {
+                                const reason = window.prompt('Enter rejection reason to notify student:', 'Payment reference not found on campus bank statement');
+                                if (reason) {
+                                  await rejectMpesaPayment({ paymentId: p.id, reason });
+                                  setAdminVerificationToast(`Payment submission rejected.`);
+                                  setTimeout(() => setAdminVerificationToast(null), 4000);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                color: '#EF4444',
+                              }}
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* MASTER REVENUE & M-PESA TRANSACTION LEDGER */}
           <div className="table-container" style={{ marginBottom: '16px' }}>
             <table className="data-table">
               <thead>
@@ -2801,6 +3143,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     <tr key={p.id}>
                       <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', fontWeight: 700 }}>
                         {p.mpesa_receipt_number || 'STK-' + p.id.slice(0, 6)}
+                        {p.raw_mpesa_text && (
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Pasted SMS</div>
+                        )}
                       </td>
                       <td>
                         <div style={{ fontWeight: 600 }}>{profile?.full_name || 'Trainee'}</div>
@@ -2814,7 +3159,33 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         {new Date(p.created_at).toLocaleDateString()}
                       </td>
                       <td>
-                        <span className="badge badge-paid">{p.status}</span>
+                        {p.status === 'pending_verification' ? (
+                          <span
+                            className="badge"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#FBBF24',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                            }}
+                          >
+                            ⏳ Verification Pending
+                          </span>
+                        ) : p.status === 'completed' ? (
+                          <span className="badge badge-paid">✓ Verified</span>
+                        ) : p.status === 'rejected' ? (
+                          <span
+                            className="badge"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#EF4444',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                            }}
+                          >
+                            Rejected
+                          </span>
+                        ) : (
+                          <span className="badge badge-paid">{p.status}</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -3266,6 +3637,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       {showManageLabsModal && (
         <ManageLabsModal
           onClose={() => setShowManageLabsModal(false)}
+        />
+      )}
+
+      {/* Configure Campus Paybill Modal */}
+      {configuringPaybillBranchId && (
+        <ConfigureBranchPaybillModal
+          branchId={configuringPaybillBranchId}
+          onClose={() => setConfiguringPaybillBranchId(null)}
         />
       )}
     </div>

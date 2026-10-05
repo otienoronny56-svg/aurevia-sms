@@ -1795,10 +1795,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                      Self-Service Fee Payment via M-Pesa STK
+                      Campus Fee Payment & M-Pesa Confirmation
                     </h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '3px 0 0 0' }}>
-                      Prompt sent to: <strong>{profile?.phone || student?.emergency_contact_phone || '0714767240'}</strong> • Enter M-Pesa PIN on your phone
+                      Paybill: <strong>{myBranch?.paybill_number || '174379'}</strong> • Account: <strong style={{ color: 'var(--crema-gold)' }}>{myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}</strong> • {myBranch?.name}
                     </p>
                   </div>
                 </div>
@@ -1817,8 +1817,8 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     boxShadow: '0 4px 14px rgba(0, 166, 81, 0.35)',
                   }}
                 >
-                  <Smartphone size={18} />
-                  <span>Pay Balance with M-Pesa (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
+                  <FileCheck size={18} />
+                  <span>Pay & Paste M-Pesa SMS (KES {(Number(myInvoice?.balance_due) || 0).toLocaleString()})</span>
                 </button>
               </div>
 
@@ -1876,12 +1876,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
               <Building2 size={18} color="var(--crema-gold)" />
               <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
-                Manual Paybill & Bank Deposit Reference
+                Campus M-Pesa Paybill & Bank Wire Credentials
               </h3>
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-              Prefer to pay via your M-Pesa Sim ToolKit menu or Bank EFT/Wire? Use the institutional credentials below. Funds will be matched to your student registration index.
+              Pay via your M-Pesa SIM menu or Bank transfer using the campus credentials below. Then paste your confirmation SMS to have your tuition balance credited.
             </p>
 
             <div
@@ -1903,12 +1903,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Safaricom M-Pesa Paybill</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                   <span style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#4ADE80' }}>
-                    174379
+                    {myBranch?.paybill_number || '174379'}
                   </span>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => handleCopy('174379', 'paybill')}
+                    onClick={() => handleCopy(myBranch?.paybill_number || '174379', 'paybill')}
                     style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
                     title="Copy Paybill number"
                   >
@@ -1928,15 +1928,15 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   padding: '14px',
                 }}
               >
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Account Reference</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Campus Account Name</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                   <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
-                    {profile?.reg_number || myInvoice?.invoice_number || 'AUR/NBO/2026/001'}
+                    {myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}
                   </span>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => handleCopy(profile?.reg_number || myInvoice?.invoice_number || 'AUR/NBO/2026/001', 'account')}
+                    onClick={() => handleCopy(myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ'), 'account')}
                     style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
                     title="Copy Account Reference"
                   >
@@ -1944,7 +1944,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use your exact Student Reg No.</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>Use this exact campus account name</div>
               </div>
 
               {/* Bank Account Card */}
@@ -1956,15 +1956,15 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   padding: '14px',
                 }}
               >
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Bank Deposit (KCB Bank)</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Bank Deposit ({myBranch?.bank_name || 'KCB Bank'})</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                   <span style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                    1289456780
+                    {myBranch?.bank_account_number || '1289456780'}
                   </span>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => handleCopy('1289456780', 'bank')}
+                    onClick={() => handleCopy(myBranch?.bank_account_number || '1289456780', 'bank')}
                     style={{ padding: '3px 8px', fontSize: '0.72rem', height: '26px' }}
                     title="Copy Bank Account"
                   >
@@ -1972,7 +1972,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     <span>{copiedKey === 'bank' ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>KCB Bank • Westlands Hub</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px' }}>{myBranch?.name}</div>
               </div>
             </div>
           </div>
@@ -2042,12 +2042,46 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#10B981', fontSize: '0.92rem' }}>
                           {pay.mpesa_receipt_number || 'REC-' + pay.id.slice(0, 6)}
                         </span>
-                        <span className="badge badge-paid" style={{ fontSize: '0.65rem' }}>
-                          Audited & Verified
-                        </span>
+                        {pay.status === 'pending_verification' ? (
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#FBBF24',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Clock size={11} />
+                            Bursar Verification Pending
+                          </span>
+                        ) : pay.status === 'rejected' ? (
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#F87171',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            Verification Rejected
+                          </span>
+                        ) : (
+                          <span className="badge badge-paid" style={{ fontSize: '0.65rem' }}>
+                            Audited & Verified
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                        {new Date(pay.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • Channel: <strong>{pay.payment_method.toUpperCase()}</strong> {pay.mpesa_phone_number && `(${pay.mpesa_phone_number})`}
+                        {new Date(pay.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • Channel: <strong>{pay.payment_method.toUpperCase()}</strong> {pay.mpesa_phone_number && `(${pay.mpesa_phone_number})`} {pay.status === 'pending_verification' && '• Queued for campus verification'}
                       </div>
                     </div>
 

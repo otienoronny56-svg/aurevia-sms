@@ -10,6 +10,11 @@ export interface Branch {
   phone: string;
   email: string;
   manager_name?: string;
+  paybill_number?: string;
+  paybill_account_name?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  payment_instructions?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -174,7 +179,12 @@ export interface Payment {
   mpesa_receipt_number?: string;
   mpesa_phone_number?: string;
   daraja_checkout_request_id?: string;
-  status: 'pending' | 'completed' | 'failed';
+  raw_mpesa_text?: string;
+  submitted_by_student_id?: string;
+  verified_by_profile_id?: string;
+  verified_at?: string;
+  verification_remarks?: string;
+  status: 'pending' | 'completed' | 'failed' | 'pending_verification' | 'reversed' | 'rejected';
   receipt_url?: string;
   created_at: string;
 }

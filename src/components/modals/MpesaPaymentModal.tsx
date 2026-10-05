@@ -24,6 +24,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Clock,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 interface MpesaPaymentModalProps {
@@ -51,6 +53,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
     enrollments,
     invoices,
     processMpesaPayment,
+    submitMpesaConfirmationSMS,
     revertPayment,
   } = useApp();
 
@@ -77,12 +80,42 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
   const student = students.find((s) => s.id === activeInvoice?.student_id);
   const profile = profiles.find((p) => p.id === student?.profile_id);
   const branch = branches.find((b) => b.id === activeInvoice?.branch_id);
-  const enr = enrollments.find((e) => e.id === activeInvoice?.enrollment_id || e.student_id === activeInvoice?.student_id);
-  const cohort = cohorts.find((c) => c.id === enr?.cohort_id);
+  const enrollment = enrollments.find((e) => e.student_id === student?.id);
+  const cohort = cohorts.find((c) => c.id === enrollment?.cohort_id);
   const course = courses.find((c) => c.id === cohort?.course_id);
+  const campusPaybill = branch?.paybill_number || '174379';
+  const campusAccount = branch?.paybill_account_name || (branch?.code ? `AUREVIA-${branch.code}` : 'AUREVIA-HQ');
+  const campusBankName = branch?.bank_name || 'KCB Bank Kenya';
+  const campusBankAccount = branch?.bank_account_number || '1289456780';
 
-  // Payment Method: 'mpesa' | 'cash' | 'bank_transfer'
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'cash' | 'bank_transfer'>('mpesa');
+  // Payment Method: 'paste_sms' | 'mpesa' | 'cash' | 'bank_transfer'
+  const [paymentMethod, setPaymentMethod] = useState<'paste_sms' | 'mpesa' | 'cash' | 'bank_transfer'>('paste_sms');
+  const [rawMpesaText, setRawMpesaText] = useState('');
+  const [extractedReceiptNo, setExtractedReceiptNo] = useState('');
+  const [isSubmittingSMS, setIsSubmittingSMS] = useState(false);
+  const [submittedForVerification, setSubmittedForVerification] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleRawMpesaChange = (text: string) => {
+    setRawMpesaText(text);
+    const codeMatch = text.match(/\b([A-Z0-9]{10})\b/i);
+    if (codeMatch) {
+      setExtractedReceiptNo(codeMatch[1].toUpperCase());
+    }
+    const amtMatch = text.match(/(?:Ksh|KES)\.?\s*([0-9,]+(?:\.[0-9]{2})?)/i);
+    if (amtMatch) {
+      const parsed = parseFloat(amtMatch[1].replace(/,/g, ''));
+      if (parsed > 0) {
+        setAmount(parsed);
+      }
+    }
+  };
 
   const defaultPhone = isStudent
     ? (currentProfile?.phone || profile?.phone || student?.emergency_contact_phone || '0714767240')
@@ -239,6 +272,38 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
     setErrorMessage('');
 
+    // 1. Submit M-Pesa SMS Confirmation for Bursar Verification
+    if (paymentMethod === 'paste_sms') {
+      if (!rawMpesaText.trim()) {
+        setErrorMessage('Please paste the confirmation SMS received from Safaricom M-Pesa on your phone.');
+        return;
+      }
+      setIsSubmittingSMS(true);
+      try {
+        const payment = await submitMpesaConfirmationSMS({
+          invoiceId: activeInvoice.id,
+          rawMpesaText: rawMpesaText.trim(),
+          claimedAmount: numericAmount,
+          studentId: activeInvoice.student_id,
+          branchId: activeInvoice.branch_id,
+          mpesaReceiptNumber: extractedReceiptNo || undefined,
+          phoneNumber: formatMpesaPhoneNumber(phone),
+        });
+        setCreatedPayment(payment);
+        setSubmittedForVerification(true);
+        setStep('success');
+        try {
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        } catch (_) {}
+        if (onSuccess) onSuccess();
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Failed to submit M-Pesa SMS verification.');
+      } finally {
+        setIsSubmittingSMS(false);
+      }
+      return;
+    }
+
     if (paymentMethod === 'mpesa') {
       const cleanPhone = formatMpesaPhoneNumber(phone);
       if (cleanPhone.length < 12) {
@@ -393,21 +458,107 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                 </div>
               )}
 
+              {/* CAMPUS PAYBILL & ACCOUNT CARD */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0, 166, 81, 0.12) 0%, rgba(24, 19, 16, 0.6) 100%)',
+                  border: '1px solid rgba(0, 166, 81, 0.3)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Smartphone size={15} color="#4ADE80" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4ADE80' }}>
+                      Official Campus M-Pesa Paybill
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    {branch?.name || 'Main Campus'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ background: 'var(--bg-surface-elevated)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Business Paybill</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#4ADE80' }}>
+                        {campusPaybill}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => handleCopy(campusPaybill, 'modal_paybill')}
+                        style={{ padding: '2px 6px', fontSize: '0.68rem', height: '22px' }}
+                      >
+                        {copiedKey === 'modal_paybill' ? <Check size={11} color="#10B981" /> : <Copy size={11} />}
+                        <span>{copiedKey === 'modal_paybill' ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-surface-elevated)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Account Name</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)' }}>
+                        {campusAccount}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => handleCopy(campusAccount, 'modal_account')}
+                        style={{ padding: '2px 6px', fontSize: '0.68rem', height: '22px' }}
+                      >
+                        {copiedKey === 'modal_account' ? <Check size={11} color="#10B981" /> : <Copy size={11} />}
+                        <span>{copiedKey === 'modal_account' ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* PAYMENT METHOD SELECTOR TABS */}
               <div style={{ marginBottom: '18px' }}>
                 <label className="form-label">Payment Channel</label>
-                <div style={{ display: 'grid', gridTemplateColumns: isStudent ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isStudent ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)', gap: '8px' }}>
+                  {/* Tab 1: Paste SMS (Default) */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('paste_sms')}
+                    style={{
+                      padding: '10px 6px',
+                      borderRadius: '8px',
+                      border: paymentMethod === 'paste_sms' ? '2px solid #00A651' : '1px solid var(--border-subtle)',
+                      background: paymentMethod === 'paste_sms' ? 'rgba(0, 166, 81, 0.18)' : 'var(--bg-surface-elevated)',
+                      color: paymentMethod === 'paste_sms' ? '#4ADE80' : 'var(--text-secondary)',
+                      fontWeight: 600,
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <FileCheck size={18} />
+                    <span>Paste M-Pesa SMS</span>
+                  </button>
+
+                  {/* Tab 2: STK Push (Coming Soon Telco Certification) */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('mpesa')}
                     style={{
-                      padding: '10px 8px',
+                      padding: '10px 6px',
                       borderRadius: '8px',
-                      border: paymentMethod === 'mpesa' ? '2px solid #00A651' : '1px solid var(--border-subtle)',
-                      background: paymentMethod === 'mpesa' ? 'rgba(0, 166, 81, 0.15)' : 'var(--bg-surface-elevated)',
-                      color: paymentMethod === 'mpesa' ? '#4ADE80' : 'var(--text-secondary)',
+                      border: paymentMethod === 'mpesa' ? '2px solid #F59E0B' : '1px solid var(--border-subtle)',
+                      background: paymentMethod === 'mpesa' ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-surface-elevated)',
+                      color: paymentMethod === 'mpesa' ? '#FBBF24' : 'var(--text-secondary)',
                       fontWeight: 600,
-                      fontSize: '0.78rem',
+                      fontSize: '0.74rem',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -417,7 +568,31 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     }}
                   >
                     <Smartphone size={18} />
-                    <span>{isStudent ? 'M-Pesa Instant STK' : 'M-Pesa STK'}</span>
+                    <span>STK Push (Soon)</span>
+                  </button>
+
+                  {/* Tab 3: Bank Transfer */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('bank_transfer')}
+                    style={{
+                      padding: '10px 6px',
+                      borderRadius: '8px',
+                      border: paymentMethod === 'bank_transfer' ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
+                      background: paymentMethod === 'bank_transfer' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-surface-elevated)',
+                      color: paymentMethod === 'bank_transfer' ? '#60A5FA' : 'var(--text-secondary)',
+                      fontWeight: 600,
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Building2 size={18} />
+                    <span>Bank Wire / EFT</span>
                   </button>
 
                   {!isStudent && (
@@ -425,13 +600,13 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                       type="button"
                       onClick={() => setPaymentMethod('cash')}
                       style={{
-                        padding: '10px 8px',
+                        padding: '10px 6px',
                         borderRadius: '8px',
                         border: paymentMethod === 'cash' ? '2px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
                         background: paymentMethod === 'cash' ? 'rgba(212, 154, 91, 0.15)' : 'var(--bg-surface-elevated)',
                         color: paymentMethod === 'cash' ? 'var(--crema-gold)' : 'var(--text-secondary)',
                         fontWeight: 600,
-                        fontSize: '0.78rem',
+                        fontSize: '0.74rem',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -444,29 +619,6 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                       <span>Cash / Desk</span>
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('bank_transfer')}
-                    style={{
-                      padding: '10px 8px',
-                      borderRadius: '8px',
-                      border: paymentMethod === 'bank_transfer' ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
-                      background: paymentMethod === 'bank_transfer' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-surface-elevated)',
-                      color: paymentMethod === 'bank_transfer' ? '#60A5FA' : 'var(--text-secondary)',
-                      fontWeight: 600,
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Building2 size={18} />
-                    <span>{isStudent ? 'Bank Wire / Paybill' : 'Bank Transfer'}</span>
-                  </button>
                 </div>
               </div>
 
@@ -511,31 +663,107 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                 </div>
               )}
 
-              {/* M-Pesa Phone Field */}
-              {paymentMethod === 'mpesa' && (
-                <div className="form-group">
-                  <label className="form-label">Safaricom Phone Number (for Live STK Prompt)</label>
-                  <div style={{ position: 'relative' }}>
-                    <Smartphone
-                      size={16}
-                      color="var(--text-muted)"
-                      style={{ position: 'absolute', left: '12px', top: '12px' }}
-                    />
-                    <input
-                      type="text"
+              {/* TAB 1: PASTE M-PESA SMS */}
+              {paymentMethod === 'paste_sms' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: '12px' }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MessageSquare size={14} color="#4ADE80" />
+                        Paste Safaricom M-Pesa Confirmation SMS
+                      </span>
+                      {extractedReceiptNo && (
+                        <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>
+                          ✓ Code: {extractedReceiptNo}
+                        </span>
+                      )}
+                    </label>
+                    <textarea
                       className="form-input"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0712345678 or 254712345678"
+                      rows={3}
+                      value={rawMpesaText}
+                      onChange={(e) => handleRawMpesaChange(e.target.value)}
+                      placeholder="e.g. QA47X9Y89K Confirmed. Ksh 15,000.00 sent to AUREVIA for account AUREVIA-NBO on 05/10/26 at 10:45 AM..."
                       required
-                      style={{ paddingLeft: '36px' }}
+                      style={{ fontSize: '0.8rem', lineHeight: 1.4 }}
                     />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Paste the SMS message received from MPESA on your phone. Code and amount will be auto-detected.
+                    </span>
                   </div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {isStudent
-                      ? 'A secure Safaricom M-Pesa PIN prompt will appear instantly on your phone.'
-                      : "A secure M-Pesa prompt will appear on the customer's phone."}
-                  </span>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">M-Pesa Reference Code</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={extractedReceiptNo}
+                        onChange={(e) => setExtractedReceiptNo(e.target.value.toUpperCase())}
+                        placeholder="e.g. QA47X9Y89K"
+                        style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Sender Phone Number</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0712345678"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: M-PESA STK PUSH (COMING SOON TELCO CERTIFICATION) */}
+              {paymentMethod === 'mpesa' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      background: 'rgba(245, 158, 11, 0.1)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      borderRadius: '8px',
+                      marginBottom: '14px',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <Clock size={14} />
+                      ⚡ STK Push (Coming Soon - Telco Certification)
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)' }}>
+                      Our Safaricom Daraja STK Push architecture is 100% complete and undergoing final telco certification. For immediate fee processing right now, please send funds to Paybill <strong>{campusPaybill}</strong> and use the <strong>Paste M-Pesa SMS</strong> tab above.
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Safaricom Phone Number (for Sandbox Prompt)</label>
+                    <div style={{ position: 'relative' }}>
+                      <Smartphone
+                        size={16}
+                        color="var(--text-muted)"
+                        style={{ position: 'absolute', left: '12px', top: '12px' }}
+                      />
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0712345678 or 254712345678"
+                        required
+                        style={{ paddingLeft: '36px' }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      A secure Safaricom M-Pesa PIN prompt can be tested in sandbox mode.
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -559,32 +787,30 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
               {/* Bank Transfer Field */}
               {paymentMethod === 'bank_transfer' && (
                 <div style={{ marginBottom: '16px' }}>
-                  {isStudent && (
-                    <div
-                      style={{
-                        padding: '12px 14px',
-                        background: 'rgba(59, 130, 246, 0.08)',
-                        border: '1px solid rgba(59, 130, 246, 0.25)',
-                        borderRadius: '8px',
-                        marginBottom: '14px',
-                        fontSize: '0.8rem',
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: '#60A5FA', marginBottom: '4px' }}>
-                        Official Academy Bank Accounts & Paybill
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
-                        <div><strong>Safaricom Paybill:</strong> 174379</div>
-                        <div><strong>Account Ref:</strong> {profile?.reg_number || activeInvoice?.invoice_number}</div>
-                        <div><strong>Bank:</strong> KCB Bank Kenya</div>
-                        <div><strong>Branch:</strong> Westlands Nairobi Hub</div>
-                      </div>
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        After transferring funds, enter your bank deposit reference below so the bursar can reconcile your receipt.
-                      </p>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      borderRadius: '8px',
+                      marginBottom: '14px',
+                      fontSize: '0.8rem',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: '#60A5FA', marginBottom: '4px' }}>
+                      Official Campus Bank Accounts & Paybill
                     </div>
-                  )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
+                      <div><strong>Safaricom Paybill:</strong> {campusPaybill}</div>
+                      <div><strong>Account Ref:</strong> {campusAccount}</div>
+                      <div><strong>Bank:</strong> {campusBankName}</div>
+                      <div><strong>Account No:</strong> {campusBankAccount}</div>
+                    </div>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                      After transferring funds, enter your bank deposit reference below so the bursar can reconcile your receipt.
+                    </p>
+                  </div>
                   <div className="form-group">
                     <label className="form-label">Bank Transaction Reference / Deposit Slip No.</label>
                     <input
@@ -600,7 +826,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
               {/* Amount Input */}
               <div className="form-group">
-                <label className="form-label">Amount to Credit (KES)</label>
+                <label className="form-label">Amount (KES)</label>
                 <input
                   type="number"
                   className="form-input"
@@ -612,7 +838,6 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     setAmount(val === '' ? '' : Number(val));
                   }}
                   min={1}
-                  max={activeInvoice?.balance_due && activeInvoice.balance_due > 0 ? activeInvoice.balance_due : undefined}
                   required
                 />
                 <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
@@ -661,13 +886,29 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
               <button
                 type="submit"
-                className={paymentMethod === 'mpesa' ? 'btn btn-mpesa' : 'btn btn-gold'}
-                style={{ width: '100%', padding: '12px', fontSize: '0.9rem', fontWeight: 700 }}
+                className={paymentMethod === 'paste_sms' ? 'btn btn-mpesa' : paymentMethod === 'mpesa' ? 'btn btn-gold' : 'btn btn-primary'}
+                disabled={isSubmittingSMS}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '8px',
+                }}
               >
-                {paymentMethod === 'mpesa' ? (
+                {paymentMethod === 'paste_sms' ? (
+                  <>
+                    <FileCheck size={18} />
+                    <span>{isSubmittingSMS ? 'Submitting SMS...' : `Submit M-Pesa Confirmation SMS (KES ${(Number(amount) || 0).toLocaleString()})`}</span>
+                  </>
+                ) : paymentMethod === 'mpesa' ? (
                   <>
                     <Smartphone size={18} />
-                    <span>Send M-Pesa STK Push (KES {(Number(amount) || 0).toLocaleString()})</span>
+                    <span>Send M-Pesa STK Push (Sandbox - KES {(Number(amount) || 0).toLocaleString()})</span>
                   </>
                 ) : paymentMethod === 'cash' ? (
                   <>
@@ -842,23 +1083,47 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                   width: '56px',
                   height: '56px',
                   borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  border: '2px solid var(--aur-emerald)',
+                  background: submittedForVerification ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  border: submittedForVerification ? '2px solid #F59E0B' : '2px solid var(--aur-emerald)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 14px',
-                  color: 'var(--aur-emerald)',
+                  color: submittedForVerification ? '#FBBF24' : 'var(--aur-emerald)',
                 }}
               >
-                <CheckCircle2 size={32} />
+                {submittedForVerification ? <Clock size={30} /> : <CheckCircle2 size={32} />}
               </div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 4px 0' }}>
-                Payment Received & Recorded!
+                {submittedForVerification
+                  ? 'M-Pesa Confirmation Queued for Verification!'
+                  : 'Payment Received & Recorded!'}
               </h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
-                Ref No: <strong style={{ color: 'var(--crema-gold)' }}>{createdPayment.mpesa_receipt_number || createdPayment.id}</strong>
+                Ref No: <strong style={{ color: 'var(--crema-gold)' }}>{createdPayment.mpesa_receipt_number || createdPayment.id}</strong> • Campus: <strong>{branch?.name}</strong>
               </p>
+
+              {submittedForVerification && (
+                <div
+                  style={{
+                    padding: '14px',
+                    borderRadius: '8px',
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    marginBottom: '18px',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.5,
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: '#FBBF24', marginBottom: '4px' }}>
+                    ⏳ Under Bursar Review: KES {(Number(createdPayment.amount) || 0).toLocaleString()}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>
+                    Your Safaricom M-Pesa confirmation has been forwarded to the <strong>{branch?.name}</strong> campus bursar desk. Once approved, your invoice balance will be updated and an official receipt dispatched to your phone and email.
+                  </div>
+                </div>
+              )}
 
               <div
                 style={{

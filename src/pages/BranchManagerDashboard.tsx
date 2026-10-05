@@ -26,6 +26,8 @@ import { PortalCredentialsManager } from '../components/analytics/PortalCredenti
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
 import { Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
+import { ConfigureBranchPaybillModal } from '../components/modals/ConfigureBranchPaybillModal';
+import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle } from 'lucide-react';
 
 type ManagerTab =
   | 'overview'
@@ -65,6 +67,8 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     invoices,
     payments,
     revertPayment,
+    verifyAndApprovePayment,
+    rejectMpesaPayment,
     smsLogs,
     staffClockins,
     leaveRequests,
@@ -108,6 +112,11 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const [timetableTrainerFilter, setTimetableTrainerFilter] = useState<string>('all');
   const [presetDayForSchedule, setPresetDayForSchedule] = useState<TimetableLesson['day_of_week'] | undefined>(undefined);
   const [showManageLabsModal, setShowManageLabsModal] = useState(false);
+  const [showPaybillModal, setShowPaybillModal] = useState(false);
+  const [verificationToast, setVerificationToast] = useState<string | null>(null);
+  const [verifiedAmountInput, setVerifiedAmountInput] = useState<Record<string, number>>({});
+  const [verificationRemarksInput, setVerificationRemarksInput] = useState<Record<string, string>>({});
+  const [isVerifyingId, setIsVerifyingId] = useState<string | null>(null);
 
   const filteredBranchLessons = branchLessons.filter((l) => {
     if (timetableModeFilter !== 'all') {
@@ -2269,94 +2278,407 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       {/* TAB: M-PESA RECEIPTS */}
       {/* ========================================================================= */}
       {activeTab === 'payments' && (
-        <div className="glass-card" style={{ padding: '20px' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1.15rem' }}>Campus M-Pesa & Cash Receipts</h3>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Audited payment transactions for {myBranch.name}
-            </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Toast Notification */}
+          {verificationToast && (
+            <div
+              className="glass-card"
+              style={{
+                padding: '12px 18px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid #10B981',
+                color: '#10B981',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <CheckCircle2 size={18} />
+              <span>{verificationToast}</span>
+            </div>
+          )}
+
+          {/* CAMPUS PAYBILL & BANKING CREDENTIALS STRIP */}
+          <div
+            className="glass-card"
+            style={{
+              padding: '18px 20px',
+              border: '1px solid rgba(212, 154, 91, 0.3)',
+              background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.12) 0%, rgba(24, 19, 16, 0.6) 100%)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'var(--crema-gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#000',
+                  }}
+                >
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                    Campus M-Pesa Paybill & Banking Configuration
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Credentials displayed dynamically across all trainee dashboards enrolled in {myBranch.name}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowPaybillModal(true)}
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '0.8rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Smartphone size={14} />
+                <span>⚙️ Configure Campus Paybill</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+              <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Safaricom Paybill</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#4ADE80', marginTop: '2px' }}>
+                  {myBranch.paybill_number || '174379'}
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Business Number</div>
+              </div>
+
+              <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Paybill Account Name</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', marginTop: '2px' }}>
+                  {myBranch.paybill_account_name || (myBranch.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Students see this exact name</div>
+              </div>
+
+              <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Bank Deposit Details</div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                  {myBranch.bank_name || 'KCB Bank Kenya'}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  A/C: {myBranch.bank_account_number || '1289456780'}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>M-Pesa Receipt</th>
-                  <th>Student Name & Reg</th>
-                  <th>Amount Credited</th>
-                  <th>Payment Method</th>
-                  <th>Date</th>
-                  <th>Gateway Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {branchPayments.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                      No payment receipts logged for this branch yet.
-                    </td>
-                  </tr>
-                ) : (
-                  branchPayments.map((p) => {
+          {/* PENDING M-PESA SMS VERIFICATIONS QUEUE */}
+          {branchPayments.filter((p) => p.status === 'pending_verification').length > 0 && (
+            <div
+              className="glass-card"
+              style={{
+                padding: '20px',
+                border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(24, 19, 16, 0.6) 100%)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileCheck size={20} color="#FBBF24" />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#FBBF24' }}>
+                    Pending Student M-Pesa Verifications ({branchPayments.filter((p) => p.status === 'pending_verification').length})
+                  </h3>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#FBBF24',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Action Required
+                </span>
+              </div>
+
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
+                Students have submitted Safaricom M-Pesa confirmation SMS messages. Review the raw SMS, confirm the funds on your campus statement, verify/adjust the amount (supporting partial payment), and click Verify & Approve to update the student balance and dispatch official SMS/Email receipts.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {branchPayments
+                  .filter((p) => p.status === 'pending_verification')
+                  .map((p) => {
                     const student = students.find((s) => s.id === p.student_id);
                     const profile = profiles.find((pr) => pr.id === student?.profile_id);
+                    const invoice = invoices.find((inv) => inv.id === p.invoice_id);
+                    const currentVerifiedAmt = verifiedAmountInput[p.id] ?? p.amount;
 
                     return (
-                      <tr key={p.id}>
-                        <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', fontWeight: 700 }}>
-                          {p.mpesa_receipt_number || 'STK-' + p.id.slice(0, 6)}
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{profile?.full_name || 'Trainee'}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{profile?.reg_number}</div>
-                        </td>
-                        <td style={{ fontWeight: 700, color: '#10B981' }}>
-                          KES {(Number(p.amount) || 0).toLocaleString()}
-                        </td>
-                        <td style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 600 }}>
-                          {p.payment_method}
-                        </td>
-                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          {new Date(p.created_at).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <span className="badge badge-paid">{p.status}</span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={async () => {
-                              if (
-                                window.confirm(
-                                  `Void/Revert receipt ${p.mpesa_receipt_number || p.id} for KES ${(Number(p.amount) || 0).toLocaleString()} and restore student fee balance?`
-                                )
-                              ) {
-                                await revertPayment(p.id);
-                              }
-                            }}
-                            title="Void or revert payment record"
-                            style={{
-                              padding: '3px 8px',
-                              fontSize: '0.72rem',
-                              color: 'var(--text-muted)',
-                              border: '1px solid var(--border-subtle)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <RotateCcw size={11} />
-                            <span>Void</span>
-                          </button>
-                        </td>
-                      </tr>
+                      <div
+                        key={p.id}
+                        style={{
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          borderRadius: '10px',
+                          padding: '14px 16px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{profile?.full_name || 'Trainee'}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--crema-gold)', marginLeft: '8px', fontWeight: 600 }}>
+                              {profile?.reg_number}
+                            </span>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              Invoice: <strong>{invoice?.invoice_number}</strong> • Balance Due: <strong style={{ color: 'var(--cherry-red)' }}>KES {(invoice?.balance_due || 0).toLocaleString()}</strong> of Total KES {(invoice?.total_fee || 0).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Claimed Amount</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#4ADE80' }}>
+                              KES {(Number(p.amount) || 0).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                              Ref: {p.mpesa_receipt_number || 'VERIF-PENDING'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Raw Safaricom SMS Bubble */}
+                        <div
+                          style={{
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-subtle)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '0.76rem',
+                            color: 'var(--text-primary)',
+                            wordBreak: 'break-word',
+                            marginBottom: '12px',
+                          }}
+                        >
+                          <span style={{ color: 'var(--crema-gold)', fontWeight: 700 }}>Pasted Safaricom SMS: </span>
+                          {p.raw_mpesa_text || 'No raw SMS text attached.'}
+                        </div>
+
+                        {/* Verification & Approval Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Verified Amount (KES):
+                              </label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                value={currentVerifiedAmt}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setVerifiedAmountInput((prev) => ({ ...prev, [p.id]: val }));
+                                }}
+                                style={{ width: '110px', padding: '4px 8px', fontSize: '0.8rem', fontWeight: 700 }}
+                              />
+                            </div>
+
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Optional remarks / bank ref..."
+                              value={verificationRemarksInput[p.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setVerificationRemarksInput((prev) => ({ ...prev, [p.id]: val }));
+                              }}
+                              style={{ width: '180px', padding: '4px 8px', fontSize: '0.75rem' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-mpesa"
+                              disabled={isVerifyingId === p.id}
+                              onClick={async () => {
+                                setIsVerifyingId(p.id);
+                                try {
+                                  await verifyAndApprovePayment({
+                                    paymentId: p.id,
+                                    verifiedAmount: currentVerifiedAmt,
+                                    remarks: verificationRemarksInput[p.id] || 'Verified by Campus Manager',
+                                  });
+                                  setVerificationToast(`Payment of KES ${currentVerifiedAmt.toLocaleString()} for ${profile?.full_name} approved! SMS & email receipt dispatched.`);
+                                  setTimeout(() => setVerificationToast(null), 5000);
+                                } catch (err: any) {
+                                  alert(err.message || 'Failed to approve payment.');
+                                } finally {
+                                  setIsVerifyingId(null);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              <CheckCircle2 size={14} />
+                              <span>{isVerifyingId === p.id ? 'Approving...' : '✓ Verify & Approve'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={async () => {
+                                const reason = window.prompt('Enter rejection reason to notify student:', 'Payment reference not found on campus bank statement');
+                                if (reason) {
+                                  await rejectMpesaPayment({ paymentId: p.id, reason });
+                                  setVerificationToast(`Payment submission rejected.`);
+                                  setTimeout(() => setVerificationToast(null), 4000);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                color: '#EF4444',
+                              }}
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* AUDITED COMPLETED RECEIPTS TABLE */}
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', margin: 0 }}>Campus Payment Receipts & Ledger</h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                  Audited payment transactions for {myBranch.name}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-gold"
+                onClick={() => setShowPaymentModal(true)}
+                style={{ padding: '7px 14px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Plus size={14} />
+                <span>Record Fee Payment</span>
+              </button>
+            </div>
+
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>M-Pesa Receipt</th>
+                    <th>Student Name & Reg</th>
+                    <th>Amount Credited</th>
+                    <th>Payment Method</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {branchPayments.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                        No payment receipts logged for this branch yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    branchPayments.map((p) => {
+                      const student = students.find((s) => s.id === p.student_id);
+                      const profile = profiles.find((pr) => pr.id === student?.profile_id);
+
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--crema-gold)', fontWeight: 700 }}>
+                            {p.mpesa_receipt_number || 'STK-' + p.id.slice(0, 6)}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{profile?.full_name || 'Trainee'}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{profile?.reg_number}</div>
+                          </td>
+                          <td style={{ fontWeight: 700, color: '#10B981' }}>
+                            KES {(Number(p.amount) || 0).toLocaleString()}
+                          </td>
+                          <td style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 600 }}>
+                            {p.payment_method}
+                          </td>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {new Date(p.created_at).toLocaleDateString()}
+                          </td>
+                          <td>
+                            <span
+                              className={p.status === 'completed' ? 'badge badge-paid' : p.status === 'pending_verification' ? 'badge badge-pending' : 'badge badge-overdue'}
+                              style={{ textTransform: 'capitalize' }}
+                            >
+                              {p.status === 'pending_verification' ? 'Verification Pending' : p.status}
+                            </span>
+                          </td>
+                          <td>
+                            {p.status === 'completed' && (
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={async () => {
+                                  if (
+                                    window.confirm(
+                                      `Void/Revert receipt ${p.mpesa_receipt_number || p.id} for KES ${(Number(p.amount) || 0).toLocaleString()} and restore student fee balance?`
+                                    )
+                                  ) {
+                                    await revertPayment(p.id);
+                                  }
+                                }}
+                                title="Void or revert payment record"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.72rem',
+                                  color: 'var(--text-muted)',
+                                  border: '1px solid var(--border-subtle)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <RotateCcw size={11} />
+                                <span>Void</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -2464,6 +2786,12 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       )}
       {showChangePasswordModal && (
         <ChangeMyPasswordModal onClose={() => setShowChangePasswordModal(false)} />
+      )}
+      {showPaybillModal && (
+        <ConfigureBranchPaybillModal
+          branchId={myBranch.id}
+          onClose={() => setShowPaybillModal(false)}
+        />
       )}
     </div>
   );
