@@ -80,17 +80,18 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
   const student = students.find((s) => s.id === activeInvoice?.student_id);
   const profile = profiles.find((p) => p.id === student?.profile_id);
   const branch =
+    branches.find((b) => b.id === presetBranchId) ||
     branches.find((b) => b.id === activeInvoice?.branch_id) ||
-    branches.find((b) => b.id === currentProfile?.branch_id) ||
     branches.find((b) => b.id === student?.branch_id) ||
+    branches.find((b) => b.id === currentProfile?.branch_id) ||
     branches[0];
   const enrollment = enrollments.find((e) => e.student_id === student?.id);
   const cohort = cohorts.find((c) => c.id === enrollment?.cohort_id);
   const course = courses.find((c) => c.id === cohort?.course_id);
   const campusPaybill = branch?.paybill_number || '174379';
   const campusAccount = branch?.paybill_account_name || (branch?.code ? `AUREVIA-${branch.code}` : 'AUREVIA-HQ');
-  const campusBankName = branch?.bank_name || 'KCB Bank Kenya';
-  const campusBankAccount = branch?.bank_account_number || '1289456780';
+  const campusBankName = branch?.bank_name || '';
+  const campusBankAccount = branch?.bank_account_number || '';
 
   // Payment Method: 'paste_sms' | 'mpesa' | 'cash' | 'bank_transfer'
   const [paymentMethod, setPaymentMethod] = useState<'paste_sms' | 'mpesa' | 'cash' | 'bank_transfer'>('paste_sms');
@@ -807,8 +808,8 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
                       <div><strong>Safaricom Paybill:</strong> {campusPaybill}</div>
                       <div><strong>Account Ref:</strong> {campusAccount}</div>
-                      <div><strong>Bank:</strong> {campusBankName}</div>
-                      <div><strong>Account No:</strong> {campusBankAccount}</div>
+                      {campusBankName && <div><strong>Bank:</strong> {campusBankName}</div>}
+                      {campusBankAccount && <div><strong>Account No:</strong> {campusBankAccount}</div>}
                     </div>
                     <p style={{ margin: '8px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                       Confirm funds on campus bank statement, then enter the student's deposit slip number or wire reference to credit tuition balance.
@@ -821,7 +822,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                       className="form-input"
                       value={bankReference}
                       onChange={(e) => setBankReference(e.target.value)}
-                      placeholder="e.g. KCB EFT-8921094 / NCBA Wire Ref"
+                      placeholder="e.g. Bank EFT Reference / Deposit Slip No."
                     />
                   </div>
                 </div>

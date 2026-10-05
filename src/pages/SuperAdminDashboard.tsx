@@ -2892,8 +2892,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Bank: <strong style={{ color: 'var(--text-primary)' }}>{b.bank_name || 'KCB Bank'}</strong> • A/C: <span style={{ fontFamily: 'var(--font-mono)' }}>{b.bank_account_number || '1289456780'}</span>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      <span style={{ color: '#4ADE80', fontWeight: 600 }}>Trainee Text: </span>
+                      {b.payment_instructions || `Pay via Paybill ${b.paybill_number || '174379'} and Account Number ${b.paybill_account_name || (b.code ? `AUREVIA-${b.code}` : 'AUREVIA-HQ')}, then paste your M-Pesa message in your trainee portal.`}
                     </div>
                   </div>
 
@@ -3262,7 +3263,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     ? 'Branch Manager'
                     : 'Lead Instructor / Q-Grader';
 
-                  const staffIdDisplay = staff.staff_id || `AUR/${sBranch?.code || 'NBO'}/STF-${String(index + 1).padStart(3, '0')}`;
+                  const staffIdDisplay = staff.staff_id || staff.reg_number || (staff.email?.includes('eigs') ? 'AUR/NBO/STF-001' : staff.email?.includes('ronny') ? 'AUR/NBO/STF-002' : staff.email?.includes('ratieno') ? 'AUR/NBO/STF-003' : `AUR/${sBranch?.code || 'NBO'}/STF-004`);
 
                   return (
                     <tr key={staff.id}>

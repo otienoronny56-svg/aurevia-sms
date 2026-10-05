@@ -116,7 +116,7 @@ export const StaffPasswordModal: React.FC<StaffPasswordModalProps> = ({ staff, o
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Staff Login ID</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--crema-gold)' }}>
-                  {staff.staff_id || 'AUR/STF-001'}
+                  {staff.staff_id || staff.reg_number || 'AUR/NBO/STF-001'}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>

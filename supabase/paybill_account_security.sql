@@ -7,9 +7,9 @@
 ALTER TABLE IF EXISTS public.aur_branches 
   ADD COLUMN IF NOT EXISTS paybill_number VARCHAR(30) DEFAULT '174379',
   ADD COLUMN IF NOT EXISTS paybill_account_name VARCHAR(100) DEFAULT 'AUREVIA-NBO',
-  ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100) DEFAULT 'KCB Bank Kenya',
-  ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100) DEFAULT '1289456780',
-  ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT 'Pay via Safaricom M-Pesa Paybill using the campus Account Name. Paste your confirmation SMS in your trainee portal.';
+  ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS payment_instructions TEXT DEFAULT 'Pay via Paybill and Account Number, then paste your M-Pesa message in your trainee portal.';
 
 -- 2. Add M-Pesa SMS verification columns to `aur_payments`
 ALTER TABLE IF EXISTS public.aur_payments
@@ -44,27 +44,21 @@ UPDATE public.aur_branches
 SET 
   paybill_number = '174379',
   paybill_account_name = 'AUREVIA-NBO',
-  bank_name = 'KCB Bank Kenya',
-  bank_account_number = '1289456780',
-  payment_instructions = 'Pay via Safaricom M-Pesa Paybill 174379 using Account Name AUREVIA-NBO. Paste your confirmation SMS in your trainee portal.'
+  payment_instructions = 'Pay via Paybill 174379 and Account Number AUREVIA-NBO, then paste your M-Pesa message in your trainee portal.'
 WHERE code = 'NBO' OR id = 'b1000000-0000-0000-0000-000000000001';
 
 UPDATE public.aur_branches
 SET 
   paybill_number = '522522',
   paybill_account_name = 'AUREVIA-MSA',
-  bank_name = 'Equity Bank Kenya',
-  bank_account_number = '011293847291',
-  payment_instructions = 'Pay via Safaricom M-Pesa Paybill 522522 using Account Name AUREVIA-MSA. Paste your confirmation SMS in your trainee portal.'
+  payment_instructions = 'Pay via Paybill 522522 and Account Number AUREVIA-MSA, then paste your M-Pesa message in your trainee portal.'
 WHERE code = 'MSA' OR id = 'b2000000-0000-0000-0000-000000000002';
 
 UPDATE public.aur_branches
 SET 
   paybill_number = '888888',
   paybill_account_name = 'AUREVIA-KGL',
-  bank_name = 'Bank of Kigali (BK)',
-  bank_account_number = '000492817492',
-  payment_instructions = 'Pay via MTN MoMo / BK Pay using Account Name AUREVIA-KGL. Paste your confirmation SMS in your trainee portal.'
+  payment_instructions = 'Pay via MTN MoMo / BK Pay using Account Number AUREVIA-KGL, then paste your transaction message in your trainee portal.'
 WHERE code = 'KGL' OR id = 'b3000000-0000-0000-0000-000000000003';
 
 -- 5. Row-Level Security Policies for Paybill & SMS Verification

@@ -216,7 +216,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       return [
         idx + 1,
         staff.full_name,
-        staff.staff_id || `AUR/${myBranch.code}/STF-${idx + 1}`,
+        staff.staff_id || staff.reg_number || 'AUR/STF',
         staff.job_title || staff.specialty || staff.role,
         timeIn,
         timeOut,
@@ -277,7 +277,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       return [
         idx + 1,
         staff.full_name,
-        staff.staff_id || `AUR/${myBranch.code}/STF-${idx + 1}`,
+        staff.staff_id || staff.reg_number || 'AUR/STF',
         staff.job_title || staff.specialty || staff.role.replace('_', ' ').toUpperCase(),
         staff.email,
         staff.phone || 'N/A',
@@ -1073,7 +1073,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {staff.staff_id || `AUR/${myBranch.code}/STF-${String(index + 1).padStart(3, '0')}`}
+                          {staff.staff_id || staff.reg_number || 'AUR/STF'}
                         </span>
                       </td>
 
@@ -1271,7 +1271,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                       </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: 'var(--crema-gold)', fontWeight: 700 }}>
-                          {staff.staff_id || `AUR/${myBranch.code}/STF-${idx + 1}`}
+                          {staff.staff_id || staff.reg_number || 'AUR/STF'}
                         </span>
                       </td>
                       <td style={{ fontSize: '0.80rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={staff.job_title || staff.specialty || staff.role.replace('_', ' ').toUpperCase()}>
@@ -2368,16 +2368,6 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                   {myBranch.paybill_account_name || (myBranch.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}
                 </div>
                 <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>Students see this exact account number</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Bank Deposit Details</div>
-                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                  {myBranch.bank_name || 'KCB Bank Kenya'}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  A/C: {myBranch.bank_account_number || '1289456780'}
-                </div>
               </div>
             </div>
 

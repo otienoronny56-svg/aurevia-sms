@@ -868,7 +868,7 @@ export const StaffLeaveManagement: React.FC<StaffLeaveManagementProps> = ({
                       </td>
                       <td>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: 'var(--crema-gold)', fontWeight: 700 }}>
-                          {staff.staff_id || `AUR/${sBranch?.code || 'HQ'}/STF-${idx + 1}`}
+                          {staff.staff_id || staff.reg_number || 'AUR/STF'}
                         </span>
                       </td>
                       <td style={{ fontSize: '0.82rem' }}>

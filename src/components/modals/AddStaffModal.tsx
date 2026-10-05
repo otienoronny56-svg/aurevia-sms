@@ -50,8 +50,33 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   const [department, setDepartment] = useState<'Hygiene & Facilities' | 'Marketing & Outreach' | 'Roastery & Logistics' | 'Security & Front Office'>('Hygiene & Facilities');
   const [jobTitle, setJobTitle] = useState('Lab Hygiene Steward & Machine Cleaner');
 
-  // Auto Staff ID
-  const nextStaffNum = profiles.filter((p) => p.role !== 'student').length + 1;
+  // Auto Staff ID: Strictly preserves existing IDs and never re-issues deleted numbers
+  const getNextPermanentStaffSeq = (): number => {
+    let highestSeq = Math.max(4, Number(localStorage.getItem('aur_highest_staff_seq')) || 4);
+    const retiredIdsStr = localStorage.getItem('aur_retired_staff_ids');
+    let retiredList: string[] = [];
+    if (retiredIdsStr) {
+      try { retiredList = JSON.parse(retiredIdsStr); } catch (_) {}
+    }
+
+    for (const p of profiles) {
+      const match = (p.staff_id || p.reg_number || '').match(/(?:STF|OPS)-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > highestSeq) highestSeq = num;
+      }
+    }
+    for (const r of retiredList) {
+      const match = r.match(/(?:STF|OPS)-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > highestSeq) highestSeq = num;
+      }
+    }
+    return highestSeq + 1;
+  };
+
+  const nextStaffNum = getNextPermanentStaffSeq();
   const branchObj = branches.find((b) => b.id === branchId) || branches[0];
   const branchCode = branchObj?.code || 'NBO';
   const prefix = staffCategory === 'system' ? 'STF' : 'OPS';
@@ -216,6 +241,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
         job_title: finalJobTitle,
         specialty: finalJobTitle,
         staff_id: staffId,
+        reg_number: staffId,
         initial_password: isSystem ? initialPassword : '',
         password_changed: false,
         assigned_courses: isSystem ? assignedCourseIds : [],

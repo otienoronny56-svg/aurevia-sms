@@ -404,8 +404,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             !p.email?.toLowerCase().includes('wanjiku') &&
             !p.email?.toLowerCase().includes('mutua')
           );
-          localStorage.setItem('aur_profiles', JSON.stringify(cleaned));
-          return cleaned;
+
+          const storedAllocationsStr = localStorage.getItem('aur_permanent_staff_ids');
+          let staffAllocations: Record<string, string> = {};
+          if (storedAllocationsStr) {
+            try { staffAllocations = JSON.parse(storedAllocationsStr); } catch (_) {}
+          }
+          const canonicalMap: Record<string, string> = {
+            'eigs733@gmail.com': 'AUR/NBO/STF-001',
+            'otienoronny56@gmail.com': 'AUR/NBO/STF-002',
+            'ratienoessy@gmail.com': 'AUR/NBO/STF-003',
+            'aureviainstituteofcoffee@gmail.com': 'AUR/NBO/STF-004',
+          };
+          const populated = cleaned.map((p: Profile) => {
+            const eKey = (p.email || '').toLowerCase().trim();
+            const sid = p.staff_id || p.reg_number || (eKey && canonicalMap[eKey]) || staffAllocations[p.id] || (eKey && staffAllocations[eKey]);
+            if (sid) {
+              return { ...p, staff_id: sid, reg_number: sid };
+            }
+            return p;
+          });
+
+          localStorage.setItem('aur_profiles', JSON.stringify(populated));
+          return populated;
         }
       } catch (_) {}
     }
@@ -690,20 +711,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (_) {}
         }
 
+        const savedOverrides = localStorage.getItem('aur_branch_payment_overrides');
+        let branchOverrides: Record<string, any> = {};
+        if (savedOverrides) {
+          try {
+            branchOverrides = JSON.parse(savedOverrides);
+          } catch (_) {}
+        }
+
         const liveBranches = (bRes.data && bRes.data.length > 0)
           ? bRes.data.map((b: any, idx: number) => {
               const localMatch = (localBranches || []).find((lb) => lb.id === b.id);
+              const override = branchOverrides[b.id];
               const base =
                 idx === 0 || b.id === 'b1000000-0000-0000-0000-000000000001'
                   ? { ...b, name: 'Aurevia Coffee Institute' }
                   : b;
               return {
                 ...base,
-                paybill_number: b.paybill_number || localMatch?.paybill_number,
-                paybill_account_name: b.paybill_account_name || localMatch?.paybill_account_name,
-                bank_name: b.bank_name || localMatch?.bank_name,
-                bank_account_number: b.bank_account_number || localMatch?.bank_account_number,
-                payment_instructions: b.payment_instructions || localMatch?.payment_instructions,
+                paybill_number: override?.paybill_number || localMatch?.paybill_number || b.paybill_number,
+                paybill_account_name: override?.paybill_account_name || localMatch?.paybill_account_name || b.paybill_account_name,
+                payment_instructions: override?.payment_instructions || localMatch?.payment_instructions || b.payment_instructions,
               };
             })
           : (localBranches || INITIAL_BRANCHES);
@@ -727,11 +755,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const liveCohorts = (hRes.data && hRes.data.length > 0) ? hRes.data : (cohorts.length > 0 ? cohorts : INITIAL_COHORTS);
         setCohorts(liveCohorts);
 
+        // Permanent Staff ID Allocation & Stability Across All Campuses
+        const storedAllocationsStr = localStorage.getItem('aur_permanent_staff_ids');
+        let staffAllocations: Record<string, string> = {};
+        if (storedAllocationsStr) {
+          try { staffAllocations = JSON.parse(storedAllocationsStr); } catch (_) {}
+        }
+
+        const retiredIdsStr = localStorage.getItem('aur_retired_staff_ids');
+        let retiredStaffIds: string[] = [];
+        if (retiredIdsStr) {
+          try { retiredStaffIds = JSON.parse(retiredIdsStr); } catch (_) {}
+        }
+
+        const canonicalStaffIds: Record<string, string> = {
+          'eigs733@gmail.com': 'AUR/NBO/STF-001',
+          'otienoronny56@gmail.com': 'AUR/NBO/STF-002',
+          'ratienoessy@gmail.com': 'AUR/NBO/STF-003',
+          'aureviainstituteofcoffee@gmail.com': 'AUR/NBO/STF-004',
+        };
+
+        let highestStaffSeq = Math.max(
+          4,
+          Number(localStorage.getItem('aur_highest_staff_seq')) || 4
+        );
+        for (const retId of retiredStaffIds) {
+          const match = retId.match(/(?:STF|OPS)-(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > highestStaffSeq) highestStaffSeq = num;
+          }
+        }
+
         // Hydrate profiles from aur_profiles & ensure baseline staff profiles are preserved
         const dbProfiles = (pRes.data || []).map((p: any) => {
           const regKey = (p.reg_number || '').trim().toLowerCase();
           const emailKey = (p.email || '').trim().toLowerCase();
           const idKey = (p.id || '').trim().toLowerCase();
+
+          let permanentStaffId = p.staff_id || p.reg_number;
+          if (p.role !== 'student') {
+            const branchObj = (liveBranches || branches).find((b: any) => b.id === p.branch_id);
+            const branchCode = branchObj?.code || 'NBO';
+
+            const isStandardSTF = permanentStaffId && /(?:STF|OPS)-\d+/i.test(permanentStaffId);
+            if (!isStandardSTF) {
+              if (emailKey && canonicalStaffIds[emailKey]) {
+                permanentStaffId = canonicalStaffIds[emailKey];
+              } else if (staffAllocations[p.id]) {
+                permanentStaffId = staffAllocations[p.id];
+              } else if (emailKey && staffAllocations[emailKey]) {
+                permanentStaffId = staffAllocations[emailKey];
+              } else {
+                highestStaffSeq += 1;
+                permanentStaffId = `AUR/${branchCode}/STF-${String(highestStaffSeq).padStart(3, '0')}`;
+              }
+            }
+
+            if (permanentStaffId) {
+              staffAllocations[p.id] = permanentStaffId;
+              if (emailKey) staffAllocations[emailKey] = permanentStaffId;
+              const match = permanentStaffId.match(/(?:STF|OPS)-(\d+)/i);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num) && num > highestStaffSeq) highestStaffSeq = num;
+              }
+
+              // Non-destructively sync staff_id and reg_number to Supabase if not yet saved
+              if (p.staff_id !== permanentStaffId || p.reg_number !== permanentStaffId) {
+                supabase
+                  .from('aur_profiles')
+                  .update({ staff_id: permanentStaffId, reg_number: permanentStaffId })
+                  .eq('id', p.id)
+                  .then(() => {}, (e: any) => console.warn('Non-destructive staff_id sync note:', e));
+              }
+            }
+          }
+
           const recoveredPwd =
             p.initial_password ||
             localStorage.getItem('aur_user_pwd_seed_' + p.id) ||
@@ -741,16 +841,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.getItem('aur_staff_pwd_' + regKey) ||
             localStorage.getItem('aur_staff_pwd_' + emailKey) ||
             localStorage.getItem('aur_staff_pwd_' + idKey) ||
+            (permanentStaffId ? localStorage.getItem('aur_staff_pwd_' + permanentStaffId.toLowerCase()) : null) ||
             INITIAL_PROFILES.find((ip) => ip.id === p.id || (ip.email && ip.email.toLowerCase() === emailKey))?.initial_password;
 
           return {
             ...p,
+            staff_id: permanentStaffId || p.staff_id,
+            reg_number: permanentStaffId || p.reg_number,
             initial_password: p.initial_password || recoveredPwd,
             password_hash: p.password_hash || p.password || localStorage.getItem('aur_user_pwd_hash_' + p.id) || undefined,
             password_changed: p.password_changed ?? (localStorage.getItem('aur_user_pwd_changed_' + p.id) === 'true'),
             specialty: (p.specialty && p.specialty.startsWith('Aur#')) ? 'Barista & Specialty Coffee' : (p.specialty || 'Barista & Specialty Coffee'),
           };
         });
+
+        localStorage.setItem('aur_permanent_staff_ids', JSON.stringify(staffAllocations));
+        localStorage.setItem('aur_highest_staff_seq', String(highestStaffSeq));
         const mergedProfiles: Profile[] = [...dbProfiles].filter(
           (p: any) =>
             !p.full_name?.toLowerCase().includes('wanjiku') &&
@@ -1152,14 +1258,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data } = await supabase
           .from('aur_profiles')
           .select('*')
-          .or(`email.ilike."${safe}",reg_number.ilike."${safe}"`)
+          .or(`email.ilike."${safe}",reg_number.ilike."${safe}",staff_id.ilike."${safe}"`)
           .limit(1);
         if (data && data.length > 0) {
           matchedProfile = data[0] as Profile;
         } else {
           const { data: byReg } = await supabase.from('aur_profiles').select('*').ilike('reg_number', rawId).maybeSingle();
-          if (byReg) {
-            matchedProfile = byReg as Profile;
+          const { data: byStaffId } = !byReg ? await supabase.from('aur_profiles').select('*').ilike('staff_id', rawId).maybeSingle() : { data: null };
+          if (byReg || byStaffId) {
+            matchedProfile = (byReg || byStaffId) as Profile;
           } else {
             const { data: byEmail } = await supabase.from('aur_profiles').select('*').ilike('email', rawId).maybeSingle();
             if (byEmail) matchedProfile = byEmail as Profile;
@@ -2429,14 +2536,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       payment_instructions?: string;
     }
   ): Promise<void> => {
+    // 1. Save directly into aur_branch_payment_overrides to ensure survival across page refreshes
+    try {
+      const savedOverrides = localStorage.getItem('aur_branch_payment_overrides');
+      const overrides = savedOverrides ? JSON.parse(savedOverrides) : {};
+      overrides[branchId] = {
+        ...overrides[branchId],
+        ...config,
+        updated_at: Date.now(),
+      };
+      localStorage.setItem('aur_branch_payment_overrides', JSON.stringify(overrides));
+    } catch (_) {}
+
     try {
       await supabase
         .from('aur_branches')
         .update({
           paybill_number: config.paybill_number,
           paybill_account_name: config.paybill_account_name,
-          bank_name: config.bank_name,
-          bank_account_number: config.bank_account_number,
           payment_instructions: config.payment_instructions,
         })
         .eq('id', branchId);
@@ -3393,7 +3510,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
-      const regNumber = params.staff_id || params.reg_number || (params.role === 'branch_manager' ? `AUR/MGR/${Date.now().toString().slice(-4)}` : `AUR/INS/${Date.now().toString().slice(-4)}`);
+      // 1. Calculate permanent staff ID using the highest counter across existing + retired IDs
+      const branchObj = branches.find((b) => b.id === (params.branch_id || branches[0].id));
+      const branchCode = branchObj?.code || 'NBO';
+
+      let highestSeq = Math.max(4, Number(localStorage.getItem('aur_highest_staff_seq')) || 4);
+      const retiredIdsStr = localStorage.getItem('aur_retired_staff_ids');
+      let retiredList: string[] = [];
+      if (retiredIdsStr) {
+        try { retiredList = JSON.parse(retiredIdsStr); } catch (_) {}
+      }
+
+      for (const p of profiles) {
+        const match = (p.staff_id || p.reg_number || '').match(/(?:STF|OPS)-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > highestSeq) highestSeq = num;
+        }
+      }
+      for (const r of retiredList) {
+        const match = r.match(/(?:STF|OPS)-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > highestSeq) highestSeq = num;
+        }
+      }
+
+      const nextSeq = highestSeq + 1;
+      const assignedStaffId = params.staff_id || params.reg_number || `AUR/${branchCode}/STF-${String(nextSeq).padStart(3, '0')}`;
+      localStorage.setItem('aur_highest_staff_seq', String(nextSeq));
+
+      const regNumber = assignedStaffId;
 
       const hashedStaffPwd = await hashPassword(staffDefaultPwd);
       const insertPayload: any = {
@@ -3403,6 +3550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: (params.email || '').trim().toLowerCase(),
         phone: (params.phone || '').trim(),
         reg_number: regNumber,
+        staff_id: regNumber,
         specialty: params.specialty || params.job_title || 'Lead Trainer',
         is_active: true,
         initial_password: staffDefaultPwd,
@@ -3421,6 +3569,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Graceful fallback if database schema is missing the new password columns:
       if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
+        if (error.message?.includes('staff_id')) {
+          delete insertPayload.staff_id;
+        }
         delete insertPayload.initial_password;
         delete insertPayload.password_hash;
         delete insertPayload.password_changed;
@@ -3433,6 +3584,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       created = {
         ...data,
         staff_id: regNumber,
+        reg_number: regNumber,
         initial_password: staffDefaultPwd,
         password_hash: hashedStaffPwd,
         password_changed: false,
@@ -3441,6 +3593,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       try {
+        const storedAllocationsStr = localStorage.getItem('aur_permanent_staff_ids');
+        let staffAllocations: Record<string, string> = {};
+        if (storedAllocationsStr) {
+          try { staffAllocations = JSON.parse(storedAllocationsStr); } catch (_) {}
+        }
+        staffAllocations[created.id] = regNumber;
+        if (created.email) staffAllocations[created.email.toLowerCase()] = regNumber;
+        localStorage.setItem('aur_permanent_staff_ids', JSON.stringify(staffAllocations));
+
         localStorage.setItem('aur_staff_pwd_' + created.id, staffDefaultPwd);
         if (created.email) localStorage.setItem('aur_staff_pwd_' + created.email.toLowerCase(), staffDefaultPwd);
         if (regNumber) localStorage.setItem('aur_staff_pwd_' + regNumber.toLowerCase(), staffDefaultPwd);
@@ -3448,6 +3609,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('aur_user_pwd_hash_' + created.id, hashedStaffPwd);
       } catch (_) {}
     } catch (e) {
+      const branchObj = branches.find((b) => b.id === (params.branch_id || branches[0].id));
+      const branchCode = branchObj?.code || 'NBO';
+      const fallbackSeq = (Number(localStorage.getItem('aur_highest_staff_seq')) || 4) + 1;
+      const assignedStaffId = params.staff_id || params.reg_number || `AUR/${branchCode}/STF-${String(fallbackSeq).padStart(3, '0')}`;
+      localStorage.setItem('aur_highest_staff_seq', String(fallbackSeq));
+
       created = {
         id: 'prof-' + Date.now(),
         role: params.role || 'instructor',
@@ -3457,7 +3624,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: params.phone || '+254 700 000 000',
         national_id: params.national_id || 'ID-000',
         specialty: params.specialty || 'Lead Trainer',
-        staff_id: params.staff_id || `AUR/STF-${Date.now().toString().slice(-3)}`,
+        staff_id: assignedStaffId,
+        reg_number: assignedStaffId,
         initial_password: params.initial_password || generateUniqueDefaultPassword(params.full_name || 'Staff'),
         password_changed: false,
         assigned_courses: params.assigned_courses || [],
@@ -3796,6 +3964,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteStaffMember = async (profileId: string) => {
+    // 1. Permanently retire the staff ID so it is NEVER re-issued to another person
+    const targetProfile = profiles.find((p) => p.id === profileId);
+    if (targetProfile) {
+      const retiredNum = targetProfile.staff_id || targetProfile.reg_number;
+      if (retiredNum) {
+        try {
+          const retiredStr = localStorage.getItem('aur_retired_staff_ids');
+          const retiredList: string[] = retiredStr ? JSON.parse(retiredStr) : [];
+          if (!retiredList.includes(retiredNum)) {
+            retiredList.push(retiredNum);
+            localStorage.setItem('aur_retired_staff_ids', JSON.stringify(retiredList));
+          }
+        } catch (_) {}
+      }
+    }
+
     try {
       await supabase.from('aur_staff_clockin').delete().eq('profile_id', profileId);
       await supabase.from('aur_leave_requests').delete().eq('profile_id', profileId);
@@ -3804,6 +3988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Delete staff in Supabase:', e);
     }
 
+    // 2. Remove ONLY this staff member from state. Remaining staff retain their exact staff_id!
     setProfiles((prev) => prev.filter((p) => p.id !== profileId));
   };
 

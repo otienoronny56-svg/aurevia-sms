@@ -128,14 +128,50 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   // Check if current user is super admin previewing the portal or a real student
   const isSuperAdminPreview = currentProfile?.role === 'super_admin';
 
-  // Find student entity strictly matching current logged-in profile (no leak fallback for real students)
-  const student = students.find((s) => s.profile_id === currentProfile?.id) || (
+  // Find student entity matching current logged-in profile
+  const foundStudent = students.find((s) => s.profile_id === currentProfile?.id);
+  const foundEnrollment = foundStudent
+    ? enrollments.find((e) => e.student_id === foundStudent.id)
+    : enrollments.find((e) => e.student_id === students[0]?.id) || (isSuperAdminPreview ? (enrollments[0] || fallbackEnrollment) : undefined);
+  const foundCohort = cohorts.find((c) => c.id === foundEnrollment?.cohort_id);
+  const foundInvoice = foundStudent
+    ? invoices.find((i) => i.student_id === foundStudent.id)
+    : invoices.find((i) => i.student_id === students[0]?.id) || (isSuperAdminPreview ? invoices[0] : undefined);
+
+  // Determine the student's true registered/enrolled campus
+  const naturalBranchId =
+    currentProfile?.branch_id ||
+    foundStudent?.branch_id ||
+    foundCohort?.branch_id ||
+    foundInvoice?.branch_id ||
+    branches[0]?.id ||
+    'b1000000-0000-0000-0000-000000000001';
+
+  // Interactive campus selection: preserves real-time choice across browser refreshes
+  const [selectedCampusId, setSelectedCampusId] = useState<string>(() => {
+    const saved = localStorage.getItem('aur_student_selected_branch');
+    if (saved && branches.some((b) => b.id === saved)) return saved;
+    return naturalBranchId;
+  });
+
+  useEffect(() => {
+    if (naturalBranchId && !localStorage.getItem('aur_student_selected_branch')) {
+      setSelectedCampusId(naturalBranchId);
+    }
+  }, [naturalBranchId]);
+
+  const handleSelectCampus = (branchId: string) => {
+    setSelectedCampusId(branchId);
+    localStorage.setItem('aur_student_selected_branch', branchId);
+  };
+
+  const student = foundStudent || (
     isSuperAdminPreview
       ? (students[0] || fallbackStudent)
       : {
           id: `student-${currentProfile?.id || 'guest'}`,
           profile_id: currentProfile?.id || '',
-          branch_id: currentProfile?.branch_id || 'b1000000-0000-0000-0000-000000000001',
+          branch_id: selectedCampusId || naturalBranchId,
           emergency_contact_name: '',
           emergency_contact_phone: '',
           emergency_contact_relationship: '',
@@ -152,9 +188,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   );
 
   const profile = currentProfile?.role === 'student' ? currentProfile : (student?.profile || currentProfile);
+
+  // myBranch strictly respects selectedCampusId or the student's true campus
   const myBranch =
+    branches.find((b) => b.id === selectedCampusId) ||
+    branches.find((b) => b.id === naturalBranchId) ||
     branches.find((b) => b.id === student?.branch_id) ||
-    branches.find((b) => b.id === currentProfile?.branch_id) ||
     branches[0] ||
     fallbackBranch;
 
@@ -1801,9 +1840,36 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     <Smartphone size={24} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                      Campus Fee Payment & M-Pesa Confirmation
-                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                        Campus Fee Payment & M-Pesa Confirmation
+                      </h3>
+                      {branches && branches.length > 1 && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Campus:</span>
+                          <select
+                            value={myBranch?.id || ''}
+                            onChange={(e) => handleSelectCampus(e.target.value)}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '0.76rem',
+                              fontWeight: 600,
+                              background: 'var(--bg-card)',
+                              color: 'var(--crema-gold)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {branches.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name} ({b.code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '3px 0 0 0' }}>
                       Paybill: <strong>{myBranch?.paybill_number || '174379'}</strong> • Account No: <strong style={{ color: 'var(--crema-gold)' }}>{myBranch?.paybill_account_name || (myBranch?.code ? `AUREVIA-${myBranch.code}` : 'AUREVIA-HQ')}</strong> • {myBranch?.name}
                     </p>
@@ -1880,11 +1946,38 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
           {/* Manual Paybill Information Card (M-Pesa Only) */}
           <div className="glass-card" style={{ padding: 'clamp(16px, 3vw, 24px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <Smartphone size={18} color="#4ADE80" />
-              <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
-                Campus M-Pesa Paybill Credentials
-              </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Smartphone size={18} color="#4ADE80" />
+                <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700 }}>
+                  Campus M-Pesa Paybill Credentials
+                </h3>
+              </div>
+              {branches && branches.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Viewing School:</span>
+                  <select
+                    value={myBranch?.id || ''}
+                    onChange={(e) => handleSelectCampus(e.target.value)}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      color: 'var(--crema-gold)',
+                      border: '1px solid rgba(0, 166, 81, 0.3)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Dynamic Real-Time Trainee Instructions */}
@@ -3677,9 +3770,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       )}
 
       {/* M-Pesa Modal */}
-      {showPaymentModal && myInvoice && (
+      {showPaymentModal && (
         <MpesaPaymentModal
-          invoice={myInvoice}
+          invoice={myInvoice || null}
+          presetBranchId={myBranch?.id}
           presetAmount={paymentPresetAmount}
           onClose={() => {
             setShowPaymentModal(false);

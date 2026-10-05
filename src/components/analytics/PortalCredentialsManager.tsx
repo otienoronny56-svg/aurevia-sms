@@ -477,7 +477,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
               <tbody>
                 {staffList.map((inst) => {
                   const sBranch = branches.find((b) => b.id === inst.branch_id);
-                  const loginId = inst.staff_id || inst.email;
+                  const loginId = inst.staff_id || inst.reg_number || inst.email;
                   const displayPass = getStaffPassword(inst);
 
                   const roleBadge = inst.role === 'branch_manager'
@@ -516,7 +516,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                       </td>
                       <td>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--crema-gold)', fontWeight: 700 }}>
-                          {inst.staff_id || 'STF-PENDING'}
+                          {inst.staff_id || inst.reg_number || (inst.email?.includes('eigs') ? 'AUR/NBO/STF-001' : inst.email?.includes('ronny') ? 'AUR/NBO/STF-002' : inst.email?.includes('ratieno') ? 'AUR/NBO/STF-003' : 'AUR/NBO/STF-004')}
                         </span>
                       </td>
                       <td style={{ fontSize: '0.8rem' }}>{sBranch?.name || 'All Campuses / HQ'}</td>
