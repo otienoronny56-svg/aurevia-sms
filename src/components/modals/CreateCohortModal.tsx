@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../lib/store';
-import { X, Calendar, Clock, Video, User, Coffee, CheckCircle2, Building, Users } from 'lucide-react';
+import { X, Calendar, Clock, Video, User, Coffee, CheckCircle2, Building, Users, RotateCcw, Sparkles } from 'lucide-react';
+import { calculateCohortEndDate, getCohortDurationSummary } from '../../lib/dateUtils';
 
 interface CreateCohortModalProps {
   onClose: () => void;
@@ -34,11 +35,47 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
   const [scheduleTiming, setScheduleTiming] = useState(TIMETABLE_PRESETS[0]);
   const [customTiming, setCustomTiming] = useState('');
 
-  // Term Dates
+  const selectedCourse = courses.find((c) => c.id === courseId) || courses[0];
+  const selectedBranch = branches.find((b) => b.id === branchId) || branches[0];
+
+  // Term Dates: Auto-calculated from course duration (e.g. 5 weeks)
   const todayStr = new Date().toISOString().split('T')[0];
-  const defaultEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const initialDuration = selectedCourse?.duration_weeks || 2;
   const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(defaultEnd);
+  const [endDate, setEndDate] = useState(() => calculateCohortEndDate(todayStr, initialDuration));
+  const [isManualEndDate, setIsManualEndDate] = useState(false);
+
+  // Handlers for dynamic date recalculation
+  const handleCourseChange = (newCourseId: string) => {
+    setCourseId(newCourseId);
+    const newCourse = courses.find((c) => c.id === newCourseId);
+    if (newCourse?.duration_weeks && startDate) {
+      setEndDate(calculateCohortEndDate(startDate, newCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    if (selectedCourse?.duration_weeks && newStart) {
+      setEndDate(calculateCohortEndDate(newStart, selectedCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const handleEndDateChange = (newEnd: string) => {
+    setEndDate(newEnd);
+    setIsManualEndDate(true);
+  };
+
+  const handleRecalculateEndDate = () => {
+    if (startDate && selectedCourse?.duration_weeks) {
+      setEndDate(calculateCohortEndDate(startDate, selectedCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const durationSummary = getCohortDurationSummary(startDate, endDate);
 
   const [maxCapacity, setMaxCapacity] = useState<number | ''>(16);
   const [googleMeetUrl, setGoogleMeetUrl] = useState(
@@ -48,9 +85,6 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-
-  const selectedCourse = courses.find((c) => c.id === courseId) || courses[0];
-  const selectedBranch = branches.find((b) => b.id === branchId) || branches[0];
 
   // Auto suggest cohort name when course or branch changes if name is empty or default
   React.useEffect(() => {
@@ -207,12 +241,12 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
                   <select
                     className="form-select"
                     value={courseId}
-                    onChange={(e) => setCourseId(e.target.value)}
+                    onChange={(e) => handleCourseChange(e.target.value)}
                     required
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.title} ({c.duration_weeks} Wks)
+                        {c.title} ({c.duration_weeks ? `${c.duration_weeks} Wks` : 'Custom'})
                       </option>
                     ))}
                   </select>
@@ -251,26 +285,73 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
 
                 {/* Start Date */}
                 <div className="form-group">
-                  <label className="form-label">Term Start Date *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Term Start Date *</label>
+                    {selectedCourse?.duration_weeks && (
+                      <span style={{ fontSize: '0.70rem', color: 'var(--crema-gold)', fontWeight: 600 }}>
+                        {selectedCourse.duration_weeks} Wks Curriculum
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="date"
                     className="form-input"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
                     required
                   />
                 </div>
 
                 {/* End Date */}
                 <div className="form-group">
-                  <label className="form-label">Exam & Completion Date *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Exam & Completion Date *</label>
+                    {selectedCourse?.duration_weeks && (
+                      <button
+                        type="button"
+                        onClick={handleRecalculateEndDate}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--crema-gold)',
+                          fontSize: '0.70rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          textDecoration: 'underline',
+                          padding: 0,
+                        }}
+                        title={`Reset end date to exactly ${selectedCourse.duration_weeks} weeks from start date`}
+                      >
+                        <RotateCcw size={10} />
+                        <span>Auto-calc ({selectedCourse.duration_weeks} wks)</span>
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="date"
                     className="form-input"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
                     required
                   />
+                  {durationSummary && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.70rem' }}>
+                      <span style={{ color: isManualEndDate ? 'var(--text-secondary)' : '#10B981', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        {isManualEndDate ? (
+                          <>✏️ Custom: {durationSummary.weeks} wks ({durationSummary.days} days)</>
+                        ) : (
+                          <>⚡ Auto-fills {selectedCourse?.duration_weeks} wks ({durationSummary.days} days)</>
+                        )}
+                      </span>
+                      {isManualEndDate && selectedCourse?.duration_weeks && durationSummary.weeks !== selectedCourse.duration_weeks && (
+                        <span style={{ color: 'var(--crema-gold)', fontSize: '0.68rem' }}>
+                          Standard is {selectedCourse.duration_weeks} wks
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Max Student Capacity */}

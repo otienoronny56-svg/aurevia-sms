@@ -15,7 +15,10 @@ import {
   AlertTriangle,
   Edit3,
   Activity,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
+import { calculateCohortEndDate, getCohortDurationSummary } from '../../lib/dateUtils';
 
 interface EditCohortModalProps {
   cohort: Cohort;
@@ -56,8 +59,43 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
     isCustomPreset ? cohort.schedule_timing : ''
   );
 
+  const selectedCourse = courses.find((c) => c.id === courseId);
   const [startDate, setStartDate] = useState(cohort.start_date || '');
   const [endDate, setEndDate] = useState(cohort.end_date || '');
+  const [isManualEndDate, setIsManualEndDate] = useState(false);
+
+  // Handlers for dynamic date recalculation based on course duration
+  const handleCourseChange = (newCourseId: string) => {
+    setCourseId(newCourseId);
+    const newCourse = courses.find((c) => c.id === newCourseId);
+    if (newCourse?.duration_weeks && startDate) {
+      setEndDate(calculateCohortEndDate(startDate, newCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    if (selectedCourse?.duration_weeks && newStart) {
+      setEndDate(calculateCohortEndDate(newStart, selectedCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const handleEndDateChange = (newEnd: string) => {
+    setEndDate(newEnd);
+    setIsManualEndDate(true);
+  };
+
+  const handleRecalculateEndDate = () => {
+    if (startDate && selectedCourse?.duration_weeks) {
+      setEndDate(calculateCohortEndDate(startDate, selectedCourse.duration_weeks));
+      setIsManualEndDate(false);
+    }
+  };
+
+  const durationSummary = getCohortDurationSummary(startDate, endDate);
+
   const [maxCapacity, setMaxCapacity] = useState<number | ''>(cohort.max_capacity ?? 16);
   const [googleMeetUrl, setGoogleMeetUrl] = useState(cohort.google_meet_url || '');
   const [status, setStatus] = useState<Cohort['status']>(cohort.status || 'upcoming');
@@ -297,13 +335,13 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
               </label>
               <select
                 value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
+                onChange={(e) => handleCourseChange(e.target.value)}
                 className="form-input"
                 required
               >
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.title} ({c.category})
+                    {c.title} ({c.duration_weeks ? `${c.duration_weeks} Wks • ` : ''}{c.category})
                   </option>
                 ))}
               </select>
@@ -495,31 +533,78 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
           {/* SECTION 5: TERM DATES */}
           <div className="grid-2">
             <div>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={14} style={{ color: 'var(--crema-gold)' }} />
-                Intake Start Date
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <Calendar size={14} style={{ color: 'var(--crema-gold)' }} />
+                  Intake Start Date *
+                </label>
+                {selectedCourse?.duration_weeks && (
+                  <span style={{ fontSize: '0.70rem', color: 'var(--crema-gold)', fontWeight: 600 }}>
+                    {selectedCourse.duration_weeks} Wks Curriculum
+                  </span>
+                )}
+              </div>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="form-input"
                 required
               />
             </div>
 
             <div>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={14} style={{ color: 'var(--crema-gold)' }} />
-                Intake End / Graduation Date
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <Calendar size={14} style={{ color: 'var(--crema-gold)' }} />
+                  Intake End / Graduation Date *
+                </label>
+                {selectedCourse?.duration_weeks && (
+                  <button
+                    type="button"
+                    onClick={handleRecalculateEndDate}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--crema-gold)',
+                      fontSize: '0.70rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      textDecoration: 'underline',
+                      padding: 0,
+                    }}
+                    title={`Reset end date to exactly ${selectedCourse.duration_weeks} weeks from start date`}
+                  >
+                    <RotateCcw size={10} />
+                    <span>Auto-calc ({selectedCourse.duration_weeks} wks)</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 className="form-input"
                 required
               />
+              {durationSummary && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.70rem' }}>
+                  <span style={{ color: isManualEndDate ? 'var(--text-secondary)' : '#10B981', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {isManualEndDate ? (
+                      <>✏️ Custom: {durationSummary.weeks} wks ({durationSummary.days} days)</>
+                    ) : (
+                      <>⚡ Auto-fills {selectedCourse?.duration_weeks} wks ({durationSummary.days} days)</>
+                    )}
+                  </span>
+                  {isManualEndDate && selectedCourse?.duration_weeks && durationSummary.weeks !== selectedCourse.duration_weeks && (
+                    <span style={{ color: 'var(--crema-gold)', fontSize: '0.68rem' }}>
+                      Standard is {selectedCourse.duration_weeks} wks
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
