@@ -7,7 +7,7 @@ import {
   CheckCircle2, Copy, Check, Eye, EyeOff, Sparkles, BookOpen,
   Sparkle, Briefcase, UserCheck, ShieldOff, Send
 } from 'lucide-react';
-import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
+import { PRODUCTION_PORTAL_URL, PRODUCTION_SMS_URL } from '../../lib/domainConfig';
 import { sendResendEmail } from '../../lib/resend';
 import { generateStaffWelcomeEmailHtml } from '../../lib/emailTemplates';
 
@@ -125,13 +125,18 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   };
 
   const handleCopyCredentials = () => {
-    const roleLabel = (createdProfile?.role || role) === 'branch_manager'
+    const effectiveRole = createdProfile?.role || role;
+    const roleLabel = effectiveRole === 'branch_manager'
       ? 'Campus Branch Manager'
-      : (createdProfile?.role || role) === 'super_admin'
+      : effectiveRole === 'super_admin'
       ? 'Super Administrator'
       : (createdProfile?.job_title || specialty || 'Faculty Instructor');
 
-    const text = `Aurevia Academy Portal Access\nStaff Member: ${fullName}\nRole: ${roleLabel}\nStaff ID / Login: ${staffId}\nBranch: ${branchObj?.name}\nPortal URL: ${PRODUCTION_PORTAL_URL}\n${staffCategory === 'system' ? `Login Identifier: ${staffId} or ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}\nPlease sign in and change your password on first login.`;
+    const staffLoginUrl = (effectiveRole === 'branch_manager' || effectiveRole === 'super_admin')
+      ? PRODUCTION_SMS_URL
+      : PRODUCTION_PORTAL_URL;
+
+    const text = `Aurevia Academy Portal Access\nStaff Member: ${fullName}\nRole: ${roleLabel}\nStaff ID / Login: ${staffId}\nBranch: ${branchObj?.name}\nPortal URL: ${staffLoginUrl}\n${staffCategory === 'system' ? `Login Identifier: ${staffId} or ${email}\nInitial Password: ${initialPassword}` : 'Access: Support Operations Staff (No Portal Login Needed)'}\nPlease sign in and change your password on first login.`;
     navigator.clipboard.writeText(text);
     setCopiedCreds(true);
     setTimeout(() => setCopiedCreds(false), 2500);
@@ -152,6 +157,11 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
         ? 'Super Administrator'
         : (createdProfile?.job_title || specialty || 'Instructor');
 
+      const effectiveRole = createdProfile?.role || role;
+      const staffLoginUrl = (effectiveRole === 'branch_manager' || effectiveRole === 'super_admin')
+        ? PRODUCTION_SMS_URL
+        : PRODUCTION_PORTAL_URL;
+
       const html = generateStaffWelcomeEmailHtml({
         staffName: createdProfile?.full_name || fullName,
         staffId: createdProfile?.staff_id || staffId,
@@ -159,7 +169,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
         department: createdProfile?.department || (role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
         branchName,
         temporaryPassword: createdProfile?.initial_password || initialPassword,
-        portalUrl: PRODUCTION_PORTAL_URL,
+        portalUrl: staffLoginUrl,
       });
 
       const res = await sendResendEmail({
@@ -188,8 +198,12 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
     }
     setIsSendingSms(true);
     try {
-      const roleLabel = (createdProfile?.role || role) === 'branch_manager' ? 'Branch Manager' : 'Staff';
-      const msg = `Hello ${fullName}, your Aurevia Academy ${roleLabel} account is active. Portal: ${PRODUCTION_PORTAL_URL} | Login ID: ${staffId} | Initial Password: ${initialPassword}. Tripple T Systems.`;
+      const effectiveRole = createdProfile?.role || role;
+      const roleLabel = effectiveRole === 'branch_manager' ? 'Branch Manager' : 'Staff';
+      const staffLoginUrl = (effectiveRole === 'branch_manager' || effectiveRole === 'super_admin')
+        ? PRODUCTION_SMS_URL
+        : PRODUCTION_PORTAL_URL;
+      const msg = `Hello ${fullName}, your Aurevia Academy ${roleLabel} account is active. Portal: ${staffLoginUrl} | Login ID: ${staffId} | Initial Password: ${initialPassword}. Tripple T Systems.`;
       await sendBulkCommunication({
         channel: 'sms',
         purpose: 'admissions',
@@ -409,9 +423,11 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Academy Portal:</span>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {(createdProfile.role === 'branch_manager' || createdProfile.role === 'super_admin') ? 'Management System:' : 'Academy Portal:'}
+                        </span>
                         <span style={{ fontWeight: 600, color: '#10B981', fontSize: '0.78rem' }}>
-                          {PRODUCTION_PORTAL_URL}
+                          {(createdProfile.role === 'branch_manager' || createdProfile.role === 'super_admin') ? PRODUCTION_SMS_URL : PRODUCTION_PORTAL_URL}
                         </span>
                       </div>
                     </>

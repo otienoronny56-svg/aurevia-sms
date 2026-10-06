@@ -5,7 +5,7 @@ import {
   RefreshCw, ShieldCheck, ExternalLink, CheckCircle2, Lock,
   Phone, Mail, Building2, AlertCircle, Sparkles, UserPlus, Trash2
 } from 'lucide-react';
-import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
+import { PRODUCTION_PORTAL_URL, PRODUCTION_SMS_URL } from '../../lib/domainConfig';
 import { INITIAL_PROFILES } from '../../lib/mockData';
 import { Profile } from '../../types/database.types';
 import { AddStaffModal } from '../modals/AddStaffModal';
@@ -152,8 +152,11 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
     setTimeout(() => setActionNotice(null), 5000);
   };
 
-  const handleCopyCredentials = (name: string, loginId: string, pass: string) => {
-    const text = `Aurevia Academy Portal Credentials\nName: ${name}\nPortal URL: ${PRODUCTION_PORTAL_URL}\nLogin Identifier: ${loginId}\nPassword: ${pass}\nPlease log in and change your password upon first entry.`;
+  const handleCopyCredentials = (name: string, loginId: string, pass: string, targetRole?: string) => {
+    const isManagement = targetRole === 'branch_manager' || targetRole === 'super_admin';
+    const targetUrl = isManagement ? PRODUCTION_SMS_URL : PRODUCTION_PORTAL_URL;
+    const portalName = isManagement ? 'Aurevia SMS Management' : 'Aurevia Academy Portal';
+    const text = `${portalName} Credentials\nName: ${name}\nPortal URL: ${targetUrl}\nLogin Identifier: ${loginId}\nPassword: ${pass}\nPlease log in and change your password upon first entry.`;
     navigator.clipboard.writeText(text);
     setCopiedId(loginId);
     showNotification(`Credentials copied for ${name}!`);
@@ -175,13 +178,16 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
 
     setSendingSmsId(loginId);
     try {
-      const msg = `Hello ${name}, your Aurevia Academy Portal account is active. Login at: ${PRODUCTION_PORTAL_URL} | Username: ${loginId} | Password: ${pass}. Tripple T Systems.`;
+      const isManagement = roleTitle === 'branch_manager' || roleTitle === 'super_admin';
+      const targetUrl = isManagement ? PRODUCTION_SMS_URL : PRODUCTION_PORTAL_URL;
+      const portalLabel = isManagement ? 'Aurevia Management System' : 'Aurevia Academy Portal';
+      const msg = `Hello ${name}, your ${portalLabel} account is active. Login at: ${targetUrl} | Username: ${loginId} | Password: ${pass}. Tripple T Systems.`;
 
       await sendBulkCommunication({
         channel: 'sms',
         purpose: 'admissions',
         messageContent: msg,
-        audienceSegment: roleTitle === 'instructor' ? 'Instructors' : 'Students',
+        audienceSegment: roleTitle === 'instructor' ? 'Instructors' : 'Staff',
         recipients: [
           {
             name,
@@ -217,6 +223,9 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
         : (staff.job_title || staff.specialty || 'Faculty Instructor');
       const pass = getStaffPassword(staff);
 
+      const isManagement = staff.role === 'branch_manager' || staff.role === 'super_admin';
+      const targetUrl = isManagement ? PRODUCTION_SMS_URL : PRODUCTION_PORTAL_URL;
+
       const html = generateStaffWelcomeEmailHtml({
         staffName: staff.full_name,
         staffId: staff.staff_id || staff.reg_number || 'Staff',
@@ -224,7 +233,7 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
         department: staff.department || (staff.role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
         branchName,
         temporaryPassword: pass,
-        portalUrl: PRODUCTION_PORTAL_URL,
+        portalUrl: targetUrl,
       });
 
       const res = await sendResendEmail({
@@ -539,9 +548,9 @@ export const PortalCredentialsManager: React.FC<PortalCredentialsManagerProps> =
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            onClick={() => handleCopyCredentials(inst.full_name, loginId, displayPass)}
+                            onClick={() => handleCopyCredentials(inst.full_name, loginId, displayPass, inst.role)}
                             style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            title="Copy Portal Login & Password"
+                            title="Copy Login & Password"
                           >
                             {copiedId === loginId ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
                             <span>Copy</span>

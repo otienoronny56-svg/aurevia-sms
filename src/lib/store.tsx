@@ -52,7 +52,7 @@ import {
   generateBroadcastEmailHtml,
   generateLoginAlertEmailHtml,
 } from './emailTemplates';
-import { PRODUCTION_PORTAL_URL } from './domainConfig';
+import { PRODUCTION_PORTAL_URL, PRODUCTION_SMS_URL } from './domainConfig';
 import { hashPassword, verifyPassword, generateSecureOTP, generateUniqueDefaultPassword } from './security';
 
 /**
@@ -398,13 +398,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.filter((p: Profile) => 
-            p.role !== 'student' &&
-            !p.full_name?.toLowerCase().includes('wanjiku') &&
-            !p.full_name?.toLowerCase().includes('mutua') &&
-            !p.email?.toLowerCase().includes('wanjiku') &&
-            !p.email?.toLowerCase().includes('mutua')
-          );
+          const cleaned = parsed.filter((p: Profile) => p.role !== 'student');
 
           const storedAllocationsStr = localStorage.getItem('aur_permanent_staff_ids');
           let staffAllocations: Record<string, string> = {};
@@ -858,13 +852,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         localStorage.setItem('aur_permanent_staff_ids', JSON.stringify(staffAllocations));
         localStorage.setItem('aur_highest_staff_seq', String(highestStaffSeq));
-        const mergedProfiles: Profile[] = [...dbProfiles].filter(
-          (p: any) =>
-            !p.full_name?.toLowerCase().includes('wanjiku') &&
-            !p.full_name?.toLowerCase().includes('mutua') &&
-            !p.email?.toLowerCase().includes('wanjiku') &&
-            !p.email?.toLowerCase().includes('mutua')
-        );
+        const mergedProfiles: Profile[] = [...dbProfiles];
         for (const initP of INITIAL_PROFILES) {
           if (!mergedProfiles.some((p: any) => p.id === initP.id || (p.email && p.email.toLowerCase() === initP.email.toLowerCase()))) {
             mergedProfiles.push(initP);
@@ -3795,7 +3783,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: (params.email || '').trim().toLowerCase(),
         phone: (params.phone || '').trim(),
         reg_number: regNumber,
-        staff_id: regNumber,
         specialty: params.specialty || params.job_title || 'Lead Trainer',
         is_active: true,
         initial_password: staffDefaultPwd,
@@ -3812,14 +3799,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       data = res.data;
       error = res.error;
 
-      // Graceful fallback if database schema is missing the new password columns:
+      // Graceful fallback if database schema is missing any columns:
       if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
-        if (error.message?.includes('staff_id')) {
-          delete insertPayload.staff_id;
+        if (error.message?.includes('initial_password') || error.message?.includes('password_hash')) {
+          delete insertPayload.initial_password;
+          delete insertPayload.password_hash;
+          delete insertPayload.password_changed;
         }
-        delete insertPayload.initial_password;
-        delete insertPayload.password_hash;
-        delete insertPayload.password_changed;
         const retryRes = await supabase.from('aur_profiles').insert(insertPayload).select().single();
         data = retryRes.data;
         error = retryRes.error;
@@ -3898,6 +3884,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? 'Super Administrator'
         : (created.job_title || created.specialty || 'Faculty Instructor');
 
+      const staffLoginUrl = (created.role === 'branch_manager' || created.role === 'super_admin')
+        ? PRODUCTION_SMS_URL
+        : PRODUCTION_PORTAL_URL;
+
       const html = generateStaffWelcomeEmailHtml({
         staffName: created.full_name,
         staffId: created.staff_id || created.reg_number || 'Staff',
@@ -3905,7 +3895,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         department: created.department || (created.role === 'branch_manager' ? 'Campus Administration' : 'Academic & Training'),
         branchName,
         temporaryPassword: staffDefaultPwd,
-        portalUrl: PRODUCTION_PORTAL_URL,
+        portalUrl: staffLoginUrl,
       });
 
       sendResendEmail({
