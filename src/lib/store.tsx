@@ -1127,6 +1127,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
       .on(
         'postgres_changes',
+        { event: '*', schema: 'public', table: 'aur_staff_clockin' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const row = payload.new as any;
+            setStaffClockins((prev) => {
+              const next = [row, ...prev.filter((c) => c.id !== row.id && !(c.profile_id === row.profile_id && (c.work_date || '').slice(0, 10) === (row.work_date || '').slice(0, 10)))];
+              localStorage.setItem('aur_staff_clockins', JSON.stringify(next));
+              return next;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setStaffClockins((prev) => {
+              const next = prev.filter((c) => c.id !== (payload.old as any).id);
+              localStorage.setItem('aur_staff_clockins', JSON.stringify(next));
+              return next;
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'aur_sms_logs' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
@@ -3259,8 +3279,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     locationNotes?: string;
   }) => {
     try {
-      await supabase.from('aur_staff_clockin').upsert(
-        {
+      const { data: existing } = await supabase
+        .from('aur_staff_clockin')
+        .select('id')
+        .eq('profile_id', params.profileId)
+        .eq('work_date', params.workDate)
+        .maybeSingle();
+
+      if (existing?.id) {
+        await supabase
+          .from('aur_staff_clockin')
+          .update({
+            branch_id: params.branchId,
+            clock_in: params.clockIn || new Date().toISOString(),
+            clock_out: params.clockOut || null,
+            location_notes: params.locationNotes || 'Signed physical attendance book',
+            status: params.clockOut ? 'completed' : 'on_duty',
+          })
+          .eq('id', existing.id);
+      } else {
+        await supabase.from('aur_staff_clockin').insert({
           profile_id: params.profileId,
           branch_id: params.branchId,
           work_date: params.workDate,
@@ -3268,9 +3306,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           clock_out: params.clockOut || null,
           location_notes: params.locationNotes || 'Signed physical attendance book',
           status: params.clockOut ? 'completed' : 'on_duty',
-        },
-        { onConflict: 'profile_id,work_date' }
-      );
+        });
+      }
     } catch (e) {
       console.warn('Supabase staff clockin sync:', e);
     }
@@ -3312,8 +3349,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await supabase.from('aur_staff_clockin').insert({
         profile_id: currentProfile.id,
         branch_id: currentProfile.branch_id || branches[0].id,
+        clock_in: newRecord.clock_in,
         work_date: today,
         location_notes: locationNotes || 'Campus Lab',
+        status: 'on_duty',
       });
     } catch (e) {
       console.warn(e);

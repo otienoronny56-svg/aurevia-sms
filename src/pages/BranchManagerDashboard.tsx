@@ -102,7 +102,18 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const branchStudents = students.filter((s) => s.branch_id === myBranch?.id);
   const branchInvoices = invoices.filter((i) => i.branch_id === myBranch?.id);
   const branchPayments = payments.filter((p) => p.branch_id === myBranch?.id);
-  const branchStaff = profiles.filter((p) => (p.branch_id === myBranch?.id || !p.branch_id) && p.role !== 'student');
+  const branchStaff = profiles
+    .filter((p) => {
+      if (p.role === 'student' || p.role === 'super_admin') return false;
+      return p.id === currentProfile.id || p.branch_id === myBranch?.id || (!p.branch_id && p.role === 'instructor');
+    })
+    .sort((a, b) => {
+      const aIsMgr = a.id === currentProfile.id || a.role === 'branch_manager';
+      const bIsMgr = b.id === currentProfile.id || b.role === 'branch_manager';
+      if (aIsMgr && !bIsMgr) return -1;
+      if (!aIsMgr && bIsMgr) return 1;
+      return a.full_name.localeCompare(b.full_name);
+    });
   const branchLeaves = leaveRequests.filter((l) => l.branch_id === myBranch?.id);
   const branchLessons = lessons.filter((l) => l.branch_id === myBranch?.id || !l.branch_id);
 
@@ -989,6 +1000,192 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
             })()}
           </div>
 
+          {/* Logbook Date Selector & Action Toolbar */}
+          <div
+            className="glass-card"
+            style={{
+              padding: '16px 20px',
+              marginBottom: '18px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.08) 0%, rgba(26, 20, 18, 0.6) 100%)',
+              border: '1px solid rgba(212, 154, 91, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={18} color="var(--crema-gold)" />
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                  Logbook Register Date:
+                </span>
+              </div>
+              <input
+                type="date"
+                value={selectedLogDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setSelectedLogDate(e.target.value)}
+                className="input-field"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
+                  fontFamily: 'var(--font-mono)',
+                  width: 'auto',
+                  background: 'var(--bg-surface)',
+                  borderColor: 'var(--crema-gold)',
+                }}
+              />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                  onClick={() => setSelectedLogDate(new Date().toISOString().split('T')[0])}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                  onClick={() => {
+                    const y = new Date();
+                    y.setDate(y.getDate() - 1);
+                    setSelectedLogDate(y.toISOString().split('T')[0]);
+                  }}
+                >
+                  Yesterday
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                onClick={handleSignAllPresent}
+                title="Fill default 08:00 AM clock-in for all unrecorded staff"
+              >
+                <CheckCircle2 size={13} color="#10B981" />
+                <span>Bulk Sign In (08:00 AM)</span>
+              </button>
+              <ExportActionsMenu
+                onExportCSV={() => handleExportStaffAttendance('csv')}
+                onExportPDF={() => handleExportStaffAttendance('pdf')}
+                label="Export Logbook"
+              />
+            </div>
+          </div>
+
+          {/* Executive Manager Attendance Status Card (Approach 1: Self-Sign with Super Admin Audit Transparency) */}
+          {(() => {
+            const managerProfile = branchStaff.find((s) => s.id === currentProfile.id || s.role === 'branch_manager') || currentProfile;
+            const managerClock = staffClockins.find(
+              (c) => c.profile_id === managerProfile.id && (c.work_date || '').slice(0, 10) === selectedLogDate.slice(0, 10)
+            );
+            const isSelfLogged = managerClock?.location_notes?.includes('MANAGER SELF-LOGGED');
+            const mgrIn = managerClock?.clock_in
+              ? new Date(managerClock.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : null;
+            const mgrOut = managerClock?.clock_out
+              ? new Date(managerClock.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : null;
+
+            return (
+              <div
+                className="glass-card"
+                style={{
+                  padding: '16px 20px',
+                  marginBottom: '20px',
+                  border: '1px solid rgba(212, 154, 91, 0.4)',
+                  background: 'linear-gradient(135deg, rgba(212, 154, 91, 0.12) 0%, rgba(20, 16, 14, 0.9) 100%)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '14px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
+                      color: '#181310',
+                      fontWeight: 800,
+                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(212, 154, 91, 0.3)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                        {managerProfile.full_name}
+                      </span>
+                      <span className="badge badge-gold" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                        Campus General Manager
+                      </span>
+                      {managerClock ? (
+                        <span className="badge badge-paid" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                          Duty Recorded
+                        </span>
+                      ) : (
+                        <span className="badge badge-pending" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                          Attendance Pending
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                      {managerClock ? (
+                        <span>
+                          Shift: <strong style={{ color: '#6EE7B7' }}>{mgrIn || '--'}</strong>
+                          {mgrOut ? <> → <strong style={{ color: 'var(--crema-gold)' }}>{mgrOut}</strong> (Completed)</> : <> → <span style={{ color: '#10B981' }}>On Duty</span></>}
+                          {isSelfLogged && (
+                            <span style={{ marginLeft: '8px', color: 'var(--crema-gold)', fontStyle: 'italic' }}>
+                              • Self-Logged Entry (Super Admin Audited)
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span>Your personal attendance for <strong>{selectedLogDate}</strong> is not yet recorded. Log your shift below:</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(212, 154, 91, 0.25)',
+                  }}
+                  onClick={() => setSigningStaff(managerProfile)}
+                >
+                  <Edit3 size={14} />
+                  <span>{managerClock ? '✏️ Edit My Attendance' : '✍️ Log My Own Attendance'}</span>
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Master Logbook Table (Zero Horizontal Scrolling) */}
           <div className="table-container" style={{ overflowX: 'hidden', marginBottom: '24px' }}>
             <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
@@ -1011,6 +1208,8 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                   );
                   const isPresent = !!clockRec?.clock_in;
                   const isDeparted = !!clockRec?.clock_out;
+                  const isManager = staff.id === currentProfile.id || staff.role === 'branch_manager';
+                  const isSelfLogged = clockRec?.location_notes?.includes('MANAGER SELF-LOGGED');
 
                   const timeInDisplay = clockRec?.clock_in
                     ? new Date(clockRec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1020,7 +1219,12 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                     : '--:--';
 
                   return (
-                    <tr key={staff.id}>
+                    <tr
+                      key={staff.id}
+                      style={{
+                        background: isManager ? 'rgba(212, 154, 91, 0.04)' : undefined,
+                      }}
+                    >
                       {/* Ser No. */}
                       <td style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.80rem' }}>
                         #{index + 1}
@@ -1034,21 +1238,24 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                               width: '32px',
                               height: '32px',
                               borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
-                              color: '#181310',
+                              background: isManager
+                                ? 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)'
+                                : 'linear-gradient(135deg, #4A3E39 0%, #2A2421 100%)',
+                              color: isManager ? '#181310' : '#E5D6C5',
                               fontWeight: 700,
                               fontSize: '0.82rem',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               flexShrink: 0,
+                              border: isManager ? '1px solid rgba(212, 154, 91, 0.5)' : undefined,
                             }}
                           >
                             {staff.full_name.charAt(0)}
                           </div>
                           <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                              {staff.full_name}
+                            <div style={{ fontWeight: isManager ? 700 : 600, fontSize: '0.82rem', color: isManager ? 'var(--crema-gold)' : 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              {staff.full_name} {isManager && '(You)'}
                             </div>
                             <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                               {staff.phone || staff.email}
@@ -1079,11 +1286,18 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
 
                       {/* Role & Dept */}
                       <td>
-                        <div style={{ fontSize: '0.80rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          {staff.job_title || staff.specialty || staff.role}
+                        <div style={{ fontSize: '0.80rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {isManager && <ShieldCheck size={13} color="var(--crema-gold)" />}
+                          <span>{isManager ? 'Branch General Manager' : (staff.job_title || staff.specialty || staff.role)}</span>
                         </div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          {clockRec?.location_notes || staff.department || (staff.system_access === false ? 'Support Operations' : 'Academic Faculty')}
+                          {isSelfLogged ? (
+                            <span style={{ color: 'var(--crema-gold)', fontWeight: 600 }}>★ Self-Signed (Super Admin Audited)</span>
+                          ) : clockRec?.location_notes?.includes('VERIFIED BY MANAGER') ? (
+                            <span style={{ color: '#10B981', fontWeight: 600 }}>✓ Verified from Logbook</span>
+                          ) : (
+                            clockRec?.location_notes || staff.department || (staff.system_access === false ? 'Support Operations' : 'Academic Faculty')
+                          )}
                         </div>
                       </td>
 
@@ -1131,7 +1345,16 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                       {/* Manager Actions */}
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '4px' }}>
-                          {!isPresent ? (
+                          {isManager ? (
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '3px 8px', fontSize: '0.70rem' }}
+                              onClick={() => setSigningStaff(staff)}
+                              title="Record or update my manager attendance entry"
+                            >
+                              <span>{clockRec ? '✏️ Edit Shift' : '✍️ Self-Sign'}</span>
+                            </button>
+                          ) : !isPresent ? (
                             <>
                               <button
                                 className="btn btn-primary"
@@ -2742,7 +2965,7 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
           branchId={myBranch.id}
           selectedDate={selectedLogDate}
           existingClockIn={staffClockins.find(
-            (c) => c.profile_id === signingStaff.id && c.work_date === selectedLogDate
+            (c) => c.profile_id === signingStaff.id && (c.work_date || '').slice(0, 10) === selectedLogDate.slice(0, 10)
           )}
           onClose={() => setSigningStaff(null)}
         />

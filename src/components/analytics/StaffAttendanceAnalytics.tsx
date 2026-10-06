@@ -28,7 +28,7 @@ export const StaffAttendanceAnalytics: React.FC = () => {
     return p?.branch_id === selectedCampusFilter;
   });
 
-  const todayClockins = filteredClockins.filter((c) => c.work_date === today);
+  const todayClockins = filteredClockins.filter((c) => (c.work_date || '').slice(0, 10) === today.slice(0, 10));
   const clockedInCount = todayClockins.length;
   const clockInRate = filteredInstructors.length > 0
     ? Math.round((clockedInCount / filteredInstructors.length) * 100)
@@ -59,7 +59,7 @@ export const StaffAttendanceAnalytics: React.FC = () => {
 
     // 1. Staff Clock-Ins
     filteredInstructors.forEach((staff) => {
-      const clockInRec = staffClockins.find((c) => c.profile_id === staff.id && c.work_date === today);
+      const clockInRec = staffClockins.find((c) => c.profile_id === staff.id && (c.work_date || '').slice(0, 10) === today.slice(0, 10));
       const b = branches.find((br) => br.id === staff.branch_id);
       rows.push([
         counter++,
@@ -107,7 +107,7 @@ export const StaffAttendanceAnalytics: React.FC = () => {
     const branchStudents = students.filter((s) => s.branch_id === b.id);
     const branchClockins = staffClockins.filter((c) => {
       const p = profiles.find((prof) => prof.id === c.profile_id);
-      return p?.branch_id === b.id && c.work_date === today;
+      return p?.branch_id === b.id && (c.work_date || '').slice(0, 10) === today.slice(0, 10);
     });
 
     const fRate = branchInstructors.length > 0
@@ -505,21 +505,33 @@ export const StaffAttendanceAnalytics: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredInstructors.map((staff) => {
               const clockInRec = staffClockins.find(
-                (c) => c.profile_id === staff.id && c.work_date === today
+                (c) => c.profile_id === staff.id && (c.work_date || '').slice(0, 10) === today.slice(0, 10)
               );
               const sBranch = branches.find((b) => b.id === staff.branch_id);
+              const isManager = staff.role === 'branch_manager';
+              const isSelfLogged = clockInRec?.location_notes?.includes('MANAGER SELF-LOGGED');
+              const isVerifiedLogbook = clockInRec?.location_notes?.includes('VERIFIED BY MANAGER');
+
+              const inTime = clockInRec?.clock_in
+                ? new Date(clockInRec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : null;
+              const outTime = clockInRec?.clock_out
+                ? new Date(clockInRec.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : null;
 
               return (
                 <div
                   key={staff.id}
                   style={{
                     background: 'var(--bg-surface-elevated)',
-                    border: '1px solid var(--border-subtle)',
+                    border: isManager ? '1px solid rgba(212, 154, 91, 0.35)' : '1px solid var(--border-subtle)',
                     borderRadius: 'var(--radius-sm)',
                     padding: '10px 14px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    gap: '10px',
+                    flexWrap: 'wrap',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -528,33 +540,59 @@ export const StaffAttendanceAnalytics: React.FC = () => {
                         width: '32px',
                         height: '32px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)',
-                        color: '#181310',
+                        background: isManager
+                          ? 'linear-gradient(135deg, #D49A5B 0%, #8C5A28 100%)'
+                          : 'linear-gradient(135deg, #3A302B 0%, #221D1B 100%)',
+                        color: isManager ? '#181310' : '#E5D6C5',
                         fontWeight: 700,
                         fontSize: '0.80rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
+                        border: isManager ? '1px solid rgba(212, 154, 91, 0.5)' : undefined,
                       }}
                     >
                       {staff.full_name.charAt(0)}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)' }}>
-                        {staff.full_name}
+                      <div style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{staff.full_name}</span>
+                        {isManager && (
+                          <span className="badge badge-gold" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>
+                            Branch GM
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
                         {staff.job_title || staff.specialty || staff.role} • <strong style={{ color: 'var(--crema-gold)' }}>{sBranch?.code || 'HQ'}</strong>
+                        {isSelfLogged && (
+                          <span style={{ color: 'var(--crema-gold)', marginLeft: '6px', fontWeight: 600 }}>
+                            ★ Self-Signed by Manager
+                          </span>
+                        )}
+                        {isVerifiedLogbook && (
+                          <span style={{ color: '#10B981', marginLeft: '6px' }}>
+                            ✓ Verified from Paper Book
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {clockInRec ? (
-                      <span className="badge badge-present" style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
-                        In: {new Date(clockInRec.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="badge badge-present" style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
+                          In: {inTime}{outTime ? ` • Out: ${outTime}` : ' (On Duty)'}
+                        </span>
+                        {isSelfLogged && (
+                          <div style={{ fontSize: '0.66rem', color: 'var(--crema-gold)', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
+                            <ShieldCheck size={11} />
+                            <span>Executive Audit Protocol</span>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <span className="badge badge-pending" style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
                         Not Clocked In
