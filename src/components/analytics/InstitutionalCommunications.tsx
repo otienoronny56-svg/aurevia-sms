@@ -535,18 +535,46 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
   // ---------------------------------------------------------------------------
   // FILTERED LEDGER LOGS
   // ---------------------------------------------------------------------------
+  // Base logs filtered by role and campus security boundaries:
+  const baseLogsForRole = useMemo(() => {
+    const isManager = isBranchManagerMode || currentProfile.role === 'branch_manager';
+    if (isManager) {
+      return smsLogs.filter((log) => {
+        // Strictly only show logs belonging to the branch manager's campus
+        if (log.branch_id && currentProfile.branch_id && log.branch_id !== currentProfile.branch_id) {
+          return false;
+        }
+
+        // Branch Managers must NEVER see Super Admin sign-in alerts or logs
+        const contentLower = (log.message_content || '').toLowerCase();
+        const subjectLower = (log.subject || '').toLowerCase();
+        const segmentLower = (log.audience_segment || '').toLowerCase();
+        const nameLower = (log.recipient_name || '').toLowerCase();
+
+        const isSuperAdminLog =
+          segmentLower.includes('super admin') ||
+          contentLower.includes('super admin') ||
+          subjectLower.includes('super admin') ||
+          profiles.some(
+            (p) => p.role === 'super_admin' && (p.full_name?.toLowerCase() === nameLower || p.email?.toLowerCase() === log.recipient_email?.toLowerCase())
+          );
+
+        return !isSuperAdminLog;
+      });
+    }
+    return smsLogs;
+  }, [smsLogs, isBranchManagerMode, currentProfile, profiles]);
+
   const filteredLogs = useMemo(() => {
-    return smsLogs.filter((log) => {
-      // Branch filter
-      if (isBranchManagerMode) {
-        if (log.branch_id && log.branch_id !== currentProfile.branch_id) return false;
-      } else if (ledgerBranchFilter !== 'ALL') {
+    return baseLogsForRole.filter((log) => {
+      // Super Admin branch filter
+      if (!isBranchManagerMode && currentProfile.role !== 'branch_manager' && ledgerBranchFilter !== 'ALL') {
         if (log.branch_id && log.branch_id !== ledgerBranchFilter) return false;
       }
 
       // Channel filter
       if (ledgerChannelFilter !== 'ALL') {
-        const logChannel = log.channel || 'sms';
+        const logChannel = log.channel || (log.recipient_email || log.recipient_phone?.includes('@') ? 'email' : 'sms');
         if (logChannel !== ledgerChannelFilter) return false;
       }
 
@@ -571,7 +599,7 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
 
       return true;
     });
-  }, [smsLogs, ledgerBranchFilter, ledgerChannelFilter, ledgerPurposeFilter, searchTerm, isBranchManagerMode, currentProfile]);
+  }, [baseLogsForRole, ledgerBranchFilter, ledgerChannelFilter, ledgerPurposeFilter, searchTerm, isBranchManagerMode, currentProfile]);
 
   // ---------------------------------------------------------------------------
   // EXPORT DISPATCH LEDGER
@@ -579,9 +607,9 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
   const handleExport = (format: 'csv' | 'pdf') => {
     const headers = ['Channel', 'Recipient Name', 'Phone / Email', 'Purpose', 'Subject / Message', 'Gateway Ref', 'Status', 'Sent At'];
     const rows = filteredLogs.map((log) => [
-      (log.channel || 'sms').toUpperCase(),
+      (log.channel || (log.recipient_email || log.recipient_phone?.includes('@') ? 'email' : 'sms')).toUpperCase(),
       log.recipient_name,
-      log.channel === 'email' ? (log.recipient_email || 'N/A') : (log.recipient_phone || 'N/A'),
+      log.channel === 'email' ? (log.recipient_email || log.recipient_phone || 'N/A') : (log.recipient_phone || 'N/A'),
       log.purpose,
       log.subject ? `${log.subject}: ${log.message_content}` : log.message_content,
       log.gateway_reference || 'N/A',
@@ -614,9 +642,9 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
   }, [filteredLogs, ledgerPage, ledgerPageSize]);
 
   // Metrics summary
-  const totalSentCount = smsLogs.length;
-  const totalSmsCount = smsLogs.filter((l) => !l.channel || l.channel === 'sms' || l.channel === 'dual').length;
-  const totalEmailCount = smsLogs.filter((l) => l.channel === 'email' || l.channel === 'dual').length;
+  const totalSentCount = baseLogsForRole.length;
+  const totalSmsCount = baseLogsForRole.filter((l) => !l.channel || l.channel === 'sms' || l.channel === 'dual').length;
+  const totalEmailCount = baseLogsForRole.filter((l) => l.channel === 'email' || l.channel === 'dual' || (l.recipient_email || l.recipient_phone?.includes('@'))).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -742,10 +770,10 @@ export const InstitutionalCommunications: React.FC<InstitutionalCommunicationsPr
               Audience Reach
             </div>
             <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: '1.2' }}>
-              {students.length + profiles.length} Contacts
+              {(isBranchManagerMode ? students.filter((s) => s.branch_id === currentProfile.branch_id).length + profiles.filter((p) => p.branch_id === currentProfile.branch_id && p.role !== 'super_admin').length : students.length + profiles.length)} Contacts
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-              {students.length} Trainees • {profiles.length} Staff
+              {(isBranchManagerMode ? students.filter((s) => s.branch_id === currentProfile.branch_id).length : students.length)} Trainees • {(isBranchManagerMode ? profiles.filter((p) => p.branch_id === currentProfile.branch_id && p.role !== 'super_admin').length : profiles.length)} Staff
             </div>
           </div>
         </div>

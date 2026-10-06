@@ -626,6 +626,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return initialFallback;
   };
 
+  /**
+   * Records a communication log in local state and persists it to Supabase aur_sms_logs
+   * so that it is never lost on refresh or cloud sync.
+   */
+  const recordAndPersistCommunicationLog = async (log: SMSLog) => {
+    setSmsLogs((prev) => [log, ...prev]);
+
+    try {
+      const isEmail = log.channel === 'email';
+      const isDual = log.channel === 'dual';
+      const recipientContact = isEmail ? (log.recipient_email || log.recipient_phone || 'N/A') : (log.recipient_phone || 'N/A');
+      const contentPrefix = isEmail 
+        ? `[EMAIL: ${log.subject || 'Notice'}] ` 
+        : isDual 
+        ? `[DUAL: ${log.subject || 'Notice'}] ` 
+        : '';
+
+      await supabase.from('aur_sms_logs').insert({
+        recipient_phone: recipientContact,
+        recipient_name: log.recipient_name,
+        message_content: `${contentPrefix}${log.message_content}`,
+        message_type: log.purpose || 'general',
+        status: log.delivery_status || 'delivered',
+        branch_id: log.branch_id || currentProfile?.branch_id || branches[0]?.id || 'b1000000-0000-0000-0000-000000000001',
+        sent_at: log.sent_at || new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Could not persist communication log to Supabase:', err);
+    }
+  };
+
   // Full Supabase Cloud Fetch & State Hydration across all Campuses
   const refreshFromSupabase = async () => {
     setIsSyncing(true);
@@ -686,13 +717,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           mpesa_phone_number: p.payer_phone || p.mpesa_phone_number || '',
         }));
 
-        // Normalize SMS logs
+        // Normalize communication logs from Supabase
         const rawSms = smsRes.data || [];
-        const normalizedSms: SMSLog[] = rawSms.map((log: any) => ({
-          ...log,
-          purpose: log.message_type || log.purpose || 'general',
-          delivery_status: log.status || log.delivery_status || 'delivered',
-        }));
+        const normalizedSms: SMSLog[] = rawSms.map((log: any) => {
+          const isEmail = (log.recipient_phone && log.recipient_phone.includes('@')) || (log.message_content && log.message_content.startsWith('[EMAIL'));
+          const isDual = log.message_content && log.message_content.startsWith('[DUAL');
+          const channel: 'sms' | 'email' | 'dual' = isEmail ? 'email' : isDual ? 'dual' : 'sms';
+          let subject = log.subject;
+          let content = log.message_content || '';
+          if (!subject && (content.startsWith('[EMAIL:') || content.startsWith('[DUAL:'))) {
+            const match = content.match(/^\[(?:EMAIL|DUAL):\s*([^\]]+)\]\s*([\s\S]*)$/);
+            if (match) {
+              subject = match[1];
+              content = match[2];
+            }
+          }
+          return {
+            ...log,
+            channel,
+            subject,
+            message_content: content,
+            recipient_email: isEmail ? log.recipient_phone : undefined,
+            recipient_phone: isEmail ? 'N/A' : (log.recipient_phone || 'N/A'),
+            purpose: log.message_type || log.purpose || 'general',
+            delivery_status: log.status || log.delivery_status || 'delivered',
+            gateway_reference: log.gateway_reference || (isEmail ? `EML-${log.id?.slice(0, 8)}` : `SMS-${log.id?.slice(0, 8)}`),
+          };
+        });
 
         // Hydrate all collections directly from Supabase
         const savedBranches = localStorage.getItem('aur_branches');
@@ -1165,6 +1216,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           html,
           fromName: 'Aurevia Security Desk',
         }).catch((err) => console.warn('[Auto Email Alert Notice]', err));
+
+        recordAndPersistCommunicationLog({
+          id: `comm-login-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          channel: 'email',
+          recipient_phone: 'N/A',
+          recipient_email: profile.email,
+          recipient_name: profile.full_name,
+          subject: 'Security Alert: Successful Sign-in',
+          message_content: `Security sign-in alert dispatched to ${profile.full_name} (${roleDisplay}) via ${method} at ${nowStr}.`,
+          purpose: 'general',
+          delivery_status: 'delivered',
+          gateway_reference: `SEC-EML-${Date.now().toString().slice(-6)}`,
+          sent_at: new Date().toISOString(),
+          branch_id: profile.branch_id || branches[0]?.id,
+          audience_segment: profile.role === 'super_admin' ? 'Super Admin Security Alert' : 'Staff Security Alert',
+        });
       }
 
       // 2. Dispatch Automated SMS Notification if phone is available
@@ -1182,7 +1249,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           purpose: 'general',
         })
           .then((log) => {
-            setSmsLogs((prev) => [log, ...prev]);
+            recordAndPersistCommunicationLog({
+              ...log,
+              branch_id: profile.branch_id || branches[0]?.id,
+              audience_segment: profile.role === 'super_admin' ? 'Super Admin Security Alert' : 'Staff Security Alert',
+            });
           })
           .catch((err) => console.warn('[Auto SMS Alert Notice]', err));
       }
@@ -1229,6 +1300,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const rawClean = rawId.replace(/[^a-z0-9]/g, '');
     const cleanRawPhone = rawId.replace(/[^0-9]/g, '');
 
+    // If identifier is "admin", check candidate Super Admins and match the EXACT one whose password was entered
+    if (rawClean === 'admin') {
+      const superAdmins = profiles.filter((p) => p.role === 'super_admin');
+      const candidateAdmins = superAdmins.length > 0 ? superAdmins : INITIAL_PROFILES.filter((p) => p.role === 'super_admin');
+      for (const sa of candidateAdmins) {
+        const storedHashedPwd = sa.password_hash || sa.password || localStorage.getItem('aur_user_pwd_hash_' + sa.id);
+        const expectedPwd = (sa.initial_password || '').trim();
+        const isPwdChanged = Boolean(sa.password_changed || localStorage.getItem('aur_user_pwd_changed_' + sa.id) === 'true');
+
+        if (isPwdChanged && storedHashedPwd) {
+          const isMatch = await verifyPassword(enteredPass.trim(), storedHashedPwd);
+          if (isMatch) return completeLogin(sa);
+        } else {
+          if (expectedPwd && enteredPass.trim() === expectedPwd) {
+            return completeLogin(sa);
+          }
+          if (storedHashedPwd && await verifyPassword(enteredPass.trim(), storedHashedPwd)) {
+            return completeLogin(sa);
+          }
+        }
+      }
+    }
+
     const matchesIdentifier = (p: Profile) => {
       const pEmail = p.email?.toLowerCase();
       const pStaffId = p.staff_id?.toLowerCase();
@@ -1238,8 +1332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pEmail === rawId ||
         pStaffId === rawId ||
         pReg === rawId ||
-        (cleanRawPhone.length >= 9 && pPhone.endsWith(cleanRawPhone.slice(-9))) ||
-        (rawClean === 'admin' && p.role === 'super_admin')
+        (cleanRawPhone.length >= 9 && pPhone.endsWith(cleanRawPhone.slice(-9)))
       );
     };
 
@@ -2174,24 +2267,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subject: `Welcome to ${branchObj?.name || 'Aurevia Coffee Institute'} - Reg: ${regNumber}`,
         html: welcomeHtml,
       }).then((res) => {
-        setSmsLogs((prev) => [
-          {
-            id: `comm-email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            channel: 'email',
-            recipient_phone: params.phone,
-            recipient_email: params.email,
-            recipient_name: params.fullName,
-            subject: `Official Enrollment Confirmation: ${regNumber}`,
-            message_content: admissionMsg,
-            purpose: 'admissions',
-            delivery_status: res.status === 'delivered' ? 'delivered' : 'failed',
-            gateway_reference: res.messageId || `EML-FAIL-${Math.floor(Math.random() * 900000 + 100000)}`,
-            sent_at: new Date().toISOString(),
-            branch_id: params.branchId,
-            audience_segment: 'New Admissions',
-          },
-          ...prev,
-        ]);
+        recordAndPersistCommunicationLog({
+          id: `comm-email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          channel: 'email',
+          recipient_phone: params.phone,
+          recipient_email: params.email,
+          recipient_name: params.fullName,
+          subject: `Official Enrollment Confirmation: ${regNumber}`,
+          message_content: admissionMsg,
+          purpose: 'admissions',
+          delivery_status: res.status === 'delivered' ? 'delivered' : 'failed',
+          gateway_reference: res.messageId || `EML-${Math.floor(Math.random() * 900000 + 100000)}`,
+          sent_at: new Date().toISOString(),
+          branch_id: params.branchId,
+          audience_segment: 'New Admissions',
+        });
       }).catch((e) => console.warn('Resend auto-welcome notice:', e));
     }
 
@@ -2684,24 +2774,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subject: `Payment Receipt: KES ${params.amount.toLocaleString()} - ${campusSignature}`,
         html: emailHtml,
       }).then((res) => {
-        setSmsLogs((prev) => [
-          {
-            id: `comm-email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            channel: 'email',
-            recipient_phone: params.phone,
-            recipient_email: studentProfile.email,
-            recipient_name: studentProfile.full_name,
-            subject: `Payment Receipt: KES ${params.amount.toLocaleString()} (${receiptNumber})`,
-            message_content: receiptMsg,
-            purpose: 'fee_receipt',
-            delivery_status: res.status === 'delivered' ? 'delivered' : 'failed',
-            gateway_reference: res.messageId || `EML-FAIL-${Math.floor(Math.random() * 900000 + 100000)}`,
-            sent_at: new Date().toISOString(),
-            branch_id: invoice.branch_id,
-            audience_segment: 'Fee Payers',
-          },
-          ...prev,
-        ]);
+        recordAndPersistCommunicationLog({
+          id: `comm-email-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          channel: 'email',
+          recipient_phone: params.phone,
+          recipient_email: studentProfile.email,
+          recipient_name: studentProfile.full_name,
+          subject: `Payment Receipt: KES ${params.amount.toLocaleString()} (${receiptNumber})`,
+          message_content: receiptMsg,
+          purpose: 'fee_receipt',
+          delivery_status: res.status === 'delivered' ? 'delivered' : 'failed',
+          gateway_reference: res.messageId || `EML-${Math.floor(Math.random() * 900000 + 100000)}`,
+          sent_at: new Date().toISOString(),
+          branch_id: invoice.branch_id,
+          audience_segment: 'Fee Payers',
+        });
       }).catch((e) => console.warn('Resend auto-receipt notice:', e));
     }
 
@@ -3902,6 +3989,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         to: created.email,
         subject: `Welcome to Aurevia Specialty Coffee Academy - Your Portal Credentials (${created.staff_id || created.reg_number})`,
         html,
+      }).then((res) => {
+        recordAndPersistCommunicationLog({
+          id: `comm-staff-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          channel: 'email',
+          recipient_phone: created.phone || 'N/A',
+          recipient_email: created.email,
+          recipient_name: created.full_name,
+          subject: `Staff Credentials: ${created.full_name}`,
+          message_content: `Staff onboarded: ${created.full_name} (${roleTitle}). Credentials delivered via email.`,
+          purpose: 'admissions',
+          delivery_status: res.status === 'delivered' ? 'delivered' : 'failed',
+          gateway_reference: res.messageId || `EML-${Math.floor(Math.random() * 900000 + 100000)}`,
+          sent_at: new Date().toISOString(),
+          branch_id: created.branch_id || undefined,
+          audience_segment: created.role === 'super_admin' ? 'Super Admin Onboarding' : 'Staff Onboarding',
+        });
       }).catch((err) => console.warn('Staff welcome email dispatch note:', err));
     }
 
@@ -3918,6 +4021,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recipientName: created.full_name,
         message: `Welcome to Aurevia! Your ${roleLabel} account is active. Staff ID: ${created.staff_id || created.reg_number}, Password: ${staffDefaultPwd}. Portal: sms.aureviacoffeeinstitute.co.ke`,
         purpose: 'general',
+      }).then((smsLog) => {
+        recordAndPersistCommunicationLog({
+          ...smsLog,
+          branch_id: created.branch_id || undefined,
+          audience_segment: created.role === 'super_admin' ? 'Super Admin Onboarding' : 'Staff Onboarding',
+        });
       }).catch(() => {});
     }
 
@@ -4335,6 +4444,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     setSmsLogs((prev) => [...createdLogs, ...prev]);
+
+    // Persist all created logs to Supabase aur_sms_logs in batch
+    try {
+      const dbPayload = createdLogs.map((log) => ({
+        recipient_phone: log.channel === 'email' ? (log.recipient_email || 'N/A') : log.recipient_phone,
+        recipient_name: log.recipient_name,
+        message_content: log.channel === 'email' 
+          ? `[EMAIL: ${log.subject || 'Notice'}] ${log.message_content}` 
+          : log.channel === 'dual'
+          ? `[DUAL: ${log.subject || 'Notice'}] ${log.message_content}`
+          : log.message_content,
+        message_type: log.purpose || 'general',
+        status: log.delivery_status || 'delivered',
+        branch_id: log.branch_id || currentProfile.branch_id || branches[0]?.id,
+        sent_at: log.sent_at,
+      }));
+
+      supabase.from('aur_sms_logs').insert(dbPayload).then(() => {}, (err: any) => console.warn('Supabase bulk communication insert note:', err));
+    } catch (e) {
+      console.warn('Error queuing bulk communication to Supabase:', e);
+    }
 
     // Dispatch real/simulated emails via Resend API when channel includes email
     if (params.channel === 'email' || params.channel === 'dual') {
