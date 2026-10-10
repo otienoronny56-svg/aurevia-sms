@@ -23,9 +23,11 @@ import { StudentRollCallAnalytics } from '../components/analytics/StudentRollCal
 import { InstitutionalCommunications } from '../components/analytics/InstitutionalCommunications';
 import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManagement';
 import { PortalCredentialsManager } from '../components/analytics/PortalCredentialsManager';
+import { CreateCourseModal } from '../components/modals/CreateCourseModal';
+import { EditCourseModal } from '../components/modals/EditCourseModal';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
-import { Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
+import { Course, Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
 import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle, Lock } from 'lucide-react';
 
 type ManagerTab =
@@ -37,6 +39,7 @@ type ManagerTab =
   | 'staff_directory'
   | 'staff'
   | 'timetable'
+  | 'courses'
   | 'students'
   | 'admissions'
   | 'cohorts'
@@ -98,6 +101,12 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const setActiveTab = propSetActiveTab || setLocalActiveTab;
 
   const branchCohorts = cohorts.filter((c) => c.branch_id === myBranch?.id);
+  const branchCourses = courses.filter((c) => {
+    if (myBranch?.id === '470b5cb5-59e2-4be0-b19b-182d9795e12b' || myBranch?.code === 'ELD') {
+      return c.branch_id === myBranch.id || c.code.startsWith('LH-');
+    }
+    return (!c.branch_id || c.branch_id === myBranch?.id) && !c.code.startsWith('LH-');
+  });
   const branchStudents = students.filter((s) => s.branch_id === myBranch?.id);
   const branchInvoices = invoices.filter((i) => i.branch_id === myBranch?.id);
   const branchPayments = payments.filter((p) => p.branch_id === myBranch?.id);
@@ -158,6 +167,8 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [signingStaff, setSigningStaff] = useState<Profile | null>(null);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+  const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<Course | null>(null);
 
   // Date for Staff Duty Register / Logbook
   const [selectedLogDate, setSelectedLogDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2428,6 +2439,142 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: CAMPUS COURSES & CURRICULUM (OPTION B - AUTONOMY) */}
+      {/* ========================================================================= */}
+      {activeTab === 'courses' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                <BookOpen size={22} color="var(--crema-gold)" />
+                <span>{myBranch.name} — Academic Courses & Tuition Fees</span>
+              </h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Curriculum, official tuition schedules, and training durations for {myBranch.name} ({myBranch.city})
+              </p>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowCreateCourseModal(true)}
+            >
+              <Plus size={16} />
+              <span>+ Add Campus Course</span>
+            </button>
+          </div>
+
+          {/* Courses Grid */}
+          <div className="grid-cards">
+            {branchCourses.map((course) => {
+              const enrolledInCourse = enrollments.filter((e) => {
+                const c = cohorts.find((co) => co.id === e.cohort_id);
+                return c?.course_id === course.id && c?.branch_id === myBranch.id;
+              }).length;
+
+              const activeCohortsForCourse = branchCohorts.filter((c) => c.course_id === course.id);
+
+              return (
+                <div key={course.id} className="glass-card" style={{ padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                      <span className="badge badge-gold" style={{ fontSize: '0.72rem' }}>
+                        {course.category}
+                      </span>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        onClick={() => setSelectedCourseForEdit(course)}
+                        title="Edit course fees, duration & curriculum"
+                      >
+                        <Edit3 size={12} color="var(--crema-gold)" />
+                        <span>Edit Course</span>
+                      </button>
+                    </div>
+
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '6px 0 2px 0' }}>{course.title}</h3>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 12px 0', fontFamily: 'var(--font-mono)' }}>
+                      Code: {course.code} • {course.duration_weeks} Weeks Duration
+                    </p>
+
+                    <div
+                      style={{
+                        background: 'rgba(212, 154, 91, 0.08)',
+                        border: '1px solid rgba(212, 154, 91, 0.2)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '12px 14px',
+                        marginBottom: '14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Standard Tuition Fee
+                        </div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--crema-gold)' }}>
+                          KES {Number(course.fee_amount).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Active Batches
+                        </div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 700 }}>
+                          {activeCohortsForCourse.length} Cohorts
+                        </div>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '14px' }}>
+                      {course.description}
+                    </p>
+
+                    {course.modules && course.modules.length > 0 && (
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                          KEY SYLLABUS MODULES:
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {course.modules.slice(0, 3).map((mod, idx) => (
+                            <span key={idx} style={{ fontSize: '0.70rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-secondary)' }}>
+                              • {mod}
+                            </span>
+                          ))}
+                          {course.modules.length > 3 && (
+                            <span style={{ fontSize: '0.70rem', color: 'var(--crema-gold)' }}>
+                              +{course.modules.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      👥 {enrolledInCourse} Trainees Admitted
+                    </span>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ padding: '4px 8px', fontSize: '0.72rem', color: 'var(--crema-gold)' }}
+                      onClick={() => {
+                        setSelectedCourseForEdit(course);
+                      }}
+                    >
+                      Configure Fees & Syllabus →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 5: INVOICES & M-PESA */}
       {/* ========================================================================= */}
       {activeTab === 'invoices' && (
@@ -3006,6 +3153,15 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       )}
       {showChangePasswordModal && (
         <ChangeMyPasswordModal onClose={() => setShowChangePasswordModal(false)} />
+      )}
+      {showCreateCourseModal && (
+        <CreateCourseModal onClose={() => setShowCreateCourseModal(false)} />
+      )}
+      {selectedCourseForEdit && (
+        <EditCourseModal
+          course={selectedCourseForEdit}
+          onClose={() => setSelectedCourseForEdit(null)}
+        />
       )}
     </div>
   );

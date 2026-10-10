@@ -132,6 +132,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [courseFilter, setCourseFilter] = useState('ALL');
   const [kycFilter, setKycFilter] = useState('ALL');
   const [cohortStatusFilter, setCohortStatusFilter] = useState<'ALL' | 'in_progress' | 'upcoming' | 'completed'>('ALL');
+  const [courseBranchFilter, setCourseBranchFilter] = useState<string>('ALL');
 
   // Super Admin Master Timetable States & Multi-Campus Filters
   const [timetableBranchFilter, setTimetableBranchFilter] = useState<string>('ALL');
@@ -1101,31 +1102,93 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       {/* ========================================================================= */}
       {/* TAB: ACADEMIC COURSES CATALOG */}
       {/* ========================================================================= */}
-      {activeTab === 'courses' && (
+      {activeTab === 'courses' && (() => {
+        const eldBranchId = '470b5cb5-59e2-4be0-b19b-182d9795e12b';
+        const nboBranchId = 'b1000000-0000-0000-0000-000000000001';
+
+        const nboCourses = courses.filter((c) => (!c.branch_id || c.branch_id === nboBranchId) && !c.code.startsWith('LH-'));
+        const eldCourses = courses.filter((c) => c.branch_id === eldBranchId || c.code.startsWith('LH-'));
+
+        const displayedCourses = courses.filter((c) => {
+          if (courseBranchFilter === 'ALL') return true;
+          if (courseBranchFilter === eldBranchId) {
+            return c.branch_id === eldBranchId || c.code.startsWith('LH-');
+          }
+          return (!c.branch_id || c.branch_id === nboBranchId) && !c.code.startsWith('LH-');
+        });
+
+        return (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Academic Curriculum & Coffee Courses</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Academic Curriculum & Multi-Campus Courses</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Specialty Coffee Association (SCA) certified curricula, modules, and fee schedules
               </p>
             </div>
+
+            <button
+              className="btn btn-primary"
+              style={{ padding: '8px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowCreateCourseModal(true)}
+            >
+              <Plus size={16} />
+              <span>+ Add New Course</span>
+            </button>
+          </div>
+
+          {/* Campus Filter Pills */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <button
+              className={`btn ${courseBranchFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 14px', fontSize: '0.80rem' }}
+              onClick={() => setCourseBranchFilter('ALL')}
+            >
+              🌐 All Schools ({courses.length})
+            </button>
+            <button
+              className={`btn ${courseBranchFilter === nboBranchId ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 14px', fontSize: '0.80rem' }}
+              onClick={() => setCourseBranchFilter(nboBranchId)}
+            >
+              🏛️ Aurevia Nairobi ({nboCourses.length})
+            </button>
+            <button
+              className={`btn ${courseBranchFilter === eldBranchId ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 14px', fontSize: '0.80rem' }}
+              onClick={() => setCourseBranchFilter(eldBranchId)}
+            >
+              🦁 Lion Hills Eldoret ({eldCourses.length})
+            </button>
           </div>
 
           <div className="grid-cards">
-            {courses.map((course) => {
+            {displayedCourses.map((course) => {
               const enrolledCount = enrollments.filter((e) => {
                 const c = cohorts.find((co) => co.id === e.cohort_id);
                 return c?.course_id === course.id;
               }).length;
 
+              const isLionHills = course.branch_id === eldBranchId || course.code.startsWith('LH-');
+
               return (
                 <div key={course.id} className="glass-card" style={{ padding: '22px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                     <div>
-                      <span className="badge badge-gold" style={{ marginBottom: '6px' }}>
-                        {course.category}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                        <span className="badge badge-gold">
+                          {course.category}
+                        </span>
+                        {isLionHills ? (
+                          <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#FACC15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                            🦁 Lion Hills
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                            🏛️ Nairobi
+                          </span>
+                        )}
+                      </div>
                       <h3 style={{ fontSize: '1.15rem', marginTop: '4px' }}>{course.title}</h3>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Code: {course.code} • {course.duration_weeks} Weeks Duration</p>
                     </div>
@@ -1263,7 +1326,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB 2: TRAINEES & KYC DIRECTORY */}

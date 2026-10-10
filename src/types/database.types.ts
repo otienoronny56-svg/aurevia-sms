@@ -57,6 +57,7 @@ export interface Course {
   certification_title: string;
   is_active: boolean;
   created_at: string;
+  branch_id?: string;
 }
 
 export type LessonMode = 'physical_lab' | 'virtual_theory' | 'field_trip';

@@ -54,10 +54,25 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
   const [createdStudentDetails, setCreatedStudentDetails] = useState<{ regNumber: string; initialPassword?: string; studentName: string } | null>(null);
   const [copiedCreds, setCopiedCreds] = useState(false);
 
+  // Campus-isolated courses: Lion Hills only sees Lion Hills courses, Nairobi only sees Nairobi courses
+  const availableCourses = courses.filter((c) => {
+    if (branchId === '470b5cb5-59e2-4be0-b19b-182d9795e12b') {
+      return c.branch_id === branchId || c.code.startsWith('LH-');
+    }
+    return (!c.branch_id || c.branch_id === branchId) && !c.code.startsWith('LH-');
+  });
+
   // Filter cohorts matching selected branch & course
   const availableCohorts = cohorts.filter(
     (c) => c.branch_id === branchId && c.course_id === courseId
   );
+
+  // Keep courseId synchronized when campus changes
+  React.useEffect(() => {
+    if (availableCourses.length > 0 && !availableCourses.some((c) => c.id === courseId)) {
+      setCourseId(availableCourses[0].id);
+    }
+  }, [branchId, courses]);
 
   // Set default cohort when course/branch changes
   React.useEffect(() => {
@@ -69,7 +84,7 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
   }, [branchId, courseId, cohorts]);
 
   const selectedBranch = branches.find((b) => b.id === branchId) || branches[0];
-  const selectedCourse = courses.find((c) => c.id === courseId) || courses[0];
+  const selectedCourse = availableCourses.find((c) => c.id === courseId) || availableCourses[0] || courses[0];
 
   // Dynamic fee calculations
   const standardTuition = Number(selectedCourse?.fee_amount) || 35000;
@@ -448,7 +463,7 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
                       onChange={(e) => setCourseId(e.target.value)}
                       required
                     >
-                      {courses.map((c) => (
+                      {availableCourses.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.title} — KES {c.fee_amount.toLocaleString()} ({c.duration_weeks} Wks)
                         </option>

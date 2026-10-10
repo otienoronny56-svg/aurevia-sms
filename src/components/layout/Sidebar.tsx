@@ -23,7 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   onOpenSqlModal,
 }) => {
-  const { currentRole, currentProfile, profiles, branches, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions, logout } = useApp();
+  const { currentRole, currentProfile, profiles, branches, courses, cohorts, students, assessments, attendance, lessons, leaveRequests, alumni, liveSessions, logout } = useApp();
 
   const myBranch = branches.find((b) => b.id === currentProfile.branch_id);
 
@@ -66,14 +66,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         ];
 
-      case 'branch_manager':
+      case 'branch_manager': {
+        const managerBranchCourses = courses.filter((c) => {
+          if (currentProfile?.branch_id === '470b5cb5-59e2-4be0-b19b-182d9795e12b') {
+            return c.branch_id === currentProfile.branch_id || c.code.startsWith('LH-');
+          }
+          return (!c.branch_id || c.branch_id === currentProfile?.branch_id) && !c.code.startsWith('LH-');
+        });
+
         return [
           {
             title: 'CAMPUS OPERATIONS',
             items: [
               { id: 'overview', label: 'Campus Dashboard', icon: LayoutDashboard },
               { id: 'timetable', label: 'Timetable & Lessons', icon: Calendar, count: lessons.length },
-              { id: 'cohorts', label: 'Intakes & Cohorts', icon: BookOpen, count: cohorts.filter(c => c.branch_id === currentProfile.branch_id).length },
+              { id: 'courses', label: 'Campus Courses', icon: BookOpen, count: managerBranchCourses.length },
+              { id: 'cohorts', label: 'Intakes & Cohorts', icon: Layers, count: cohorts.filter(c => c.branch_id === currentProfile.branch_id).length },
               { id: 'admissions', label: 'Student Admissions', icon: GraduationCap },
             ],
           },
@@ -96,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ],
           },
         ];
+      }
 
       case 'instructor':
         return [

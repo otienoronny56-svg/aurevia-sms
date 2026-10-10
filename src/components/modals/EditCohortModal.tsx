@@ -59,7 +59,15 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
     isCustomPreset ? cohort.schedule_timing : ''
   );
 
-  const selectedCourse = courses.find((c) => c.id === courseId);
+  // Campus-scoped courses
+  const availableCourses = courses.filter((c) => {
+    if (branchId === '470b5cb5-59e2-4be0-b19b-182d9795e12b') {
+      return c.branch_id === branchId || c.code.startsWith('LH-') || c.id === cohort.course_id;
+    }
+    return ((!c.branch_id || c.branch_id === branchId) && !c.code.startsWith('LH-')) || c.id === cohort.course_id;
+  });
+
+  const selectedCourse = availableCourses.find((c) => c.id === courseId) || courses.find((c) => c.id === courseId);
   const [startDate, setStartDate] = useState(cohort.start_date || '');
   const [endDate, setEndDate] = useState(cohort.end_date || '');
   const [isManualEndDate, setIsManualEndDate] = useState(false);
@@ -339,7 +347,7 @@ export const EditCohortModal: React.FC<EditCohortModalProps> = ({
                 className="form-input"
                 required
               >
-                {courses.map((c) => (
+                {availableCourses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} ({c.duration_weeks ? `${c.duration_weeks} Wks • ` : ''}{c.category})
                   </option>

@@ -8,9 +8,13 @@ interface CreateCourseModalProps {
 }
 
 export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose }) => {
-  const { courses, refreshFromSupabase } = useApp();
+  const { courses, branches, currentProfile, refreshFromSupabase, createCourse } = useApp();
+  const isBranchManager = currentProfile?.role === 'branch_manager';
+  const defaultBranchId = isBranchManager && currentProfile?.branch_id ? currentProfile.branch_id : 'all';
+
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
+  const [targetBranchId, setTargetBranchId] = useState<string>(defaultBranchId);
   const [category, setCategory] = useState<'Barista Skills' | 'Coffee Roasting' | 'Sensory & Cupping' | 'Green Coffee' | 'Brewing & Water'>('Barista Skills');
   const [durationWeeks, setDurationWeeks] = useState<number | ''>(2);
   const [feeAmount, setFeeAmount] = useState<number | ''>(35000);
@@ -22,29 +26,48 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
     if (!title || !code) return;
 
     setIsSubmitting(true);
+    const finalBranchId = targetBranchId === 'all' ? undefined : targetBranchId;
+    let finalCode = code.trim().toUpperCase();
+    if (finalBranchId === '470b5cb5-59e2-4be0-b19b-182d9795e12b' && !finalCode.startsWith('LH-')) {
+      finalCode = `LH-${finalCode}`;
+    }
+
     const newCourse = {
       id: crypto.randomUUID ? crypto.randomUUID() : 'c' + Date.now(),
-      title,
-      code: code.toUpperCase(),
+      title: title.trim(),
+      code: finalCode,
       category,
       duration_weeks: Number(durationWeeks) || 1,
       fee_amount: Number(feeAmount) || 0,
-      description: description || 'Official Specialty Coffee Association certified training module.',
+      description: description.trim() || 'Specialty Coffee Association curriculum module.',
+      modules: [],
+      certification_title: `${title.trim()} Certification`,
       is_active: true,
       created_at: new Date().toISOString(),
+      branch_id: finalBranchId,
     };
 
     try {
-      if (supabase) {
-        await supabase.from('aur_courses').insert([newCourse]);
+      if (createCourse) {
+        await createCourse(newCourse as any);
+      } else if (supabase) {
+        const dbCourse = {
+          id: newCourse.id,
+          title: newCourse.title,
+          code: newCourse.code,
+          category: newCourse.category,
+          duration_weeks: newCourse.duration_weeks,
+          fee_amount: newCourse.fee_amount,
+          description: newCourse.description,
+          certification_title: newCourse.certification_title,
+          is_active: newCourse.is_active,
+        };
+        await supabase.from('aur_courses').insert([dbCourse]);
       }
-      const saved = localStorage.getItem('aur_courses');
-      const list = saved ? JSON.parse(saved) : courses;
-      localStorage.setItem('aur_courses', JSON.stringify([...list, newCourse]));
       await refreshFromSupabase();
       onClose();
     } catch (err: any) {
-      console.warn('Course creation fallback:', err);
+      console.warn('Course creation note:', err);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -98,6 +121,46 @@ export const CreateCourseModal: React.FC<CreateCourseModalProps> = ({ onClose })
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Target Campus */}
+          <div>
+            <label style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+              Offering Campus / School *
+            </label>
+            {isBranchManager ? (
+              <div
+                style={{
+                  background: 'var(--bg-surface-elevated)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: 'var(--crema-gold)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span>{branches.find((b) => b.id === targetBranchId)?.name || 'My Campus'}</span>
+                <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>(Locked to your school)</span>
+              </div>
+            ) : (
+              <select
+                className="form-select"
+                value={targetBranchId}
+                onChange={(e) => setTargetBranchId(e.target.value)}
+                style={{ width: '100%', fontSize: '0.82rem' }}
+              >
+                <option value="all">🌐 All Campuses (Universal Standard)</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.code === 'ELD' ? '🦁 ' : '🏛️ '}{b.name} ({b.city})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div>
             <label style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
               Course Title *

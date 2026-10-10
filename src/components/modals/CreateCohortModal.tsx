@@ -35,8 +35,23 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
   const [scheduleTiming, setScheduleTiming] = useState(TIMETABLE_PRESETS[0]);
   const [customTiming, setCustomTiming] = useState('');
 
-  const selectedCourse = courses.find((c) => c.id === courseId) || courses[0];
+  // Filter courses by selected campus
+  const availableCourses = courses.filter((c) => {
+    if (branchId === '470b5cb5-59e2-4be0-b19b-182d9795e12b') {
+      return c.branch_id === branchId || c.code.startsWith('LH-');
+    }
+    return (!c.branch_id || c.branch_id === branchId) && !c.code.startsWith('LH-');
+  });
+
+  const selectedCourse = availableCourses.find((c) => c.id === courseId) || availableCourses[0] || courses[0];
   const selectedBranch = branches.find((b) => b.id === branchId) || branches[0];
+
+  // Auto-sync course when branch changes
+  React.useEffect(() => {
+    if (availableCourses.length > 0 && !availableCourses.some((c) => c.id === courseId)) {
+      handleCourseChange(availableCourses[0].id);
+    }
+  }, [branchId, courses]);
 
   // Term Dates: Auto-calculated from course duration (e.g. 5 weeks)
   const todayStr = new Date().toISOString().split('T')[0];
@@ -48,7 +63,7 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
   // Handlers for dynamic date recalculation
   const handleCourseChange = (newCourseId: string) => {
     setCourseId(newCourseId);
-    const newCourse = courses.find((c) => c.id === newCourseId);
+    const newCourse = availableCourses.find((c) => c.id === newCourseId) || courses.find((c) => c.id === newCourseId);
     if (newCourse?.duration_weeks && startDate) {
       setEndDate(calculateCohortEndDate(startDate, newCourse.duration_weeks));
       setIsManualEndDate(false);
@@ -244,7 +259,7 @@ export const CreateCohortModal: React.FC<CreateCohortModalProps> = ({ onClose, o
                     onChange={(e) => handleCourseChange(e.target.value)}
                     required
                   >
-                    {courses.map((c) => (
+                    {availableCourses.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.title} ({c.duration_weeks ? `${c.duration_weeks} Wks` : 'Custom'})
                       </option>

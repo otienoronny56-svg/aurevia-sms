@@ -14,10 +14,13 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { updateCourse } = useApp();
+  const { updateCourse, branches, currentProfile } = useApp();
+  const isBranchManager = currentProfile?.role === 'branch_manager';
+  const initialBranchId = course.branch_id || (course.code?.startsWith('LH-') ? '470b5cb5-59e2-4be0-b19b-182d9795e12b' : 'b1000000-0000-0000-0000-000000000001');
 
   const [title, setTitle] = useState(course.title || '');
   const [code, setCode] = useState(course.code || '');
+  const [targetBranchId, setTargetBranchId] = useState<string>(initialBranchId);
   const [category, setCategory] = useState<any>(course.category || 'Barista Skills');
   const [durationWeeks, setDurationWeeks] = useState<number | ''>(course.duration_weeks ?? 2);
   const [feeAmount, setFeeAmount] = useState<number | ''>(course.fee_amount ?? 35000);
@@ -57,6 +60,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
         description: description.trim(),
         certification_title: certificationTitle.trim() || `${title.trim()} Certification`,
         is_active: isActive,
+        branch_id: targetBranchId === 'all' ? undefined : targetBranchId,
       });
 
       if (onSuccess) onSuccess();
@@ -162,6 +166,42 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Campus Allocation */}
+            <div>
+              <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '6px' }}>
+                Offering Campus / School
+              </label>
+              {isBranchManager ? (
+                <div
+                  style={{
+                    background: 'var(--bg-surface-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '8px 12px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: 'var(--crema-gold)',
+                  }}
+                >
+                  {branches.find((b) => b.id === targetBranchId)?.name || 'Campus Course'}
+                </div>
+              ) : (
+                <select
+                  className="input-field"
+                  value={targetBranchId}
+                  onChange={(e) => setTargetBranchId(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                >
+                  <option value="all">🌐 All Campuses (Universal Standard)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.code === 'ELD' ? '🦁 ' : '🏛️ '}{b.name} ({b.city})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             {/* Title & Code */}
             <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '14px' }}>
               <div>

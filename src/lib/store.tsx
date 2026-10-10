@@ -810,9 +810,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (_) {}
         }
 
-        const liveCourses = (cRes.data && cRes.data.length > 0)
+        const rawCourses = (cRes.data && cRes.data.length > 0)
           ? cRes.data
           : (localCourses || INITIAL_COURSES);
+        const liveCourses: Course[] = (rawCourses as any[]).map((c: any) => {
+          let branchId = c.branch_id;
+          if (!branchId) {
+            if (c.code?.startsWith('LH-') || c.title?.toLowerCase().includes('lion hills') || c.description?.toLowerCase().includes('lion hills')) {
+              branchId = '470b5cb5-59e2-4be0-b19b-182d9795e12b';
+            } else {
+              branchId = 'b1000000-0000-0000-0000-000000000001';
+            }
+          }
+          return {
+            ...c,
+            branch_id: branchId,
+            fee_amount: Number(c.fee_amount) || 0,
+            duration_weeks: Number(c.duration_weeks) || 1,
+          };
+        });
         setCourses(liveCourses);
         const liveCohorts = (hRes.data && hRes.data.length > 0) ? hRes.data : (cohorts.length > 0 ? cohorts : INITIAL_COHORTS);
         setCohorts(liveCohorts);
@@ -3793,7 +3809,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .single();
 
       if (error || !data) throw error;
-      created = data;
+      created = {
+        ...data,
+        branch_id: course.branch_id || (course.code?.startsWith('LH-') ? '470b5cb5-59e2-4be0-b19b-182d9795e12b' : 'b1000000-0000-0000-0000-000000000001'),
+      };
     } catch (e) {
       created = {
         id: newId,
@@ -3807,6 +3826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         certification_title: course.certification_title || `${course.title || 'SCA'} Certification`,
         is_active: course.is_active ?? true,
         created_at: new Date().toISOString(),
+        branch_id: course.branch_id || (course.code?.startsWith('LH-') ? '470b5cb5-59e2-4be0-b19b-182d9795e12b' : 'b1000000-0000-0000-0000-000000000001'),
       };
     }
 
