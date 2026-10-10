@@ -196,8 +196,24 @@ interface AppContextType {
     emergencyPhone: string;
     emergencyRelationship: string;
     coffeeExperience: string;
+    customFee?: number;
+    discountAmount?: number;
+    discountType?: 'fixed' | 'percentage' | 'custom';
+    discountReason?: string;
+    discountNote?: string;
   }) => Promise<{ profile: Profile; regNumber: string; invoice: Invoice }>;
   verifyStudentKYC: (studentId: string) => Promise<void>;
+  updateInvoiceFeeAndDiscount: (
+    invoiceId: string,
+    updates: {
+      totalFee: number;
+      standardFee?: number;
+      discountAmount?: number;
+      discountType?: 'fixed' | 'percentage' | 'custom';
+      discountReason?: string;
+      discountNote?: string;
+    }
+  ) => Promise<void>;
   processMpesaPayment: (params: {
     invoiceId: string;
     amount: number;
@@ -1886,6 +1902,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     nationality?: string;
     gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
     medicalConditions?: string;
+    customFee?: number;
+    discountAmount?: number;
+    discountType?: 'fixed' | 'percentage' | 'custom';
+    discountReason?: string;
+    discountNote?: string;
   }) => {
     // 0. Email uniqueness check
     const cleanEmail = (params.email || '').trim().toLowerCase();
@@ -1907,7 +1928,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const branch = branches.find((b) => b.id === params.branchId) || branches[0];
     const regNumber = await allocateUniqueStudentRegNumber(params.branchId);
     const course = courses.find((c) => c.id === params.courseId) || courses[0];
-    const feeAmount = course?.fee_amount || 35000;
+    
+    // Calculate standard tuition vs discounted / custom net fee
+    const standardFee = course?.fee_amount || 35000;
+    let feeAmount = standardFee;
+    let discountAmount = params.discountAmount || 0;
+
+    if (params.customFee !== undefined && params.customFee !== null && !isNaN(Number(params.customFee))) {
+      feeAmount = Math.max(0, Number(params.customFee));
+      discountAmount = Math.max(0, standardFee - feeAmount);
+    } else if (params.discountAmount !== undefined && params.discountAmount !== null && Number(params.discountAmount) > 0) {
+      discountAmount = Math.min(standardFee, Number(params.discountAmount));
+      feeAmount = Math.max(0, standardFee - discountAmount);
+    }
+
     const studentDefaultPwd = generateUniqueDefaultPassword(params.fullName);
 
     let createdProfile: Profile;
@@ -2124,6 +2158,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           student_id: createdStudent.id,
           branch_id: params.branchId,
           total_fee: feeAmount,
+          standard_fee: standardFee,
+          discount_amount: discountAmount,
+          discount_type: params.discountType,
+          discount_reason: params.discountReason,
+          discount_note: params.discountNote,
           amount_paid: 0,
           balance_due: feeAmount,
           status: 'pending',
@@ -2140,6 +2179,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...invData,
           branch_id: params.branchId,
           total_fee: totalFee,
+          standard_fee: standardFee,
+          discount_amount: discountAmount,
+          discount_type: params.discountType,
+          discount_reason: params.discountReason,
+          discount_note: params.discountNote,
           amount_paid: amountPaid,
           balance_due: balanceDue,
         };
@@ -2222,6 +2266,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           student_id: sId,
           branch_id: params.branchId,
           total_fee: feeAmount,
+          standard_fee: standardFee,
+          discount_amount: discountAmount,
+          discount_type: params.discountType,
+          discount_reason: params.discountReason,
+          discount_note: params.discountNote,
           amount_paid: 0,
           balance_due: feeAmount,
           status: 'pending',
@@ -2865,7 +2914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Update Campus Paybill & Banking Configuration
+  // Update Campus Paybill & Banking Configuration (Super Admin Only)
   const updateBranchPaymentConfig = async (
     branchId: string,
     config: {
@@ -2876,6 +2925,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       payment_instructions?: string;
     }
   ): Promise<void> => {
+    if (currentProfile?.role !== 'super_admin') {
+      throw new Error('Access Denied: Only Super Administrators have authority to modify institutional Paybill and banking configurations.');
+    }
+
     // 1. Save directly into aur_branch_payment_overrides to ensure survival across page refreshes
     try {
       const savedOverrides = localStorage.getItem('aur_branch_payment_overrides');
@@ -3126,6 +3179,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         p.id === params.paymentId ? { ...p, status: 'rejected' as const, verification_remarks: params.reason } : p
       );
       localStorage.setItem('aur_payments', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Adjust Tuition Fee or Apply Discount to an existing invoice
+  const updateInvoiceFeeAndDiscount = async (
+    invoiceId: string,
+    updates: {
+      totalFee: number;
+      standardFee?: number;
+      discountAmount?: number;
+      discountType?: 'fixed' | 'percentage' | 'custom';
+      discountReason?: string;
+      discountNote?: string;
+    }
+  ): Promise<void> => {
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
+    if (!invoice) throw new Error('Invoice record not found');
+
+    const totalFee = Math.max(0, Number(updates.totalFee));
+    const amountPaid = Number(invoice.amount_paid) || 0;
+    const balanceDue = Math.max(0, totalFee - amountPaid);
+    const dbStatus = balanceDue === 0 ? 'paid' : amountPaid > 0 ? 'partially_paid' : 'unpaid';
+    const localStatus = balanceDue === 0 ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+
+    // 1. Update in Supabase aur_invoices
+    try {
+      await supabase
+        .from('aur_invoices')
+        .update({
+          total_fee: totalFee,
+          balance_due: balanceDue,
+          status: dbStatus,
+        })
+        .eq('id', invoiceId);
+    } catch (e) {
+      console.warn('Supabase invoice fee update note:', e);
+    }
+
+    // 2. Update local state & localStorage
+    setInvoices((prev) => {
+      const next = prev.map((inv) => {
+        if (inv.id === invoiceId) {
+          return {
+            ...inv,
+            total_fee: totalFee,
+            balance_due: balanceDue,
+            status: localStatus as any,
+            standard_fee: updates.standardFee !== undefined ? updates.standardFee : (inv.standard_fee || inv.total_fee),
+            discount_amount: updates.discountAmount !== undefined ? updates.discountAmount : inv.discount_amount,
+            discount_type: updates.discountType !== undefined ? updates.discountType : inv.discount_type,
+            discount_reason: updates.discountReason !== undefined ? updates.discountReason : inv.discount_reason,
+            discount_note: updates.discountNote !== undefined ? updates.discountNote : inv.discount_note,
+          };
+        }
+        return inv;
+      });
+      localStorage.setItem('aur_invoices', JSON.stringify(next));
       return next;
     });
   };
@@ -4723,6 +4834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAlumni,
         deleteAlumni,
         updateStudentKYC,
+        updateInvoiceFeeAndDiscount,
         processMpesaPayment,
         revertPayment,
         updateBranchPaymentConfig,

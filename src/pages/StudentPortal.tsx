@@ -1058,12 +1058,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             {/* Financial Numbers Bar */}
             <div className="bursar-metrics-grid">
               <div className="bursar-metric-cell">
-                <div className="metric-label">Total Tuition</div>
+                <div className="metric-label">Net Tuition</div>
                 <div className="metric-val" style={{ color: 'var(--text-primary)' }}>
                   KES {(Number(myInvoice?.total_fee) || Number(myCourse?.fee_amount) || 0).toLocaleString()}
                 </div>
-                <div className="metric-sub" style={{ color: 'var(--text-muted)' }}>
-                  {myCourse?.title?.slice(0, 18) || 'Enrolled Course'}
+                <div className="metric-sub" style={{ color: myInvoice?.discount_amount ? '#10B981' : 'var(--text-muted)' }}>
+                  {myInvoice?.discount_amount ? `Save KES ${myInvoice.discount_amount.toLocaleString()} (${myInvoice.discount_reason || 'Subsidy'})` : (myCourse?.title?.slice(0, 18) || 'Enrolled Course')}
                 </div>
               </div>
 

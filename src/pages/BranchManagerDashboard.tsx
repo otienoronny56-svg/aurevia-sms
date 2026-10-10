@@ -26,8 +26,7 @@ import { PortalCredentialsManager } from '../components/analytics/PortalCredenti
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
 import { Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
-import { ConfigureBranchPaybillModal } from '../components/modals/ConfigureBranchPaybillModal';
-import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle } from 'lucide-react';
+import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle, Lock } from 'lucide-react';
 
 type ManagerTab =
   | 'overview'
@@ -123,7 +122,6 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
   const [timetableTrainerFilter, setTimetableTrainerFilter] = useState<string>('all');
   const [presetDayForSchedule, setPresetDayForSchedule] = useState<TimetableLesson['day_of_week'] | undefined>(undefined);
   const [showManageLabsModal, setShowManageLabsModal] = useState(false);
-  const [showPaybillModal, setShowPaybillModal] = useState(false);
   const [verificationToast, setVerificationToast] = useState<string | null>(null);
   const [verifiedAmountInput, setVerifiedAmountInput] = useState<Record<string, number>>({});
   const [verificationRemarksInput, setVerificationRemarksInput] = useState<Record<string, string>>({});
@@ -2559,21 +2557,24 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setShowPaybillModal(true)}
+              <div
                 style={{
-                  padding: '7px 14px',
-                  fontSize: '0.8rem',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(212, 154, 91, 0.12)',
+                  border: '1px solid rgba(212, 154, 91, 0.3)',
+                  color: 'var(--crema-gold)',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
                 }}
+                title="Institutional Paybill and bank account credentials are centralized and managed exclusively by Head Office (Super Admin)."
               >
-                <Smartphone size={14} />
-                <span>⚙️ Configure Campus Paybill</span>
-              </button>
+                <Lock size={14} color="var(--crema-gold)" />
+                <span>Centralized Paybill • Managed by Super Admin</span>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
@@ -3005,12 +3006,6 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       )}
       {showChangePasswordModal && (
         <ChangeMyPasswordModal onClose={() => setShowChangePasswordModal(false)} />
-      )}
-      {showPaybillModal && (
-        <ConfigureBranchPaybillModal
-          branchId={myBranch.id}
-          onClose={() => setShowPaybillModal(false)}
-        />
       )}
     </div>
   );

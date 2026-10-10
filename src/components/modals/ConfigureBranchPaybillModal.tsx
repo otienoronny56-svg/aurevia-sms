@@ -9,6 +9,7 @@ import {
   AlertCircle,
   HelpCircle,
   RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface ConfigureBranchPaybillModalProps {
@@ -22,7 +23,8 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
   onClose,
   onSuccess,
 }) => {
-  const { branches, updateBranchPaymentConfig } = useApp();
+  const { currentProfile, branches, updateBranchPaymentConfig } = useApp();
+  const isSuperAdmin = currentProfile?.role === 'super_admin';
   const branch = branches.find((b) => b.id === branchId) || branches[0];
 
   const initialPaybill = branch?.paybill_number || '174379';
@@ -97,6 +99,61 @@ export const ConfigureBranchPaybillModal: React.FC<ConfigureBranchPaybillModalPr
       setIsSaving(false);
     }
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px',
+        }}
+      >
+        <div
+          className="glass-card"
+          style={{
+            width: '100%',
+            maxWidth: '440px',
+            padding: '28px',
+            textAlign: 'center',
+            borderRadius: '16px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#EF4444',
+              margin: '0 auto 16px auto',
+            }}
+          >
+            <ShieldAlert size={28} />
+          </div>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '8px' }}>
+            Super Administrator Authorization Required
+          </h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '20px' }}>
+            Institutional banking credentials and Safaricom M-Pesa Paybill numbers are centralized and may only be altered by the Head Office Super Administrator.
+          </p>
+          <button className="btn btn-secondary" onClick={onClose} style={{ width: '100%' }}>
+            Dismiss
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

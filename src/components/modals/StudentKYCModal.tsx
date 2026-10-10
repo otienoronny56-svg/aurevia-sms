@@ -3,7 +3,7 @@ import { useApp } from '../../lib/store';
 import {
   X, UserPlus, Sparkles, CheckCircle2, ShieldCheck, Coffee,
   Calendar, Phone, Mail, FileText, Heart, AlertTriangle, User, Globe,
-  Copy, Check, Key, GraduationCap
+  Copy, Check, Key, GraduationCap, Tag, Percent, ChevronDown, ChevronUp, DollarSign
 } from 'lucide-react';
 import { PRODUCTION_PORTAL_URL } from '../../lib/domainConfig';
 
@@ -32,6 +32,14 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
   const [cohortId, setCohortId] = useState('');
   const [coffeeExperience, setCoffeeExperience] = useState('Beginner');
+
+  // Fee Adjustment & Discount
+  const [showFeeCustomization, setShowFeeCustomization] = useState(false);
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed' | 'custom'>('none');
+  const [discountValue, setDiscountValue] = useState<number | ''>('');
+  const [discountReason, setDiscountReason] = useState('Early Bird Intake');
+  const [customFeeAmount, setCustomFeeAmount] = useState<number | ''>('');
+  const [discountNote, setDiscountNote] = useState('');
 
   // Medical & Health Lab Safety
   const [medicalConditions, setMedicalConditions] = useState('None');
@@ -63,6 +71,25 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
   const selectedBranch = branches.find((b) => b.id === branchId) || branches[0];
   const selectedCourse = courses.find((c) => c.id === courseId) || courses[0];
 
+  // Dynamic fee calculations
+  const standardTuition = Number(selectedCourse?.fee_amount) || 35000;
+  let computedDiscount = 0;
+  let finalPayableFee = standardTuition;
+
+  if (showFeeCustomization) {
+    if (discountType === 'percentage' && discountValue !== '') {
+      const pct = Math.min(100, Math.max(0, Number(discountValue)));
+      computedDiscount = Math.round((standardTuition * pct) / 100);
+      finalPayableFee = Math.max(0, standardTuition - computedDiscount);
+    } else if (discountType === 'fixed' && discountValue !== '') {
+      computedDiscount = Math.min(standardTuition, Math.max(0, Number(discountValue)));
+      finalPayableFee = Math.max(0, standardTuition - computedDiscount);
+    } else if (discountType === 'custom' && customFeeAmount !== '') {
+      finalPayableFee = Math.max(0, Number(customFeeAmount));
+      computedDiscount = Math.max(0, standardTuition - finalPayableFee);
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -84,6 +111,11 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
         emergencyPhone,
         emergencyRelationship,
         coffeeExperience,
+        customFee: showFeeCustomization ? finalPayableFee : undefined,
+        discountAmount: showFeeCustomization && computedDiscount > 0 ? computedDiscount : 0,
+        discountType: showFeeCustomization && discountType !== 'none' ? discountType : undefined,
+        discountReason: showFeeCustomization && computedDiscount > 0 ? discountReason : undefined,
+        discountNote: showFeeCustomization && discountNote.trim() ? discountNote.trim() : undefined,
       });
 
       setCreatedRegNo(result.regNumber);
@@ -542,31 +574,308 @@ export const StudentKYCModal: React.FC<StudentKYCModalProps> = ({ onClose, onSuc
                 </div>
               </div>
 
-              {/* Tuition & Invoice Overview */}
+              {/* Tuition, Fee Customization & Discount Engine */}
               <div
                 style={{
                   background: 'var(--bg-surface-elevated)',
-                  border: '1px solid var(--border-medium)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '14px 18px',
+                  border: showFeeCustomization ? '1px solid rgba(212, 154, 91, 0.4)' : '1px solid var(--border-medium)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '16px 20px',
                   marginBottom: '20px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                <div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Program Tuition Fee</div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--crema-gold)' }}>
-                    KES {selectedCourse?.fee_amount.toLocaleString() || '35,000'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showFeeCustomization ? '16px' : '0' }}>
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Program Tuition & Invoice Setup
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
+                      <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--crema-gold)' }}>
+                        KES {finalPayableFee.toLocaleString()}
+                      </span>
+                      {showFeeCustomization && computedDiscount > 0 && (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                          KES {standardTuition.toLocaleString()}
+                        </span>
+                      )}
+                      {showFeeCustomization && computedDiscount > 0 && (
+                        <span className="badge badge-success" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                          Save KES {computedDiscount.toLocaleString()} ({Math.round((computedDiscount / standardTuition) * 100)}% off)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFeeCustomization(!showFeeCustomization);
+                        if (!showFeeCustomization && discountType === 'none') {
+                          setDiscountType('percentage');
+                          setDiscountValue(10);
+                        }
+                      }}
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderColor: showFeeCustomization ? 'var(--crema-gold)' : 'var(--border-subtle)',
+                        color: showFeeCustomization ? 'var(--crema-gold)' : 'var(--text-primary)',
+                      }}
+                    >
+                      <Tag size={14} />
+                      <span>{showFeeCustomization ? 'Hide Discount Controls' : 'Edit Fee / Apply Discount'}</span>
+                      {showFeeCustomization ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Automatic Invoice & Sequence</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6EE7B7' }}>
-                    AUR/{selectedBranch?.code || 'NBO'}/2026/XXX
+
+                {/* Collapsible Fee & Discount Customization Box */}
+                {showFeeCustomization && (
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.25)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '6px' }}>
+                        Adjustment Mode
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                        {[
+                          { id: 'none', label: 'Standard Rate' },
+                          { id: 'percentage', label: 'Percentage (%) Off' },
+                          { id: 'fixed', label: 'Fixed Amount (KES) Off' },
+                          { id: 'custom', label: 'Direct Fee Override' },
+                        ].map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setDiscountType(m.id as any);
+                              if (m.id === 'percentage' && (discountValue === '' || discountValue === 0)) setDiscountValue(10);
+                              if (m.id === 'fixed' && (discountValue === '' || discountValue === 0)) setDiscountValue(5000);
+                              if (m.id === 'custom' && customFeeAmount === '') setCustomFeeAmount(standardTuition);
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              fontSize: '0.74rem',
+                              fontWeight: discountType === m.id ? 700 : 500,
+                              borderRadius: 'var(--radius-sm)',
+                              border: discountType === m.id ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                              background: discountType === m.id ? 'rgba(212, 154, 91, 0.15)' : 'var(--bg-surface)',
+                              color: discountType === m.id ? 'var(--crema-gold)' : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {discountType === 'percentage' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                              Discount Percentage (%)
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                className="form-input"
+                                value={discountValue}
+                                onChange={(e) => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                placeholder="e.g. 10"
+                                style={{ paddingRight: '32px' }}
+                              />
+                              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
+                                %
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                              Discount Category / Reason
+                            </label>
+                            <select
+                              className="form-select"
+                              value={discountReason}
+                              onChange={(e) => setDiscountReason(e.target.value)}
+                            >
+                              <option value="Early Bird Intake">Early Bird Intake</option>
+                              <option value="Scholarship / Institutional Bursary">Scholarship / Bursary</option>
+                              <option value="Staff & Family Privilege">Staff & Family Privilege</option>
+                              <option value="Corporate / Group Enrollment">Corporate / Group Enrollment</option>
+                              <option value="Referral Incentive">Referral Incentive</option>
+                              <option value="Financial Hardship Concession">Financial Hardship Concession</option>
+                              <option value="Executive Management Waiver">Executive Management Waiver</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Quick Presets:</span>
+                          {[5, 10, 15, 20, 25, 50].map((pct) => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => setDiscountValue(pct)}
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                borderRadius: '4px',
+                                border: discountValue === pct ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                                background: discountValue === pct ? 'rgba(212, 154, 91, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                color: discountValue === pct ? 'var(--crema-gold)' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {pct}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {discountType === 'fixed' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                            Fixed Discount Amount (KES)
+                          </label>
+                          <input
+                            type="number"
+                            min="100"
+                            max={standardTuition}
+                            step="500"
+                            className="form-input"
+                            value={discountValue}
+                            onChange={(e) => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder="e.g. 5000"
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                            Discount Category / Reason
+                          </label>
+                          <select
+                            className="form-select"
+                            value={discountReason}
+                            onChange={(e) => setDiscountReason(e.target.value)}
+                          >
+                            <option value="Early Bird Intake">Early Bird Intake</option>
+                            <option value="Scholarship / Institutional Bursary">Scholarship / Bursary</option>
+                            <option value="Staff & Family Privilege">Staff & Family Privilege</option>
+                            <option value="Corporate / Group Enrollment">Corporate / Group Enrollment</option>
+                            <option value="Referral Incentive">Referral Incentive</option>
+                            <option value="Financial Hardship Concession">Financial Hardship Concession</option>
+                            <option value="Executive Management Waiver">Executive Management Waiver</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {discountType === 'custom' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                            Agreed Net Tuition Fee (KES)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="500"
+                            className="form-input"
+                            value={customFeeAmount}
+                            onChange={(e) => setCustomFeeAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder={`Standard: ${standardTuition}`}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                            Adjustment Category
+                          </label>
+                          <select
+                            className="form-select"
+                            value={discountReason}
+                            onChange={(e) => setDiscountReason(e.target.value)}
+                          >
+                            <option value="Special Bursar Approval">Special Bursar Approval</option>
+                            <option value="Custom Negotiated Rate">Custom Negotiated Rate</option>
+                            <option value="Scholarship Grant">Scholarship Grant</option>
+                            <option value="Executive Discretion">Executive Discretion</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {discountType !== 'none' && (
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                          Optional Bursar Audit Note / Approval Reference
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={discountNote}
+                          onChange={(e) => setDiscountNote(e.target.value)}
+                          placeholder="e.g. Authorized by Academic Dean / Promo voucher #AUR2026"
+                        />
+                      </div>
+                    )}
+
+                    {/* Breakdown Summary Box */}
+                    <div
+                      style={{
+                        background: 'rgba(212, 154, 91, 0.08)',
+                        border: '1px solid rgba(212, 154, 91, 0.25)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '16px' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Standard Tuition: </span>
+                          <span style={{ fontWeight: 600 }}>KES {standardTuition.toLocaleString()}</span>
+                        </div>
+                        {computedDiscount > 0 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Discount: </span>
+                            <span style={{ fontWeight: 700, color: '#10B981' }}>- KES {computedDiscount.toLocaleString()} ({discountReason})</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Net Payable on Invoice: </span>
+                        <span style={{ fontWeight: 800, color: 'var(--crema-gold)', fontSize: '0.92rem' }}>
+                          KES {finalPayableFee.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Action Buttons */}

@@ -5,7 +5,7 @@ import {
   ArrowLeft, X, ShieldCheck, Coffee, Calendar, Clock, Phone, Mail, Award,
   DollarSign, Download, CheckCircle2, Video, UserCheck,
   Edit, Trash2, Heart, User, AlertTriangle,
-  Copy, Check, MapPin, MessageSquare, Share2
+  Copy, Check, MapPin, MessageSquare, Share2, Tag, Percent, Save
 } from 'lucide-react';
 import { generatePaymentReceiptPDF, generateCertificatePDF } from '../../lib/pdf';
 import { shareReceiptOnWhatsApp, shareReceiptViaEmail } from '../../lib/shareUtils';
@@ -29,12 +29,23 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     attendance,
     deleteStudent,
     graduateStudent,
+    updateInvoiceFeeAndDiscount,
   } = useApp();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedReg, setCopiedReg] = useState(false);
+
+  // Fee Adjustment & Discount modal states
+  const [showFeeAdjustmentModal, setShowFeeAdjustmentModal] = useState(false);
+  const [editDiscountType, setEditDiscountType] = useState<'none' | 'percentage' | 'fixed' | 'custom'>('none');
+  const [editDiscountValue, setEditDiscountValue] = useState<number | ''>('');
+  const [editDiscountReason, setEditDiscountReason] = useState('Early Bird Intake');
+  const [editCustomTotalFee, setEditCustomTotalFee] = useState<number | ''>('');
+  const [editDiscountNote, setEditDiscountNote] = useState('');
+  const [isSavingFeeAdjustment, setIsSavingFeeAdjustment] = useState(false);
+  const [feeAdjustError, setFeeAdjustError] = useState<string | null>(null);
 
   // Find linked entities with safe defaults
   const profile = profiles.find((p) => p.id === student?.profile_id) || student?.profile || {
@@ -113,6 +124,70 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       alert('Error deleting trainee: ' + err.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const initFeeAdjustmentModal = () => {
+    const standardBase = Number(course?.fee_amount) || Number(invoice?.standard_fee) || Number(invoice?.total_fee) || 35000;
+    if (invoice?.discount_amount && invoice.discount_amount > 0) {
+      setEditDiscountType(invoice.discount_type || 'fixed');
+      setEditDiscountValue(invoice.discount_type === 'percentage'
+        ? Math.round((invoice.discount_amount / standardBase) * 100)
+        : invoice.discount_amount
+      );
+      setEditDiscountReason(invoice.discount_reason || 'Special Bursar Approval');
+      setEditDiscountNote(invoice.discount_note || '');
+      setEditCustomTotalFee(invoice.total_fee);
+    } else {
+      setEditDiscountType('none');
+      setEditDiscountValue('');
+      setEditDiscountReason('Early Bird Intake');
+      setEditDiscountNote('');
+      setEditCustomTotalFee(invoice?.total_fee || standardBase);
+    }
+    setFeeAdjustError(null);
+  };
+
+  const handleSaveFeeAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invoice?.id) {
+      alert('Invoice record not found for this trainee.');
+      return;
+    }
+
+    setIsSavingFeeAdjustment(true);
+    setFeeAdjustError(null);
+
+    const standardBase = Number(course?.fee_amount) || Number(invoice?.standard_fee) || Number(invoice?.total_fee) || 35000;
+    let computedDiscount = 0;
+    let finalFee = standardBase;
+
+    if (editDiscountType === 'percentage' && editDiscountValue !== '') {
+      const pct = Math.min(100, Math.max(0, Number(editDiscountValue)));
+      computedDiscount = Math.round((standardBase * pct) / 100);
+      finalFee = Math.max(0, standardBase - computedDiscount);
+    } else if (editDiscountType === 'fixed' && editDiscountValue !== '') {
+      computedDiscount = Math.min(standardBase, Math.max(0, Number(editDiscountValue)));
+      finalFee = Math.max(0, standardBase - computedDiscount);
+    } else if (editDiscountType === 'custom' && editCustomTotalFee !== '') {
+      finalFee = Math.max(0, Number(editCustomTotalFee));
+      computedDiscount = Math.max(0, standardBase - finalFee);
+    }
+
+    try {
+      await updateInvoiceFeeAndDiscount(invoice.id, {
+        totalFee: finalFee,
+        standardFee: standardBase,
+        discountAmount: computedDiscount,
+        discountType: editDiscountType !== 'none' ? editDiscountType : undefined,
+        discountReason: computedDiscount > 0 ? editDiscountReason : undefined,
+        discountNote: editDiscountNote.trim() || undefined,
+      });
+      setShowFeeAdjustmentModal(false);
+    } catch (err: any) {
+      setFeeAdjustError(err?.message || 'Failed to update tuition fee adjustment');
+    } finally {
+      setIsSavingFeeAdjustment(false);
     }
   };
 
@@ -617,14 +692,69 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <DollarSign size={15} />
                     <span>Fee Ledger & M-Pesa Receipts</span>
                   </h3>
-                  <span className={`badge badge-${feeStatus}`} style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
-                    {feeStatus.toUpperCase()}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {invoice && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          initFeeAdjustmentModal();
+                          setShowFeeAdjustmentModal(true);
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          color: 'var(--crema-gold)',
+                          borderColor: 'rgba(212, 154, 91, 0.3)',
+                          background: 'rgba(212, 154, 91, 0.08)',
+                        }}
+                      >
+                        <Tag size={13} />
+                        <span>Adjust Fee / Discount</span>
+                      </button>
+                    )}
+                    <span className={`badge badge-${feeStatus}`} style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                      {feeStatus.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Active Discount / Concession Banner */}
+                {invoice && invoice.discount_amount !== undefined && invoice.discount_amount > 0 && (
+                  <div
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.08)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '8px 12px',
+                      marginBottom: '12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.76rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Tag size={13} color="#10B981" />
+                      <span style={{ fontWeight: 600, color: '#6EE7B7' }}>
+                        Active Discount: -KES {invoice.discount_amount.toLocaleString()} ({invoice.discount_reason || 'Approved Discount'})
+                      </span>
+                      {invoice.discount_note && (
+                        <span style={{ color: 'var(--text-muted)' }}>• {invoice.discount_note}</span>
+                      )}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                      Standard Base: KES {(invoice.standard_fee || (invoice.total_fee + invoice.discount_amount)).toLocaleString()}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ background: 'var(--bg-surface-elevated)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Total Tuition Fee</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Net Tuition Fee</div>
                     <div style={{ fontSize: '1.05rem', fontWeight: 800, marginTop: '2px' }}>
                       KES {totalFee.toLocaleString()}
                     </div>
@@ -861,6 +991,322 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           student={student}
           onClose={() => setShowEditModal(false)}
         />
+      )}
+
+      {/* Fee Adjustment & Discount Modal */}
+      {showFeeAdjustmentModal && (
+        <div className="modal-overlay" onClick={() => setShowFeeAdjustmentModal(false)} style={{ zIndex: 1250 }}>
+          <div
+            className="modal-content glass-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '540px', width: '95%', padding: '24px', borderRadius: 'var(--radius-lg)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(212, 154, 91, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--crema-gold)',
+                  }}
+                >
+                  <Tag size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Adjust Tuition Fee & Discount</h3>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    Invoice {invoice?.invoice_number || 'INV-CURRENT'} • {profile.full_name}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFeeAdjustmentModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {feeAdjustError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #EF4444', color: '#FCA5A5', padding: '10px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', marginBottom: '16px' }}>
+                {feeAdjustError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveFeeAdjustment}>
+              {/* Mode Selection */}
+              <div style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontSize: '0.76rem', marginBottom: '6px' }}>
+                  Fee Adjustment Mode
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {[
+                    { id: 'none', label: 'Standard Rate' },
+                    { id: 'percentage', label: 'Percentage (%) Off' },
+                    { id: 'fixed', label: 'Fixed (KES) Off' },
+                    { id: 'custom', label: 'Direct Override' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        const standardBase = Number(course?.fee_amount) || Number(invoice?.standard_fee) || Number(invoice?.total_fee) || 35000;
+                        setEditDiscountType(m.id as any);
+                        if (m.id === 'percentage' && (editDiscountValue === '' || editDiscountValue === 0)) setEditDiscountValue(10);
+                        if (m.id === 'fixed' && (editDiscountValue === '' || editDiscountValue === 0)) setEditDiscountValue(5000);
+                        if (m.id === 'custom' && editCustomTotalFee === '') setEditCustomTotalFee(standardBase);
+                      }}
+                      style={{
+                        padding: '6px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: editDiscountType === m.id ? 700 : 500,
+                        borderRadius: 'var(--radius-sm)',
+                        border: editDiscountType === m.id ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                        background: editDiscountType === m.id ? 'rgba(212, 154, 91, 0.15)' : 'var(--bg-surface-elevated)',
+                        color: editDiscountType === m.id ? 'var(--crema-gold)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mode-specific Inputs */}
+              {editDiscountType === 'percentage' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Discount Percentage (%) *</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          className="form-input"
+                          value={editDiscountValue}
+                          onChange={(e) => setEditDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="10"
+                          required
+                          style={{ paddingRight: '28px' }}
+                        />
+                        <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Discount Category *</label>
+                      <select
+                        className="form-select"
+                        value={editDiscountReason}
+                        onChange={(e) => setEditDiscountReason(e.target.value)}
+                      >
+                        <option value="Early Bird Intake">Early Bird Intake</option>
+                        <option value="Scholarship / Institutional Bursary">Scholarship / Bursary</option>
+                        <option value="Staff & Family Privilege">Staff & Family Privilege</option>
+                        <option value="Corporate / Group Enrollment">Corporate / Group Enrollment</option>
+                        <option value="Referral Incentive">Referral Incentive</option>
+                        <option value="Financial Hardship Concession">Financial Hardship Concession</option>
+                        <option value="Special Bursar Approval">Special Bursar Approval</option>
+                        <option value="Administrative Correction">Administrative Correction</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Quick percentage chips */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Quick Select:</span>
+                    {[5, 10, 15, 20, 25, 50].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setEditDiscountValue(pct)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '0.7rem',
+                          borderRadius: '4px',
+                          border: editDiscountValue === pct ? '1px solid var(--crema-gold)' : '1px solid var(--border-subtle)',
+                          background: editDiscountValue === pct ? 'rgba(212, 154, 91, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: editDiscountValue === pct ? 'var(--crema-gold)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {editDiscountType === 'fixed' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Discount Amount (KES) *</label>
+                    <input
+                      type="number"
+                      min="100"
+                      step="500"
+                      className="form-input"
+                      value={editDiscountValue}
+                      onChange={(e) => setEditDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="e.g. 5000"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Discount Category *</label>
+                    <select
+                      className="form-select"
+                      value={editDiscountReason}
+                      onChange={(e) => setEditDiscountReason(e.target.value)}
+                    >
+                      <option value="Early Bird Intake">Early Bird Intake</option>
+                      <option value="Scholarship / Institutional Bursary">Scholarship / Bursary</option>
+                      <option value="Staff & Family Privilege">Staff & Family Privilege</option>
+                      <option value="Corporate / Group Enrollment">Corporate / Group Enrollment</option>
+                      <option value="Referral Incentive">Referral Incentive</option>
+                      <option value="Financial Hardship Concession">Financial Hardship Concession</option>
+                      <option value="Special Bursar Approval">Special Bursar Approval</option>
+                      <option value="Administrative Correction">Administrative Correction</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {editDiscountType === 'custom' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Agreed Total Tuition (KES) *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="500"
+                      className="form-input"
+                      value={editCustomTotalFee}
+                      onChange={(e) => setEditCustomTotalFee(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="e.g. 30000"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Reason / Authorization *</label>
+                    <select
+                      className="form-select"
+                      value={editDiscountReason}
+                      onChange={(e) => setEditDiscountReason(e.target.value)}
+                    >
+                      <option value="Special Bursar Approval">Special Bursar Approval</option>
+                      <option value="Custom Negotiated Rate">Custom Negotiated Rate</option>
+                      <option value="Scholarship Grant">Scholarship Grant</option>
+                      <option value="Executive Management Waiver">Executive Management Waiver</option>
+                      <option value="Administrative Correction">Administrative Correction</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Note / Memo */}
+              <div style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                  Audit Note / Memo (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editDiscountNote}
+                  onChange={(e) => setEditDiscountNote(e.target.value)}
+                  placeholder="e.g. Authorized by Campus Manager / Principal"
+                />
+              </div>
+
+              {/* Live Preview Box */}
+              {(() => {
+                const standardBase = Number(course?.fee_amount) || Number(invoice?.standard_fee) || Number(invoice?.total_fee) || 35000;
+                let previewDiscount = 0;
+                let previewTotal = standardBase;
+
+                if (editDiscountType === 'percentage' && editDiscountValue !== '') {
+                  const pct = Math.min(100, Math.max(0, Number(editDiscountValue)));
+                  previewDiscount = Math.round((standardBase * pct) / 100);
+                  previewTotal = Math.max(0, standardBase - previewDiscount);
+                } else if (editDiscountType === 'fixed' && editDiscountValue !== '') {
+                  previewDiscount = Math.min(standardBase, Math.max(0, Number(editDiscountValue)));
+                  previewTotal = Math.max(0, standardBase - previewDiscount);
+                } else if (editDiscountType === 'custom' && editCustomTotalFee !== '') {
+                  previewTotal = Math.max(0, Number(editCustomTotalFee));
+                  previewDiscount = Math.max(0, standardBase - previewTotal);
+                }
+
+                const previewBalance = Math.max(0, previewTotal - totalPaidAmount);
+
+                return (
+                  <div
+                    style={{
+                      background: 'rgba(212, 154, 91, 0.08)',
+                      border: '1px solid rgba(212, 154, 91, 0.25)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '12px 14px',
+                      marginBottom: '20px',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Standard Base Fee:</span>{' '}
+                        <strong>KES {standardBase.toLocaleString()}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Discount:</span>{' '}
+                        <strong style={{ color: previewDiscount > 0 ? '#10B981' : 'inherit' }}>
+                          {previewDiscount > 0 ? `- KES ${previewDiscount.toLocaleString()}` : 'None'}
+                        </strong>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '8px', borderTop: '1px solid rgba(212, 154, 91, 0.2)' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>New Net Tuition:</span>{' '}
+                        <strong style={{ color: 'var(--crema-gold)' }}>KES {previewTotal.toLocaleString()}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Projected Balance:</span>{' '}
+                        <strong style={{ color: previewBalance > 0 ? 'var(--cherry-red)' : '#10B981' }}>
+                          KES {previewBalance.toLocaleString()}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowFeeAdjustmentModal(false)}
+                  disabled={isSavingFeeAdjustment}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSavingFeeAdjustment}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Save size={15} />
+                  <span>{isSavingFeeAdjustment ? 'Saving Adjustment...' : 'Save & Update Fee'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );

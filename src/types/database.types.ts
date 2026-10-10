@@ -165,6 +165,11 @@ export interface Invoice {
   status: 'unpaid' | 'partial' | 'paid' | 'pending' | 'partially_paid' | 'overdue';
   due_date: string;
   created_at: string;
+  standard_fee?: number;
+  discount_amount?: number;
+  discount_type?: 'fixed' | 'percentage' | 'custom';
+  discount_reason?: string;
+  discount_note?: string;
   enrollment?: Enrollment;
   payments?: Payment[];
 }

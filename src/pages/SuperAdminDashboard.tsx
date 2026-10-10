@@ -1068,6 +1068,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       <span>Delete Campus</span>
                     </button>
                   </div>
+
+                  <button
+                    className="btn btn-secondary"
+                    style={{
+                      width: '100%',
+                      marginTop: '8px',
+                      padding: '7px 10px',
+                      fontSize: '0.76rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: 'rgba(74, 222, 128, 0.08)',
+                      borderColor: 'rgba(74, 222, 128, 0.3)',
+                      color: '#4ADE80',
+                      fontWeight: 600,
+                    }}
+                    onClick={() => setConfiguringPaybillBranchId(branch.id)}
+                    title="Configure M-Pesa Paybill and Bank details for this campus"
+                  >
+                    <Smartphone size={13} />
+                    <span>Configure Paybill ({branch.paybill_number || '174379'})</span>
+                  </button>
                 </div>
               );
             })}
