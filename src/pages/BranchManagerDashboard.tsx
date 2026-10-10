@@ -25,10 +25,12 @@ import { StaffLeaveManagement } from '../components/analytics/StaffLeaveManageme
 import { PortalCredentialsManager } from '../components/analytics/PortalCredentialsManager';
 import { CreateCourseModal } from '../components/modals/CreateCourseModal';
 import { EditCourseModal } from '../components/modals/EditCourseModal';
+import { AlumniPerformanceModal } from '../components/modals/AlumniPerformanceModal';
+import { EditAlumniModal } from '../components/modals/EditAlumniModal';
 import { ExportActionsMenu } from '../components/common/ExportActionsMenu';
 import { exportToCSV, exportToPDFReport } from '../lib/exportUtils';
-import { Course, Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson } from '../types/database.types';
-import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle, Lock } from 'lucide-react';
+import { Course, Invoice, Profile, Cohort, StudentKYC, LessonMode, TimetableLesson, Alumni } from '../types/database.types';
+import { FileCheck, CreditCard, Smartphone, Send, ShieldCheck, HelpCircle, Lock, Award, Building2 } from 'lucide-react';
 
 type ManagerTab =
   | 'overview'
@@ -43,6 +45,7 @@ type ManagerTab =
   | 'students'
   | 'admissions'
   | 'cohorts'
+  | 'alumni'
   | 'invoices'
   | 'payments'
   | 'attendance'
@@ -80,6 +83,10 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     verifyStudentKYC,
     reviewLeaveRequest,
     recordStaffAttendanceByManager,
+    assessments,
+    alumni,
+    updateAlumni,
+    deleteAlumni,
   } = useApp();
 
   // Branch Manager belongs strictly to their assigned branch
@@ -107,6 +114,10 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     }
     return (!c.branch_id || c.branch_id === myBranch?.id) && !c.code.startsWith('LH-');
   });
+  const branchAlumni = alumni.filter((a) => a.branch_id === myBranch?.id);
+  const [alumniSearch, setAlumniSearch] = useState('');
+  const [selectedAlumniForPerformance, setSelectedAlumniForPerformance] = useState<Alumni | null>(null);
+  const [selectedAlumniForEdit, setSelectedAlumniForEdit] = useState<Alumni | null>(null);
   const branchStudents = students.filter((s) => s.branch_id === myBranch?.id);
   const branchInvoices = invoices.filter((i) => i.branch_id === myBranch?.id);
   const branchPayments = payments.filter((p) => p.branch_id === myBranch?.id);
@@ -444,6 +455,35 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
     }
   };
 
+  const handleExportAlumni = (format: 'csv' | 'pdf') => {
+    const headers = ['#', 'Full Name', 'Course', 'Intake Batch', 'Graduation Month/Year', 'Certificate Serial', 'Phone', 'Employer / Placement', 'Status'];
+    const rows = branchAlumni.map((alm, idx) => {
+      const crs = courses.find((c) => c.id === alm.course_id);
+      return [
+        idx + 1,
+        alm.full_name,
+        crs?.title || alm.certification_name,
+        alm.cohort_name || '--',
+        `${alm.graduation_month} ${alm.graduation_year}`,
+        alm.certificate_serial_no,
+        alm.phone || '--',
+        alm.current_employer || 'Specialty Coffee Industry',
+        alm.employment_status || 'Employed',
+      ];
+    });
+
+    if (format === 'csv') {
+      exportToCSV(`${myBranch.code}_Certified_Alumni`, headers, rows);
+    } else {
+      exportToPDFReport(
+        `${myBranch.code}_Certified_Alumni`,
+        `CERTIFIED ALUMNI DIRECTORY - ${myBranch.name.toUpperCase()}`,
+        `Official Registry of Certified Graduates & Alumni Placements • Total: ${branchAlumni.length}`,
+        headers,
+        rows
+      );
+    }
+  };
 
   const handleExportSMS = (format: 'csv' | 'pdf') => {
     const headers = ['Channel', 'Recipient Phone / Email', 'Recipient Name', 'Purpose', 'Subject / Message', 'Status', 'Sent At'];
@@ -2575,6 +2615,182 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: CAMPUS CERTIFIED ALUMNI & GRADUATES */}
+      {/* ========================================================================= */}
+      {activeTab === 'alumni' && (() => {
+        const filteredAlumni = branchAlumni.filter((a) => {
+          if (!alumniSearch.trim()) return true;
+          const q = alumniSearch.toLowerCase();
+          return (
+            a.full_name.toLowerCase().includes(q) ||
+            (a.email && a.email.toLowerCase().includes(q)) ||
+            (a.phone && a.phone.includes(q)) ||
+            (a.certificate_serial_no && a.certificate_serial_no.toLowerCase().includes(q)) ||
+            (a.cohort_name && a.cohort_name.toLowerCase().includes(q))
+          );
+        });
+
+        const totalGrads = branchAlumni.length;
+        const employedCount = branchAlumni.filter((a) => a.employment_status === 'Employed').length;
+        const employmentRate = totalGrads > 0 ? Math.round((employedCount / totalGrads) * 100) : 100;
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Header & Export Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                  <Award size={22} color="var(--crema-gold)" />
+                  <span>{myBranch.name} — Certified Alumni Registry</span>
+                </h2>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Official registry of graduates, certification credentials, and career outcomes for {myBranch.name}
+                </p>
+              </div>
+
+              <ExportActionsMenu
+                onExportCSV={() => handleExportAlumni('csv')}
+                onExportPDF={() => handleExportAlumni('pdf')}
+                label="Export Alumni Ledger"
+              />
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(212, 154, 91, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crema-gold)' }}>
+                  <GraduationCap size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800 }}>{totalGrads}</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Certified Graduates</div>
+                </div>
+              </div>
+
+              <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#10B981' }}>{employmentRate}%</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Active Placement Rate</div>
+                </div>
+              </div>
+
+              <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38BDF8' }}>
+                  <Building2 size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800 }}>{myBranch.city}</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Regional Hub Campus</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="glass-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search graduates by name, admission #, phone, or cohort..."
+                  value={alumniSearch}
+                  onChange={(e) => setAlumniSearch(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.82rem' }}
+                />
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Showing <strong>{filteredAlumni.length}</strong> of <strong>{totalGrads}</strong> alumni
+              </div>
+            </div>
+
+            {/* Alumni Table */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Alumni Name</th>
+                      <th>Curriculum / Course</th>
+                      <th>Intake Batch</th>
+                      <th>Certificate Serial</th>
+                      <th>Contact (Phone / Email)</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAlumni.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                          No alumni records match your search query.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAlumni.map((a, idx) => {
+                        const course = courses.find((c) => c.id === a.course_id);
+                        return (
+                          <tr key={a.id}>
+                            <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                            <td>
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.full_name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{a.job_title}</div>
+                            </td>
+                            <td>
+                              <span className="badge badge-gold" style={{ fontSize: '0.70rem' }}>
+                                {course?.title || a.certification_name}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                              {a.cohort_name || `${a.graduation_month} ${a.graduation_year}`}
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: 'var(--crema-gold)' }}>
+                              {a.certificate_serial_no}
+                            </td>
+                            <td style={{ fontSize: '0.76rem' }}>
+                              <div>{a.phone || '--'}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.70rem' }}>{a.email || '--'}</div>
+                            </td>
+                            <td>
+                              <span className="badge badge-approved" style={{ fontSize: '0.70rem' }}>
+                                {a.employment_status || 'Employed'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                                  onClick={() => setSelectedAlumniForPerformance(a)}
+                                  title="Inspect Performance & Certificate"
+                                >
+                                  Transcript
+                                </button>
+                                <button
+                                  className="btn btn-ghost"
+                                  style={{ padding: '3px 6px', fontSize: '0.72rem', color: 'var(--crema-gold)' }}
+                                  onClick={() => setSelectedAlumniForEdit(a)}
+                                  title="Edit Record"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
       {/* TAB 5: INVOICES & M-PESA */}
       {/* ========================================================================= */}
       {activeTab === 'invoices' && (
@@ -3161,6 +3377,23 @@ export const BranchManagerDashboard: React.FC<BranchManagerDashboardProps> = ({
         <EditCourseModal
           course={selectedCourseForEdit}
           onClose={() => setSelectedCourseForEdit(null)}
+        />
+      )}
+      {selectedAlumniForPerformance && (
+        <AlumniPerformanceModal
+          alumni={selectedAlumniForPerformance}
+          assessments={assessments}
+          courses={courses}
+          branches={branches}
+          onClose={() => setSelectedAlumniForPerformance(null)}
+        />
+      )}
+      {selectedAlumniForEdit && (
+        <EditAlumniModal
+          alumni={selectedAlumniForEdit}
+          onClose={() => setSelectedAlumniForEdit(null)}
+          onUpdate={updateAlumni}
+          onDelete={deleteAlumni}
         />
       )}
     </div>

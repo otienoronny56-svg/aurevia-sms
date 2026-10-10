@@ -83,6 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               { id: 'courses', label: 'Campus Courses', icon: BookOpen, count: managerBranchCourses.length },
               { id: 'cohorts', label: 'Intakes & Cohorts', icon: Layers, count: cohorts.filter(c => c.branch_id === currentProfile.branch_id).length },
               { id: 'admissions', label: 'Student Admissions', icon: GraduationCap },
+              { id: 'alumni', label: 'Certified Alumni', icon: Award, count: alumni.filter(a => a.branch_id === currentProfile?.branch_id).length },
             ],
           },
           {
